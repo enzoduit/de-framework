@@ -1,0 +1,23 @@
+# Environment / secrets
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Agent runtime data (not part of framework, contains private data)
+agents/
+# But DO include examples/
+!examples/
+
+# Session data
+sessions/
+*.jsonl
+
+# Editor
+.DS_Store
+*.swp

@@ -1,0 +1,3 @@
+anthropic>=0.25.0
+# The backend uses Python stdlib only (http.server, json, pathlib, subprocess)
+# No other pip packages required
