@@ -435,6 +435,23 @@ textarea, input, select { font-family: inherit; }
 .preview-box-label { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); margin-bottom:8px; }
 .preview-tree { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-sec); line-height:1.8; }
 
+/* ── SETTINGS ── */
+.btn-gear { background:none; color:var(--text-muted); font-size:15px; padding:0; border:none; cursor:pointer; line-height:1; transition:color 0.15s; }
+.btn-gear:hover { color:var(--accent); }
+.btn-connected { color:var(--green) !important; }
+#settings-panel { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.65); z-index:250; display:none; justify-content:flex-end; }
+#settings-panel.open { display:flex; }
+.settings-drawer { width:min(420px,100%); height:100%; background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.settings-field { margin-bottom:16px; }
+.settings-field label { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.1em; color:var(--text-muted); margin-bottom:6px; display:block; }
+.settings-input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:7px; padding:10px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); transition:border-color 0.15s; }
+.settings-input:focus { outline:none; border-color:var(--accent); }
+.btn-test { width:100%; background:none; border:1px solid var(--border); border-radius:7px; padding:9px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-sec); cursor:pointer; margin-top:4px; transition:all 0.15s; }
+.btn-test:hover { border-color:var(--text-sec); color:var(--text); }
+.settings-note { font-size:12px; color:var(--text-sec); line-height:1.6; background:var(--surface2); border-radius:8px; padding:12px; margin-bottom:16px; }
+.settings-note code { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent); }
+.btn-settings-save { flex:1; background:var(--accent); color:#fff; border:none; border-radius:7px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:0.08em; cursor:pointer; transition:opacity 0.15s; }
+.btn-settings-save:hover { opacity:0.85; }
 /* ── MOBILE ── */
 .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99; }
 @media (max-width:767px) {
@@ -469,7 +486,10 @@ textarea, input, select { font-family: inherit; }
   <div class="de-list" id="de-list"></div>
   <div class="sidebar-footer">
     <div class="decisions-pill" id="decisions-pill" onclick="openDecisions()">⏳ decisions</div>
-    <div class="mono" style="font-size:10px;color:var(--text-muted)" id="live-time"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="mono" style="font-size:10px;color:var(--text-muted)" id="live-time"></div>
+      <button class="btn-gear" id="btn-gear" onclick="openSettings()" title="Backend settings">⚙</button>
+    </div>
   </div>
 </aside>
 
@@ -547,6 +567,36 @@ textarea, input, select { font-family: inherit; }
     </div>
   </div>
 </main>
+</div>
+
+<!-- ═══ SETTINGS PANEL ═══ -->
+<div id="settings-panel">
+  <div style="flex:1" onclick="closeSettings()"></div>
+  <div class="settings-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">⚙ Backend Settings</div>
+      <button class="btn-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="settings-note">
+        The portal talks directly to your backend. Run <code>python backend/server.py</code> and enter the URL below. See the README for full setup.
+      </div>
+      <div class="settings-field">
+        <label>BACKEND URL</label>
+        <input class="settings-input" id="s-url" type="url" placeholder="http://localhost:8766" autocomplete="off">
+      </div>
+      <div class="settings-field">
+        <label>API TOKEN (DE_API_TOKEN)</label>
+        <input class="settings-input" id="s-token" type="password" placeholder="your-api-token" autocomplete="off">
+      </div>
+      <button class="btn-test" onclick="testConn()" id="btn-test">Test connection</button>
+      <div id="s-test-status" style="font-size:12px;font-family:'JetBrains Mono',monospace;margin-top:8px;min-height:20px"></div>
+    </div>
+    <div class="settings-footer" style="padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px">
+      <button class="btn-prev" onclick="closeSettings()">Cancel</button>
+      <button class="btn-settings-save" onclick="saveSettings()">✓ Save &amp; Connect</button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ DECISIONS DRAWER ═══ -->
@@ -739,6 +789,38 @@ let wizardStep = 0;
 const STEPS = 5;
 let chatPoller = null;
 
+
+/* ═══ BACKEND CONFIG ═══ */
+function getBackendConfig(){try{return JSON.parse(localStorage.getItem('de_backend')||'{"url":"","token":""}');}catch{return{url:'',token:''};}}
+function isBackendConfigured(){const c=getBackendConfig();return!!(c.url&&c.token);}
+function updateGearIcon(){const g=$('btn-gear');if(!g)return;g.classList.toggle('btn-connected',isBackendConfigured());g.title=isBackendConfigured()?'Backend connected — click to change':'Connect your backend';}
+async function apiFetch(path,options={}){
+  const cfg=getBackendConfig();
+  if(!cfg.url){const e=new Error('no-backend');e.noBackend=true;throw e;}
+  const url=cfg.url.replace(/\/$/,'')+path;
+  const hdrs={'Content-Type':'application/json','Authorization':'Bearer '+cfg.token,...(options.headers||{})};
+  return fetch(url,{...options,headers:hdrs});
+}
+function openSettings(){const cfg=getBackendConfig();const inp=$('s-url');if(inp)inp.value=cfg.url||'';const tok=$('s-token');if(tok)tok.value=cfg.token||'';const st=$('s-test-status');if(st){st.textContent='';st.style.color='';}$('settings-panel').classList.add('open');}
+function closeSettings(){$('settings-panel').classList.remove('open');}
+async function saveSettings(){
+  const url=($('s-url').value||'').trim().replace(/\/$/,'');
+  const token=($('s-token').value||'').trim();
+  if(!url){alert('Please enter the backend URL.');return;}
+  localStorage.setItem('de_backend',JSON.stringify({url,token}));
+  closeSettings();updateGearIcon();await loadList();
+}
+async function testConn(){
+  const url=($('s-url').value||'').trim().replace(/\/$/,'');
+  const token=($('s-token').value||'').trim();
+  const s=$('s-test-status');s.textContent='Testing…';
+  try{
+    const r=await fetch(url+'/health',{headers:{'Authorization':'Bearer '+token}});
+    const txt=await r.text();let d;try{d=JSON.parse(txt);}catch{d={ok:r.ok};}
+    s.textContent=d.ok?'✅ Connected!':'⚠ Response '+r.status+': '+JSON.stringify(d);
+    s.style.color=d.ok?'var(--green)':'var(--yellow)';
+  }catch(e){s.textContent='❌ '+e.message;s.style.color='var(--red)';}
+}
 /* ═══ UTILS ═══ */
 const $ = id => document.getElementById(id);
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -762,7 +844,7 @@ function closeSidebar(){$('sidebar').classList.remove('open');$('sidebar-overlay
 /* ═══ DE LIST ═══ */
 async function loadList(){
   try{
-    const r=await fetch('/de-list');const d=await r.json();
+    const r=await apiFetch('/de-list');const d=await r.json();
     const des=d.des||[];
     const c=$('de-list');
     if(!des.length){c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No employees yet.<br>Click + NEW to create one.</div>';return;}
@@ -778,7 +860,7 @@ async function loadList(){
     const total=des.reduce((s,d)=>s+(d.pending_decisions||0),0);
     const pill=$('decisions-pill');
     if(pill){pill.textContent=`⏳ ${total} decision${total!==1?'s':''}`;pill.classList.toggle('active',total>0);}
-  }catch(e){$('de-list').innerHTML='<div style="padding:16px;font-size:11px;color:var(--red)">Failed to load</div>';}
+  }catch(e){const c=$('de-list');if(e.noBackend){c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No backend connected.<br><br>Click <strong>⚙</strong> (sidebar footer) to configure.</div>';return;}c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--red)">Failed to load: '+esc(e.message)+'</div>';}
 }
 
 async function selectDE(name){
@@ -789,7 +871,7 @@ async function selectDE(name){
   $('empty-state').style.display='none';
   $('de-view').classList.add('visible');
   try{
-    const r=await fetch('/de/'+name);const de=await r.json();
+    const r=await apiFetch('/de/'+name);const de=await r.json();
     $('dv-name').textContent=de.display_name||name.toUpperCase();
     $('dv-role').textContent=de.role||'';
     const av=$('dv-avatar');
@@ -825,7 +907,7 @@ async function sendChat(){
   msgs.innerHTML+=`<div class="thinking-wrap" id="${tid}"><div class="thinking-dots"><span></span><span></span><span></span></div><span id="${tid}-lbl">Starting…</span></div>`;
   msgs.scrollTop=msgs.scrollHeight;
   try{
-    const r=await fetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:selectedDE,trigger_type:'chat',trigger_context:msg})});
+    const r=await apiFetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:selectedDE,trigger_type:'chat',trigger_context:msg})});
     const d=await r.json();
     if(!d.ok)throw new Error(d.error||'Failed to start');
     chatPoll(selectedDE,d.session_id,tid,sendBtn);
@@ -843,7 +925,7 @@ function chatPoll(de,sid,tid,sendBtn){
   if(chatPoller)clearInterval(chatPoller);
   chatPoller=setInterval(async()=>{
     try{
-      const r=await fetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
+      const r=await apiFetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
       const steps=s.steps||[];
       if(steps.length>last){
         steps.slice(last).forEach(step=>{const el=renderChatStep(step);if(el){msgs.innerHTML+=el;}});
@@ -886,7 +968,7 @@ function renderChatStep(step){
 /* ═══ PROGRESS ═══ */
 async function loadProgress(de){
   try{
-    const r=await fetch(`/de/${de}/sessions`);const d=await r.json();
+    const r=await apiFetch(`/de/${de}/sessions`);const d=await r.json();
     const sessions=d.sessions||[];
     const list=$('prog-session-list');if(!list)return;
     list.innerHTML=sessions.length
@@ -904,7 +986,7 @@ async function loadSteps(de,sid,el){
   if(el)el.classList.add('active');
   const pane=$('prog-steps');pane.innerHTML='<div class="prog-empty">Loading…</div>';
   try{
-    const r=await fetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
+    const r=await apiFetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
     const isLive=s.status==='running'||s.status==='queued';
     const render=()=>`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
@@ -913,7 +995,7 @@ async function loadSteps(de,sid,el){
       </div>
       ${(s.steps||[]).map(renderStep).join('')||'<div class="prog-empty">No steps yet.</div>'}`;
     pane.innerHTML=render();
-    if(isLive){const t=setInterval(async()=>{const r2=await fetch(`/de/${de}/sessions/${sid}`);const s2=await r2.json();s.steps=s2.steps;s.status=s2.status;pane.innerHTML=render();if(s2.status!=='running'&&s2.status!=='queued')clearInterval(t);},2500);}
+    if(isLive){const t=setInterval(async()=>{const r2=await apiFetch(`/de/${de}/sessions/${sid}`);const s2=await r2.json();s.steps=s2.steps;s.status=s2.status;pane.innerHTML=render();if(s2.status!=='running'&&s2.status!=='queued')clearInterval(t);},2500);}
   }catch(e){pane.innerHTML=`<div class="prog-empty">Error: ${esc(e.message)}</div>`;}
 }
 
@@ -946,7 +1028,7 @@ function renderStep(step){
 async function loadProfile(de){
   const inner=$('profile-inner');
   try{
-    const r=await fetch('/de/'+de);const d=await r.json();
+    const r=await apiFetch('/de/'+de);const d=await r.json();
     const respGroup=(title,color,items)=>!items?.length?'':
       `<div class="resp-group"><span class="resp-group-label" style="color:${color};background:${color}1a">${title}</span>
        <ul class="resp-list">${items.map(i=>`<li style="border-color:${color}40">${esc(i)}</li>`).join('')}</ul></div>`;
@@ -969,7 +1051,7 @@ async function deRun(){
   if(!selectedDE)return;
   const btn=$('btn-run');btn.disabled=true;btn.textContent='…';
   try{
-    const r=await fetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:selectedDE,trigger_type:'user',trigger_context:'Manual run triggered via portal'})});
+    const r=await apiFetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:selectedDE,trigger_type:'user',trigger_context:'Manual run triggered via portal'})});
     const d=await r.json();
     if(d.ok){btn.textContent='✅ QUEUED';switchTab('progress');setTimeout(()=>loadProgress(selectedDE),1000);setTimeout(()=>{btn.textContent='▶ RUN';btn.disabled=false;},3000);}
     else{btn.textContent='❌';setTimeout(()=>{btn.textContent='▶ RUN';btn.disabled=false;},3000);}
@@ -982,7 +1064,7 @@ function closeDecisions(){$('decisions-panel').classList.remove('open');}
 async function loadDecisionsPending(){
   const body=$('decisions-body');
   try{
-    const r=await fetch('/decisions');const d=await r.json();
+    const r=await apiFetch('/decisions');const d=await r.json();
     const pending=d.pending||[];
     const pill=$('decisions-pill');
     if(pill){pill.textContent=`⏳ ${pending.length} decision${pending.length!==1?'s':''}`;pill.classList.toggle('active',pending.length>0);}
@@ -1002,7 +1084,7 @@ async function loadDecisionsPending(){
 }
 async function decide(id,action){
   const card=$('dc-'+id);
-  try{await fetch('/decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,action})});}catch(e){}
+  try{await apiFetch('/decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,action})});}catch(e){}
   if(card){card.style.opacity='0.4';card.querySelector('.dec-actions').style.display='none';}
   setTimeout(loadDecisionsPending,1000);
 }
@@ -1057,7 +1139,7 @@ async function sendSetup(){
   appendSetupMsg('thinking','',tid);
   const btn=$('setup-send-btn');btn.disabled=true;
   try{
-    const r=await fetch('/de/setup-chat',{
+    const r=await apiFetch('/de/setup-chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({messages:setupMsgs}),
@@ -1073,7 +1155,7 @@ async function sendSetup(){
     }
   }catch(e){
     $(tid)?.remove();
-    const noBackend=e.message&&(e.message.includes('not configured')||e.message.includes('503')||e.message.includes('502'));
+    const noBackend=e.noBackend||e.message==='no-backend'||(e.message&&e.message.includes('no-backend'));
     appendSetupMsg('ai', noBackend
       ? 'This is the **template version** \u2014 no backend is connected yet.\n\nTo use the AI setup assistant:\n1. Run the backend server (\`python backend/server.py\`)\n2. Set **DE_API_URL** and **DE_API_TOKEN** in Cloudflare Pages → Settings → Environment Variables\n3. Redeploy the portal\n\nSee the README for the full quickstart.'
       : '⚠ ' + e.message);
@@ -1103,7 +1185,7 @@ async function createFromConfig(){
   if(!setupConfig)return;
   const btn=$('btn-confirm-create');btn.disabled=true;btn.textContent='Creating…';
   try{
-    const r=await fetch('/de/create',{
+    const r=await apiFetch('/de/create',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(setupConfig),
@@ -1122,6 +1204,9 @@ async function createFromConfig(){
 /* ═══ INIT ═══ */
 loadList();
 setInterval(loadList,60000);
+updateGearIcon();
+// Open settings on first load if no backend configured
+if(!isBackendConfigured()){setTimeout(openSettings,800);}
 </script>
 </body>
 </html>
