@@ -66,6 +66,180 @@ def _de_pending_count(de_name):
         return 0
 
 
+def _generate_job_md(p: dict) -> str:
+    """Generate a job.md from Create DE form payload."""
+    name = p.get('display_name') or p.get('name', 'AGENT')
+    role = p.get('role', '')
+    mission = p.get('mission', 'No mission defined yet.')
+    kpis = p.get('kpis', [])
+    resp = p.get('responsibilities', {})
+    l0 = resp.get('level_0', [])
+    l1 = resp.get('level_1', [])
+    l2 = resp.get('level_2', [])
+    constraints = p.get('hard_constraints', [])
+    eval_data = p.get('self_evaluation', {})
+    criteria = eval_data.get('criteria', [])
+    schedule = eval_data.get('schedule', 'manual')
+    sources = p.get('data_sources', [])
+    autoresearch = p.get('autoresearch', {})
+    research_enabled = autoresearch.get('enabled', False)
+    research_queries = autoresearch.get('queries', [])
+    research_freq = autoresearch.get('schedule', 'daily')
+
+    lines = []
+    lines.append(f'# {name} — {role}')
+    lines.append('')
+    lines.append('## Mission')
+    lines.append(mission)
+    lines.append('')
+
+    if kpis:
+        lines.append('## KPIs')
+        for k in kpis:
+            lines.append(f'- {k}')
+        lines.append('')
+
+    lines.append('## Autonomy Levels')
+    lines.append('')
+    lines.append('### Level 0 — Act immediately, no notification')
+    if l0:
+        for item in l0:
+            lines.append(f'- {item}')
+    else:
+        lines.append('- Read own state files (metrics.json, memory.md, log.jsonl)')
+    lines.append('')
+
+    lines.append('### Level 1 — Act, then document (reversible)')
+    if l1:
+        for item in l1:
+            lines.append(f'- {item}')
+    else:
+        lines.append('- (None defined)')
+    lines.append('')
+
+    lines.append('### Level 2 — Requires explicit approval before acting')
+    if l2:
+        for item in l2:
+            lines.append(f'- {item}')
+    else:
+        lines.append('- (None defined)')
+    lines.append('')
+
+    if constraints:
+        lines.append('## Hard Constraints')
+        for c in constraints:
+            lines.append(f'- {c}')
+        lines.append('')
+
+    if criteria:
+        lines.append('## Self-Evaluation Criteria')
+        lines.append(f'Run schedule: {schedule}')
+        lines.append('')
+        lines.append('After each run, evaluate yourself against these criteria and update metrics.json:')
+        for c in criteria:
+            lines.append(f'- {c}')
+        lines.append('')
+
+    if sources:
+        lines.append('## Data Sources')
+        for s in sources:
+            lines.append(f'- {s}')
+        lines.append('')
+
+    if research_enabled and research_queries:
+        lines.append('## Autoresearch')
+        lines.append(f'Frequency: {research_freq}')
+        lines.append('')
+        lines.append('On each research run, search for and summarize findings on these topics, then append key insights to memory.md:')
+        for q in research_queries:
+            lines.append(f'- {q}')
+        lines.append('')
+
+    lines.append('## Instructions')
+    lines.append('1. Start by reading your current state: metrics.json, memory.md, and recent log entries.')
+    lines.append('2. Perform your regular duties appropriate to the trigger type.')
+    lines.append('3. Document findings using write_portal_inbox for anything noteworthy.')
+    lines.append('4. Update metrics.json with current KPI values using update_metrics.')
+    lines.append('5. Evaluate yourself against your success criteria. Record the result in metrics.json.')
+    lines.append('6. For Level 2 actions, call request_human_decision and pause.')
+    lines.append('7. End with a clear summary of what you did and what the current state is.')
+    lines.append('')
+    lines.append('Be specific and action-oriented. Verify changes worked before declaring success.')
+
+    return '\n'.join(lines)
+
+
+def handle_de_create(handler, body: dict):
+    """POST /de/create — create a new Digital Employee from form payload."""
+    name = (body.get('name') or '').strip().lower().replace(' ', '-')
+    if not name:
+        return handler.send_json(400, {'ok': False, 'error': 'name is required'})
+    if not name.replace('-', '').isalnum():
+        return handler.send_json(400, {'ok': False, 'error': 'name must be lowercase alphanumeric with hyphens only'})
+
+    de_dir = AGENTS_BASE / name
+    if de_dir.exists():
+        return handler.send_json(409, {'ok': False, 'error': f'Agent "{name}" already exists'})
+
+    try:
+        de_dir.mkdir(parents=True)
+        (de_dir / 'sessions').mkdir()
+
+        # de.json — agent profile
+        de_json = {
+            'name': name,
+            'display_name': body.get('display_name') or name.upper(),
+            'role': body.get('role', ''),
+            'color': body.get('color', '#FF4500'),
+            'mission': body.get('mission', ''),
+            'kpis': body.get('kpis', []),
+            'responsibilities': body.get('responsibilities', {'level_0': [], 'level_1': [], 'level_2': []}),
+            'hard_constraints': body.get('hard_constraints', []),
+            'data_sources': body.get('data_sources', []),
+            'self_evaluation': body.get('self_evaluation', {}),
+            'autoresearch': body.get('autoresearch', {}),
+            'triggers': [
+                {'type': 'user', 'description': 'On-demand via portal or API'},
+            ],
+        }
+        schedule = (body.get('self_evaluation') or {}).get('schedule', 'manual')
+        if schedule and schedule != 'manual':
+            schedule_labels = {
+                'hourly': 'Every hour',
+                '3x_daily': '3x daily (08:00, 14:00, 20:00 UTC)',
+                'daily': 'Daily at 08:00 UTC',
+                'weekly': 'Weekly on Monday at 08:00 UTC',
+            }
+            de_json['triggers'].append({
+                'type': 'cron',
+                'schedule': schedule_labels.get(schedule, schedule),
+                'description': 'Scheduled autonomous run',
+            })
+
+        (de_dir / 'de.json').write_text(json.dumps(de_json, indent=2))
+
+        # job.md — generated mission brief
+        job_md = _generate_job_md(body)
+        (de_dir / 'job.md').write_text(job_md)
+
+        # metrics.json — empty initial state
+        (de_dir / 'metrics.json').write_text(json.dumps({
+            'created_at': now_iso(),
+            'last_updated': now_iso(),
+        }, indent=2))
+
+        # memory.md — empty
+        (de_dir / 'memory.md').write_text(f'# {de_json["display_name"]} — Memory\n\nCreated {now_iso()}. No entries yet.\n')
+
+        return handler.send_json(201, {'ok': True, 'name': name, 'dir': str(de_dir)})
+    except Exception as e:
+        # clean up on failure
+        import shutil
+        try: shutil.rmtree(de_dir)
+        except Exception: pass
+        return handler.send_json(500, {'ok': False, 'error': str(e)})
+
+
 def handle_de_list(handler):
     """GET /de-list — list all Digital Employees with summary info."""
     de_names = _get_de_names()

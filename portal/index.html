@@ -3,2871 +3,1027 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Agent Portal</title>
+<title>Digital Employees</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0A0A0A;
-    --surface: #141414;
-    --surface2: #1C1C1C;
-    --border: rgba(255,255,255,0.08);
-    --text: #F0F0F0;
-    --text-sec: #888888;
-    --text-muted: #555555;
-    --orange: #FF4500;
-    --green: #00C864;
-    --yellow: #FFC800;
-    --red: #FF4444;
-    --nav-h: 64px;
-  }
-
-  html, body {
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
-    overflow: hidden;
-  }
-
-  .mono { font-family: 'JetBrains Mono', monospace; }
-
-  /* ── Layout ── */
-  #app {
-    min-height: 100vh;
-    padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
-  }
-
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-  #tab-workspace.active {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
-    overflow-y: auto;
-    background: var(--bg);
-    z-index: 10;
-  }
-
-  .page-content {
-    padding: 16px;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-
-  /* ── Bottom Nav ── */
-  #bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: var(--nav-h);
-    background: #111111;
-    border-top: 1px solid var(--border);
-    display: flex;
-    align-items: stretch;
-    z-index: 100;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .nav-btn {
-    flex: 1;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 0.05em;
-    transition: color 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .nav-btn .nav-icon { font-size: 16px; line-height: 1; }
-  .nav-btn span:not(.nav-icon) { font-size: 8px; letter-spacing: 0.06em; }
-  .nav-btn.active { color: var(--orange); }
-  .nav-btn:hover { color: var(--text); }
-
-  /* ── Section Headers ── */
-  .section-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-    margin-top: 20px;
-  }
-  .section-label:first-child { margin-top: 0; }
-
-  /* ── Alert Banner ── */
-  .alert-banner {
-    background: rgba(255, 69, 0, 0.15);
-    border: 1px solid rgba(255, 69, 0, 0.4);
-    border-radius: 10px;
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .alert-banner-text {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--orange);
-  }
-
-  .alert-banner-arrow {
-    color: var(--orange);
-    font-size: 16px;
-  }
-
-  /* ── Tool Grid ── */
-  .tool-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  .tool-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .tool-card-top {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .status-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    flex-shrink: 0;
-    transition: background 0.3s;
-  }
-
-  .tool-name {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text);
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .tool-open-btn {
-    display: block;
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px;
-    text-align: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--text-sec);
-    text-decoration: none;
-    transition: color 0.15s, border-color 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .tool-open-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-
-  .server-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    background: var(--surface2);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 3px 6px;
-    text-align: center;
-  }
-
-  /* ── System Numbers ── */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-bottom: 4px;
-  }
-
-  .stat-chip {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 8px;
-    text-align: center;
-  }
-
-  .stat-chip-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text);
-    display: block;
-    white-space: nowrap;
-  }
-
-  .stat-chip-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    color: var(--text-muted);
-    display: block;
-    margin-top: 2px;
-    letter-spacing: 0.05em;
-  }
-
-  /* ── Quick Links ── */
-  .quick-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-
-  .quick-link {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 8px;
-    text-align: center;
-    text-decoration: none;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--text-sec);
-    transition: color 0.15s, border-color 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .quick-link:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-
-  /* ── Team Tab ── */
-  .needs-decision-header {
-    background: rgba(255, 69, 0, 0.12);
-    border: 1px solid rgba(255, 69, 0, 0.35);
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 16px;
-  }
-
-  .needs-decision-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--orange);
-    margin-bottom: 10px;
-  }
-
-  .approval-card {
-    background: var(--surface2);
-    border: 1px solid rgba(255, 69, 0, 0.2);
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 8px;
-  }
-
-  .approval-card:last-child { margin-bottom: 0; }
-
-  .approval-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 4px;
-  }
-
-  .approval-desc {
-    font-size: 12px;
-    color: var(--text-sec);
-    margin-bottom: 10px;
-  }
-
-  .approval-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn-approve {
-    flex: 1;
-    background: rgba(0, 200, 100, 0.15);
-    border: 1px solid rgba(0, 200, 100, 0.4);
-    border-radius: 6px;
-    padding: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--green);
-    cursor: pointer;
-    letter-spacing: 0.08em;
-    transition: background 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .btn-approve:hover { background: rgba(0, 200, 100, 0.25); }
-
-  .btn-reject {
-    flex: 1;
-    background: rgba(255, 68, 68, 0.1);
-    border: 1px solid rgba(255, 68, 68, 0.3);
-    border-radius: 6px;
-    padding: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--red);
-    cursor: pointer;
-    letter-spacing: 0.08em;
-    transition: background 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .btn-reject:hover { background: rgba(255, 68, 68, 0.2); }
-
-  .btn-sendback {
-    flex: 1;
-    background: rgba(255, 180, 0, 0.1);
-    border: 1px solid rgba(255, 180, 0, 0.35);
-    border-radius: 6px;
-    padding: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--yellow);
-    cursor: pointer;
-    letter-spacing: 0.08em;
-    transition: background 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .btn-sendback:hover { background: rgba(255, 180, 0, 0.2); }
-
-  .sendback-input {
-    width: 100%;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,180,0,0.3);
-    border-radius: 6px;
-    padding: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-primary);
-    margin-top: 8px;
-    box-sizing: border-box;
-    resize: vertical;
-  }
-
-  /* ── Agent Cards ── */
-  .agent-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    margin-bottom: 12px;
-    overflow: hidden;
-  }
-
-  .agent-card.setup-mode { opacity: 0.6; }
-
-  .agent-card-header {
-    padding: 14px 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-  }
-
-  .agent-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: var(--orange);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 18px;
-    font-weight: 700;
-    color: white;
-    flex-shrink: 0;
-  }
-
-  .agent-avatar.dim {
-    background: var(--surface2);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-  }
-
-  .agent-info { flex: 1; min-width: 0; }
-
-  .agent-name-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 2px;
-  }
-
-  .agent-name {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text);
-  }
-
-  .agent-status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .agent-role {
-    font-size: 11px;
-    color: var(--text-sec);
-    white-space: normal;
-    overflow: visible;
-    word-break: break-word;
-  }
-
-  .agent-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    padding: 3px 7px;
-    border-radius: 4px;
-    flex-shrink: 0;
-  }
-
-  .badge-ok {
-    background: rgba(0, 200, 100, 0.15);
-    color: var(--green);
-    border: 1px solid rgba(0, 200, 100, 0.3);
-  }
-
-  .badge-setup {
-    background: var(--surface2);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-  }
-
-  .agent-chevron {
-    color: var(--text-muted);
-    font-size: 12px;
-    flex-shrink: 0;
-    transition: transform 0.2s;
-  }
-
-  .agent-chevron.open { transform: rotate(180deg); }
-
-  .agent-kpis {
-    padding: 0 16px 12px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-
-  .kpi-chip {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 6px;
-    text-align: center;
-  }
-
-  .kpi-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text);
-    display: block;
-  }
-
-  .kpi-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    color: var(--text-muted);
-    display: block;
-    margin-top: 1px;
-  }
-
-  .agent-body {
-    display: none;
-    border-top: 1px solid var(--border);
-    padding: 14px 16px;
-  }
-
-  .agent-body.open { display: block; }
-
-  .token-bars { margin-bottom: 12px; }
-
-  .token-bar-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-  }
-
-  .token-bar-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-sec);
-    width: 130px;
-    flex-shrink: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .token-bar-track {
-    flex: 1;
-    height: 4px;
-    background: var(--surface2);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .token-bar-fill {
-    height: 100%;
-    background: var(--orange);
-    border-radius: 2px;
-  }
-
-  .token-bar-pct {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-muted);
-    width: 30px;
-    text-align: right;
-    flex-shrink: 0;
-  }
-
-  .activity-log-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-
-  .activity-entry {
-    font-size: 12px;
-    color: var(--text-sec);
-    margin-bottom: 4px;
-    padding-left: 10px;
-    border-left: 2px solid var(--surface2);
-  }
-
-  .activity-entry .ts {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-muted);
-  }
-
-  .mission-section {
-    background: var(--surface2);
-    border-radius: 8px;
-    padding: 12px;
-  }
-
-  .mission-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--yellow);
-    margin-bottom: 6px;
-    letter-spacing: 0.05em;
-  }
-
-  .mission-text {
-    font-size: 12px;
-    color: var(--text-sec);
-    line-height: 1.6;
-  }
-
-  /* ── System Tab ── */
-  .error-summary-badge {
-    background: rgba(255, 68, 68, 0.12);
-    border: 1px solid rgba(255, 68, 68, 0.3);
-    border-radius: 8px;
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-
-  .error-badge-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--red);
-    flex-shrink: 0;
-  }
-
-  .error-badge-text {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--red);
-  }
-
-  .cron-table { width: 100%; }
-
-  .cron-row {
-    display: flex;
-    align-items: center;
-    padding: 9px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .cron-row:last-child { border-bottom: none; }
-
-  .cron-name {
-    flex: 1;
-    font-size: 12px;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding-right: 10px;
-  }
-
-  .cron-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    padding: 3px 8px;
-    border-radius: 4px;
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-
-  .badge-error {
-    background: rgba(255, 68, 68, 0.15);
-    color: var(--red);
-    border: 1px solid rgba(255, 68, 68, 0.3);
-  }
-
-  .badge-ok-cron {
-    background: rgba(0, 200, 100, 0.1);
-    color: var(--green);
-    border: 1px solid rgba(0, 200, 100, 0.25);
-  }
-
-  .badge-pending {
-    background: rgba(255, 200, 0, 0.1);
-    color: var(--yellow);
-    border: 1px solid rgba(255, 200, 0, 0.3);
-  }
-
-  .show-all-toggle {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    text-align: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-sec);
-    cursor: pointer;
-    margin-top: 8px;
-    -webkit-tap-highlight-color: transparent;
-    transition: color 0.15s;
-  }
-
-  .show-all-toggle:hover { color: var(--text); }
-
-  #cron-all { display: none; }
-  #cron-all.open { display: block; }
-
-  /* ── Live Pages ── */
-  .live-page-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .live-page-row:last-child { border-bottom: none; }
-
-  .live-page-name {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text);
-  }
-
-  .visit-link {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--orange);
-    text-decoration: none;
-    letter-spacing: 0.06em;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  /* ── Domain chips ── */
-  .domain-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .domain-chip {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-sec);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 4px 8px;
-  }
-
-  /* ── Settings ── */
-  .cred-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-  }
-
-  .cred-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    color: var(--orange);
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
-
-  .cred-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text-sec);
-  }
-
-  .cred-val.revealed { color: var(--text); word-break: break-all; }
-
-  .cred-reveal-hint {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-
-  .zt-list {
-    list-style: none;
-  }
-
-  .zt-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 9px 0;
-    border-bottom: 1px solid var(--border);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text);
-  }
-
-  .zt-item:last-child { border-bottom: none; }
-
-  .zt-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--green);
-    flex-shrink: 0;
-  }
-
-  /* ── Card wrapper ── */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 12px;
-  }
-
-  .card-inner {
-    padding: 14px 16px;
-  }
-
-  /* ── Page header ── */
-  .page-header {
-    padding: 20px 16px 0;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-
-  .page-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-    letter-spacing: -0.02em;
-  }
-
-  .page-subtitle {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-muted);
-    margin-top: 2px;
-  }
-
-  .anomaly-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: rgba(255, 200, 0, 0.1);
-    border: 1px solid rgba(255, 200, 0, 0.25);
-    border-radius: 5px;
-    padding: 3px 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    font-weight: 600;
-    color: var(--yellow);
-    margin-left: 10px;
-    vertical-align: middle;
-  }
-
-  .divider { height: 1px; background: var(--border); margin: 16px 0; }
-
-  /* Voice visualizer bars */
-  .vbar {
-    width: 4px;
-    background: #FF4500;
-    border-radius: 2px;
-    animation: vbar-pulse 0.8s ease-in-out infinite;
-    height: 8px;
-  }
-  .vbar:nth-child(1) { animation-delay: 0s; }
-  .vbar:nth-child(2) { animation-delay: 0.1s; }
-  .vbar:nth-child(3) { animation-delay: 0.2s; }
-  .vbar:nth-child(4) { animation-delay: 0.3s; }
-  .vbar:nth-child(5) { animation-delay: 0.4s; }
-  @keyframes vbar-pulse {
-    0%, 100% { height: 8px; opacity: 0.4; }
-    50% { height: 24px; opacity: 1; }
-  }
-
-
-  /* ── Digital Employees Tab ── */
-  #tab-team.active { display:flex; flex-direction:column; height:calc(100vh - var(--nav-h) - env(safe-area-inset-bottom)); overflow:hidden; padding:0; }
-  .de-layout { display:flex; flex:1; overflow:hidden; }
-  .de-sidebar { width:180px; border-right:1px solid var(--border); overflow-y:auto; flex-shrink:0; padding:8px 0; }
-  .de-sidebar-header { padding:10px 12px; font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-muted); letter-spacing:0.12em; border-bottom:1px solid var(--border); margin-bottom:4px; }
-  .de-card { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; cursor:pointer; border-left:3px solid transparent; transition:all 0.15s; }
-  .de-card:hover { background:var(--surface); }
-  .de-card.active { background:var(--surface); border-left-color:var(--orange); }
-  .de-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:3px; }
-  /* center pane — replaces old de-sessions-pane */
-  .de-center-pane { flex:1; overflow:hidden; display:flex; flex-direction:column; min-width:0; }
-  .de-center-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; flex-shrink:0; background:var(--surface); }
-  .de-start-btn { background:var(--orange); border:none; color:#fff; font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.1em; padding:5px 10px; border-radius:6px; cursor:pointer; transition:opacity 0.15s; }
-  .de-start-btn:disabled { opacity:0.5; }
-  .de-new-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text-sec); font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.08em; padding:5px 10px; border-radius:6px; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
-  .de-new-btn:hover { border-color:var(--orange); color:var(--orange); }
-  .de-session-card { padding:10px 12px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.1s; }
-  .de-session-card:hover { background:var(--surface); }
-  .de-session-card.active { background:var(--surface2); border-left:2px solid var(--orange); }
-  /* profile pane — always-visible right column */
-  .de-profile-pane { width:360px; min-width:180px; max-width:620px; border-left:1px solid var(--border); overflow-y:auto; flex-shrink:0; display:flex; flex-direction:column; }
-  .de-resize-handle { width:5px; background:transparent; cursor:col-resize; flex-shrink:0; transition:background 0.15s; }
-  .de-resize-handle:hover, .de-resize-handle.dragging { background:var(--orange); }
-  .de-profile-tabs { display:flex; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; }
-  .de-profile-tab { flex:1; padding:10px 8px; text-align:center; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.08em; color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; }
-  .de-profile-tab.active { color:var(--orange); border-bottom-color:var(--orange); }
-  .de-profile-body { padding:16px; overflow-y:auto; flex:1; }
-  /* step styling */
-  .de-step { border-left:3px solid; border-radius:0 12px 12px 0; padding:12px 16px; margin-bottom:8px; }
-  .de-step-label { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.12em; margin-bottom:6px; }
-  /* inline new-session form */
-  .de-new-session-form { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; margin:12px 16px; }
-  .de-new-session-form textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); resize:vertical; box-sizing:border-box; }
-  .de-new-session-form textarea:focus { outline:none; border-color:var(--orange); }
-  /* Mobile tab bar — hidden on desktop */
-  .de-mobile-tabs { display:none; }
-
-  @media(max-width:767px){
-    /* Tab bar visible on mobile */
-    .de-mobile-tabs { display:flex; background:var(--surface2); border-bottom:1px solid var(--border); flex-shrink:0; }
-    .de-mobile-tab-btn { flex:1; padding:11px 4px; text-align:center; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.08em; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-muted); cursor:pointer; transition:color 0.15s,border-color 0.15s; }
-    .de-mobile-tab-btn.active { color:var(--orange); border-bottom-color:var(--orange); }
-    /* Single-pane layout */
-    #tab-team.active { height:calc(100vh - var(--nav-h) - env(safe-area-inset-bottom)); overflow:hidden; display:flex; flex-direction:column; padding:0; }
-    .de-layout { flex:1; overflow:hidden; position:relative; flex-direction:row; }
-    .de-sidebar, #de-center-pane, #de-profile-pane { position:absolute !important; top:0; left:0; right:0; bottom:0; width:100% !important; min-width:0 !important; max-width:100% !important; max-height:none !important; height:100%; overflow-y:auto; display:none !important; }
-    .de-sidebar.mobile-active, #de-center-pane.mobile-active, #de-profile-pane.mobile-active { display:flex !important; flex-direction:column; }
-    .de-resize-handle { display:none !important; }
-  }
-
-  </style>
+/* ── RESET + TOKENS ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0A0A0A; --surface: #141414; --surface2: #1C1C1C;
+  --border: rgba(255,255,255,0.08);
+  --text: #F0F0F0; --text-sec: #888; --text-muted: #555;
+  --accent: #FF4500; --green: #00C864; --yellow: #FFC800; --red: #FF4444;
+  --sidebar-w: 230px;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.5; overflow: hidden; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+button { cursor: pointer; font-family: inherit; border: none; }
+textarea, input, select { font-family: inherit; }
+
+/* ── APP SHELL ── */
+#app { display: flex; height: 100vh; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width: var(--sidebar-w); background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+  transition: transform 0.25s;
+}
+.sidebar-header {
+  padding: 16px 14px 12px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.sidebar-logo {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+  color: var(--text); letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px;
+}
+.logo-dot { color: var(--accent); font-size: 16px; }
+.btn-new {
+  background: var(--accent); color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.08em; padding: 5px 10px; border-radius: 6px; transition: opacity 0.15s;
+}
+.btn-new:hover { opacity: 0.85; }
+.de-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+.de-item {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+  cursor: pointer; border-left: 3px solid transparent; transition: background 0.1s, border-color 0.1s;
+}
+.de-item:hover { background: var(--surface2); }
+.de-item.active { background: rgba(255,69,0,0.08); border-left-color: var(--accent); }
+.de-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.de-item-info { flex: 1; min-width: 0; }
+.de-item-name { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.de-item-role { font-size: 10px; color: var(--text-muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.de-badge { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; background: rgba(255,69,0,0.2); color: var(--accent); border-radius: 4px; padding: 2px 5px; flex-shrink: 0; }
+.sidebar-footer {
+  padding: 10px 14px; border-top: 1px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.decisions-pill {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+  color: var(--text-muted); cursor: pointer; padding: 4px 8px;
+  border-radius: 5px; border: 1px solid var(--border); transition: all 0.15s;
+}
+.decisions-pill:hover { border-color: var(--accent); color: var(--accent); }
+.decisions-pill.active { color: var(--accent); border-color: rgba(255,69,0,0.4); background: rgba(255,69,0,0.1); }
+
+/* ── MAIN ── */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.mobile-topbar { display: none; }
+
+/* empty state */
+#empty-state {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 16px; padding: 40px; text-align: center;
+}
+.empty-icon { font-size: 52px; }
+.empty-title { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--text); }
+.empty-desc { font-size: 13px; color: var(--text-sec); max-width: 340px; line-height: 1.6; }
+.btn-create-first {
+  background: var(--accent); color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.08em; padding: 12px 24px; border-radius: 8px; transition: opacity 0.15s;
+}
+.btn-create-first:hover { opacity: 0.85; }
+
+/* DE view */
+#de-view { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+#de-view.visible { display: flex; }
+.de-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; background: var(--surface);
+}
+.de-avatar {
+  width: 38px; height: 38px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.de-header-info { flex: 1; min-width: 0; }
+.de-header-name { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--text); }
+.de-header-role { font-size: 11px; color: var(--text-sec); }
+.de-header-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.live-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,68,68,0.15); border: 1px solid rgba(255,68,68,0.3);
+  border-radius: 4px; padding: 3px 8px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: var(--red);
+}
+.live-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--red); animation:pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.btn-run {
+  background: var(--accent); color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; padding: 7px 14px; border-radius: 6px; transition: opacity 0.15s;
+}
+.btn-run:hover { opacity: 0.85; }
+.btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* tabs */
+.de-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+.de-tab {
+  padding: 10px 22px; background: none;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s;
+}
+.de-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.de-tab:hover:not(.active) { color: var(--text-sec); }
+.tab-pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.tab-pane.active { display: flex; }
+
+/* ── CHAT TAB ── */
+#chat-messages {
+  flex: 1; overflow-y: auto; padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.msg-user {
+  align-self: flex-end; max-width: 72%;
+  background: var(--accent); color: #fff;
+  border-radius: 12px 12px 3px 12px; padding: 10px 14px;
+  font-size: 13px; line-height: 1.5;
+}
+.msg-agent { align-self: flex-start; max-width: 82%; width: 100%; }
+.msg-agent-label { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-muted); letter-spacing:0.1em; margin-bottom:5px; }
+.step-bubble {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid; border-radius: 0 8px 8px 0;
+  padding: 9px 12px; margin-bottom: 5px; font-size: 12px;
+}
+.step-bubble-label { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.1em; margin-bottom:4px; }
+.step-bubble-body { color: var(--text-sec); line-height: 1.6; word-break: break-word; }
+.step-bubble-mono { font-family:'JetBrains Mono',monospace; font-size:11px; }
+.thinking-wrap { display:flex; align-items:center; gap:8px; color:var(--text-muted); font-size:12px; font-family:'JetBrains Mono',monospace; }
+.thinking-dots { display:flex; gap:3px; }
+.thinking-dots span { width:5px; height:5px; border-radius:50%; background:var(--accent); animation:blink 1.4s infinite; }
+.thinking-dots span:nth-child(2){animation-delay:.2s}.thinking-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+.msg-summary {
+  background: rgba(0,200,100,0.07); border: 1px solid rgba(0,200,100,0.2);
+  border-radius: 3px 12px 12px 12px; padding: 12px 16px;
+  font-size: 13px; color: var(--text); line-height: 1.6;
+}
+.chat-input-bar {
+  padding: 14px 24px; border-top: 1px solid var(--border);
+  display: flex; gap: 10px; align-items: flex-end;
+  background: var(--surface); flex-shrink: 0;
+}
+#chat-input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text);
+  resize: none; min-height: 42px; max-height: 120px; line-height: 1.5; transition: border-color 0.15s;
+}
+#chat-input:focus { outline:none; border-color:var(--accent); }
+#chat-input::placeholder { color:var(--text-muted); }
+.btn-send {
+  background: var(--accent); color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  padding: 0 18px; border-radius: 8px; height: 42px; flex-shrink: 0; transition: opacity 0.15s;
+}
+.btn-send:hover { opacity: 0.85; }
+.btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── PROGRESS TAB ── */
+.progress-layout { display:flex; flex:1; overflow:hidden; }
+.prog-sessions {
+  width: 220px; border-right: 1px solid var(--border);
+  overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column;
+}
+.prog-sessions-hdr {
+  padding: 10px 14px; font-family:'JetBrains Mono',monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+  color: var(--text-muted); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.prog-session {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.1s;
+}
+.prog-session:hover { background: var(--surface2); }
+.prog-session.active { background: rgba(255,69,0,0.07); border-left: 2px solid var(--accent); }
+.prog-session-top { display:flex; align-items:center; gap:6px; }
+.prog-session-trigger { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:var(--text); }
+.prog-session-meta { font-size:10px; color:var(--text-muted); margin-top:2px; }
+.prog-session-summary { font-size:11px; color:var(--text-sec); margin-top:4px; line-height:1.4; }
+.prog-steps {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.prog-empty { color:var(--text-muted); font-size:12px; text-align:center; margin-top:40px; }
+.step-card {
+  border-left: 3px solid; border-radius: 0 10px 10px 0;
+  padding: 10px 14px; font-size: 12px;
+}
+.step-card-label { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.12em; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; }
+.step-card-ts { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-muted); font-weight:400; }
+.step-card-body { color:var(--text-sec); line-height:1.6; word-break:break-word; white-space:pre-wrap; }
+.step-card-mono { font-family:'JetBrains Mono',monospace; font-size:11px; }
+
+/* ── PROFILE TAB ── */
+.profile-scroll { flex:1; overflow-y:auto; padding:24px; }
+.profile-inner { max-width: 640px; }
+.prof-section { margin-bottom: 24px; }
+.prof-label {
+  font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700;
+  letter-spacing:0.14em; color:var(--text-muted); margin-bottom:10px; text-transform:uppercase;
+}
+.prof-mission { font-size:14px; color:var(--text-sec); line-height:1.7; }
+.kpi-list { list-style:none; }
+.kpi-list li {
+  font-size:12px; color:var(--text-sec); padding:6px 0; border-bottom:1px solid var(--border);
+  display:flex; align-items:flex-start; gap:8px;
+}
+.kpi-list li::before { content:'→'; color:var(--accent); font-family:'JetBrains Mono',monospace; font-size:11px; flex-shrink:0; margin-top:1px; }
+.resp-group { margin-bottom:12px; }
+.resp-group-label {
+  font-size:10px; font-weight:600; padding:3px 9px; border-radius:4px;
+  display:inline-block; margin-bottom:6px;
+}
+.resp-list { list-style:none; }
+.resp-list li { font-size:12px; color:var(--text-sec); padding:3px 0 3px 12px; border-left:2px solid; line-height:1.5; margin-bottom:2px; }
+
+/* ── DECISIONS DRAWER ── */
+#decisions-panel {
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.65); z-index:200; display:none; justify-content:flex-end;
+}
+#decisions-panel.open { display:flex; }
+.decisions-drawer {
+  width:min(460px,100%); height:100%; background:var(--surface);
+  border-left:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden;
+}
+.drawer-header {
+  padding:18px 20px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.drawer-title { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text); }
+.btn-close { background:none; color:var(--text-muted); font-size:20px; padding:0; line-height:1; transition:color 0.15s; }
+.btn-close:hover { color:var(--text); }
+.drawer-body { flex:1; overflow-y:auto; padding:16px 20px; }
+.dec-card {
+  background:var(--surface2); border:1px solid rgba(255,69,0,0.2);
+  border-radius:10px; padding:14px; margin-bottom:10px;
+}
+.dec-agent { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--accent); letter-spacing:0.1em; margin-bottom:4px; }
+.dec-title { font-size:13px; font-weight:600; color:var(--text); margin-bottom:4px; }
+.dec-desc { font-size:12px; color:var(--text-sec); margin-bottom:10px; line-height:1.5; }
+.dec-proposed { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); margin-bottom:10px; line-height:1.5; }
+.dec-actions { display:flex; gap:8px; }
+.btn-approve {
+  flex:1; background:rgba(0,200,100,0.12); border:1px solid rgba(0,200,100,0.35);
+  border-radius:6px; padding:8px; font-family:'JetBrains Mono',monospace;
+  font-size:11px; font-weight:700; color:var(--green); transition:background 0.15s;
+}
+.btn-approve:hover { background:rgba(0,200,100,0.22); }
+.btn-reject {
+  flex:1; background:rgba(255,68,68,0.1); border:1px solid rgba(255,68,68,0.3);
+  border-radius:6px; padding:8px; font-family:'JetBrains Mono',monospace;
+  font-size:11px; font-weight:700; color:var(--red); transition:background 0.15s;
+}
+.btn-reject:hover { background:rgba(255,68,68,0.2); }
+
+/* ── CREATE PANEL ── */
+#create-panel {
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.8); z-index:300; display:none;
+  align-items:center; justify-content:center; padding:20px;
+}
+#create-panel.open { display:flex; }
+.create-modal {
+  width:min(700px,100%); max-height:92vh; background:var(--surface);
+  border:1px solid var(--border); border-radius:14px;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.create-header {
+  padding:18px 24px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.create-title { font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); }
+.create-body { flex:1; overflow-y:auto; padding:24px; }
+.wizard-nav {
+  display:flex; gap:3px; margin-bottom:24px; padding:4px;
+  background:var(--surface2); border-radius:8px;
+}
+.wnav-btn {
+  flex:1; padding:7px 4px; background:none;
+  font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.08em;
+  color:var(--text-muted); border-radius:6px; transition:all 0.15s; white-space:nowrap;
+}
+.wnav-btn.active { background:var(--surface); color:var(--accent); }
+.wnav-btn.done { color:var(--green); }
+.wstep { display:none; }
+.wstep.active { display:block; }
+.f-group { margin-bottom:18px; }
+.f-label {
+  font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700;
+  letter-spacing:0.1em; color:var(--text-muted); margin-bottom:6px; display:block;
+}
+.f-hint { font-size:11px; color:var(--text-muted); margin-top:4px; }
+.f-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.f-input, .f-textarea, .f-select {
+  width:100%; background:var(--surface2); border:1px solid var(--border);
+  border-radius:7px; padding:10px 12px;
+  font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); transition:border-color 0.15s;
+}
+.f-input:focus, .f-textarea:focus, .f-select:focus { outline:none; border-color:var(--accent); }
+.f-textarea { resize:vertical; line-height:1.6; }
+.color-row { display:flex; gap:8px; flex-wrap:wrap; }
+.color-swatch {
+  width:28px; height:28px; border-radius:6px; cursor:pointer;
+  border:2px solid transparent; transition:border-color 0.15s, transform 0.1s;
+}
+.color-swatch:hover { transform:scale(1.1); }
+.color-swatch.sel { border-color:#fff; }
+.list-builder { display:flex; flex-direction:column; gap:5px; margin-bottom:6px; }
+.list-row { display:flex; gap:8px; align-items:center; }
+.list-row input {
+  flex:1; background:var(--surface2); border:1px solid var(--border);
+  border-radius:6px; padding:8px 10px;
+  font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text);
+}
+.list-row input:focus { outline:none; border-color:var(--accent); }
+.btn-rm { background:none; color:var(--text-muted); font-size:16px; padding:0 4px; line-height:1; transition:color 0.15s; }
+.btn-rm:hover { color:var(--red); }
+.btn-add {
+  background:none; border:1px dashed var(--border);
+  border-radius:6px; padding:7px 12px;
+  font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted);
+  text-align:left; width:100%; transition:all 0.15s;
+}
+.btn-add:hover { border-color:var(--accent); color:var(--accent); }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; }
+.toggle-label-text { font-size:13px; color:var(--text); }
+.toggle-hint { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.toggle { position:relative; width:40px; height:22px; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-track {
+  position:absolute; inset:0; background:var(--surface2); border:1px solid var(--border);
+  border-radius:11px; transition:background 0.2s; cursor:pointer;
+}
+.toggle-track::before {
+  content:''; position:absolute; left:2px; top:2px;
+  width:16px; height:16px; border-radius:50%; background:var(--text-muted); transition:transform 0.2s, background 0.2s;
+}
+.toggle input:checked + .toggle-track { background:rgba(255,69,0,0.2); border-color:var(--accent); }
+.toggle input:checked + .toggle-track::before { transform:translateX(18px); background:var(--accent); }
+.create-footer {
+  padding:16px 24px; border-top:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.btn-prev {
+  background:none; border:1px solid var(--border); border-radius:7px;
+  padding:9px 18px; font-family:'JetBrains Mono',monospace; font-size:11px;
+  color:var(--text-sec); transition:all 0.15s;
+}
+.btn-prev:hover { border-color:var(--text-sec); color:var(--text); }
+.btn-next, .btn-create-de {
+  background:var(--accent); color:#fff;
+  font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:0.08em;
+  padding:9px 20px; border-radius:7px; transition:opacity 0.15s;
+}
+.btn-next:hover, .btn-create-de:hover { opacity:0.85; }
+.preview-box {
+  margin-top:20px; padding:16px; background:var(--surface2); border-radius:8px;
+}
+.preview-box-label { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); margin-bottom:8px; }
+.preview-tree { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-sec); line-height:1.8; }
+
+/* ── MOBILE ── */
+.sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99; }
+@media (max-width:767px) {
+  .sidebar-overlay { display:block; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+  .sidebar-overlay.visible { opacity:1; pointer-events:auto; }
+  #sidebar { position:fixed; top:0; left:0; bottom:0; z-index:100; transform:translateX(-100%); }
+  #sidebar.open { transform:translateX(0); }
+  .mobile-topbar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .mobile-topbar-title { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--text); }
+  .btn-ham { background:none; color:var(--text-sec); font-size:20px; padding:0; line-height:1; }
+  .progress-layout { flex-direction:column; }
+  .prog-sessions { width:100%; height:180px; border-right:none; border-bottom:1px solid var(--border); }
+  .f-row { grid-template-columns:1fr; }
+}
+</style>
 </head>
 <body>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
 <div id="app">
 
-  <!-- ═══════════════════════════════════════════════ TAB: OVERVIEW ═════ -->
-  <div id="tab-overview" class="tab-content active">
-    <div class="page-header">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:16px">
-        <div>
-          <div class="page-title" style="display:flex;align-items:center;gap:8px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" style="height:26px;width:auto;">
-  <path d="M 18 42 L 28 42 L 28 6 L 8 6 L 8 14 L 18 14 Z" fill="#FAFAFA"/>
-  <rect x="30" y="2" width="16" height="16" fill="#FF4500"/>
-  <text x="38" y="13" font-family="Arial,sans-serif" font-size="8" font-weight="bold" fill="#FAFAFA" text-anchor="middle">12</text>
-</svg><span>PORTAL</span></div>
-          <div class="page-subtitle">AGENT COMMAND CENTER</div>
+<!-- ═══ SIDEBAR ═══ -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo"><span class="logo-dot">⚡</span>DE FRAMEWORK</div>
+    <button class="btn-new" onclick="openCreate()">+ NEW</button>
+  </div>
+  <div class="de-list" id="de-list"></div>
+  <div class="sidebar-footer">
+    <div class="decisions-pill" id="decisions-pill" onclick="openDecisions()">⏳ decisions</div>
+    <div class="mono" style="font-size:10px;color:var(--text-muted)" id="live-time"></div>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<main id="main">
+  <div class="mobile-topbar">
+    <button class="btn-ham" onclick="openSidebar()">☰</button>
+    <span class="mobile-topbar-title">⚡ DE Framework</span>
+    <button class="btn-ham" onclick="openDecisions()">⏳</button>
+  </div>
+
+  <!-- Empty state -->
+  <div id="empty-state">
+    <div class="empty-icon">⚡</div>
+    <div class="empty-title">Digital Employees</div>
+    <div class="empty-desc">AI agents with defined missions, KPIs, and approval gates. Autonomous by default, supervised when it matters.</div>
+    <button class="btn-create-first" onclick="openCreate()">+ Create your first Digital Employee</button>
+  </div>
+
+  <!-- DE view -->
+  <div id="de-view">
+    <div class="de-header">
+      <div class="de-avatar" id="dv-avatar">?</div>
+      <div class="de-header-info">
+        <div class="de-header-name" id="dv-name">—</div>
+        <div class="de-header-role" id="dv-role">—</div>
+      </div>
+      <div class="de-header-actions">
+        <span class="live-badge" id="dv-live" style="display:none">LIVE</span>
+        <button class="btn-run" id="btn-run" onclick="deRun()">▶ RUN</button>
+      </div>
+    </div>
+
+    <div class="de-tabs">
+      <button class="de-tab active" onclick="switchTab('chat')">💬 CHAT</button>
+      <button class="de-tab" onclick="switchTab('progress')">⚡ PROGRESS</button>
+      <button class="de-tab" onclick="switchTab('profile')">ℹ PROFILE</button>
+    </div>
+
+    <!-- CHAT -->
+    <div class="tab-pane active" id="tab-chat">
+      <div id="chat-messages">
+        <div style="color:var(--text-muted);font-size:12px;text-align:center;margin-top:48px">
+          Send a message to start a session with this employee.
         </div>
-        <div style="text-align:right">
-          <div class="mono" style="font-size:10px;color:var(--text-muted)">07-08</div>
-          <div class="mono" style="font-size:10px;color:var(--text-muted)" id="live-time">—</div>
+      </div>
+      <div class="chat-input-bar">
+        <textarea id="chat-input" rows="1"
+          placeholder="Message this employee… (Enter to send, Shift+Enter for newline)"
+          onkeydown="chatKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="btn-send" id="btn-send" onclick="sendChat()">SEND</button>
+      </div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="tab-pane" id="tab-progress">
+      <div class="progress-layout">
+        <div class="prog-sessions">
+          <div class="prog-sessions-hdr">SESSIONS</div>
+          <div id="prog-session-list"><div style="padding:12px;font-size:11px;color:var(--text-muted)">No sessions yet.</div></div>
+        </div>
+        <div class="prog-steps" id="prog-steps">
+          <div class="prog-empty">Select a session to view steps.</div>
         </div>
       </div>
     </div>
 
-    <div class="page-content">
-
-      <!-- No pending approvals -->
-
-      <!-- Live Tools -->
-      <div class="section-label">LIVE TOOLS</div>
-      <div class="tool-grid">
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" style="background:#D64E12;"></div>
-            <span class="tool-name">VIP Admin</span>
-          </div>
-          <a href="https://agentic-living.com/admin.html" target="_blank" class="tool-open-btn">OPEN →</a>
+    <!-- PROFILE -->
+    <div class="tab-pane" id="tab-profile">
+      <div class="profile-scroll">
+        <div class="profile-inner" id="profile-inner">
+          <div style="color:var(--text-muted);font-size:12px">Loading…</div>
         </div>
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" id="dot-tasks"></div>
-            <span class="tool-name">Tasks</span>
-          </div>
-          <a href="https://tasks.trillion-initiative.com" target="_blank" class="tool-open-btn">OPEN →</a>
-        </div>
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" id="dot-okr"></div>
-            <span class="tool-name">OKR</span>
-          </div>
-          <a href="https://okr.trillion-initiative.com" target="_blank" class="tool-open-btn">OPEN →</a>
-        </div>
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" id="dot-agentschool"></div>
-            <span class="tool-name">Agent School</span>
-          </div>
-          <a href="https://agent-school.trillion-initiative.com" target="_blank" class="tool-open-btn">OPEN →</a>
-        </div>
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" id="dot-ngocrm"></div>
-            <span class="tool-name">NGO CRM</span>
-          </div>
-          <a href="https://ngo-crm-flyraising.pages.dev" target="_blank" class="tool-open-btn">OPEN →</a>
-        </div>
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" id="dot-acnur"></div>
-            <span class="tool-name">ACNUR OS</span>
-          </div>
-          <a href="https://acnur-os.human-altruism.org" target="_blank" class="tool-open-btn">OPEN →</a>
-        </div>
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" id="dot-costs"></div>
-            <span class="tool-name">Costs</span>
-          </div>
-          <a href="https://costs.enzoduit.com" target="_blank" class="tool-open-btn">OPEN →</a>
-        </div>
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" id="dot-linkedin"></div>
-            <span class="tool-name">LinkedIn Ideas</span>
-          </div>
-          <a href="https://ideas.enzoduit.com" target="_blank" class="tool-open-btn">OPEN →</a>
-        </div>
-        <div class="tool-card">
-          <div class="tool-card-top">
-            <div class="status-dot" id="dot-humaninput"></div>
-            <span class="tool-name">Human Input</span>
-          </div>
-          <div class="server-badge">SERVER ONLY</div>
-        </div>
-      </div>
-
-      <!-- System Numbers -->
-      <div class="section-label">SYSTEM NUMBERS</div>
-      <div class="stats-row">
-        <div class="stat-chip">
-          <span class="stat-chip-val">9,873</span>
-          <span class="stat-chip-label">ENTRIES</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-chip-val">$44</span>
-          <span class="stat-chip-label">/MONTH</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-chip-val">25</span>
-          <span class="stat-chip-label">CRON JOBS</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-chip-val">27</span>
-          <span class="stat-chip-label">DOMAINS</span>
-        </div>
-      </div>
-
-      <!-- Quick Links -->
-      <div class="section-label">QUICK LINKS</div>
-      <div class="quick-grid">
-        <a href="https://dash.cloudflare.com" target="_blank" class="quick-link">Cloudflare</a>
-        <a href="https://console.hetzner.cloud" target="_blank" class="quick-link">Hetzner</a>
-        <a href="https://console.anthropic.com" target="_blank" class="quick-link">Anthropic</a>
-        <a href="https://railway.app" target="_blank" class="quick-link">Railway</a>
-        <a href="https://krisp.ai" target="_blank" class="quick-link">Krisp</a>
-        <a href="https://login.tailscale.com" target="_blank" class="quick-link">Tailscale</a>
       </div>
     </div>
   </div>
-
-  <!-- ═══════════════════════════════════════════════ TAB: TEAM ═════════ -->
-  <!-- ═══ TAB: DECISIONS ═══ -->
-<div id="tab-decisions" class="tab-content">
-  <div class="page-header">
-    <div class="page-title">🎙 DECISIONS</div>
-    <div class="page-subtitle">VOICE INTERFACE · DIGITAL EMPLOYEES</div>
-  </div>
-  <div class="page-content">
-
-    <!-- Voice Session — Native WebRTC (asks for mic permission, works) -->
-    <div id="voice-session-idle" style="margin-bottom:16px;">
-      <button id="voice-start-btn" onclick="startVoiceSession()" disabled style="width:100%;background:#333;border:none;color:#666;font-family:var(--font-mono);font-size:13px;font-weight:900;letter-spacing:2px;padding:18px;cursor:not-allowed;display:flex;align-items:center;justify-content:center;gap:12px;-webkit-tap-highlight-color:transparent;">
-        <span style="font-size:20px;">🎙</span>
-        <span id="voice-start-label">LOADING DECISIONS...</span>
-      </button>
-      <div style="font-family:var(--font-mono);font-size:10px;color:#333;text-align:center;margin-top:8px;letter-spacing:1px;">SAY YES/APPROVE OR NO/REJECT · ASK FOR CONTEXT · ADD CONDITIONS</div>
-    </div>
-    
-    <div id="voice-session-active" style="display:none;margin-bottom:16px;">
-      <div style="background:#141414;border:2px solid #FF4500;padding:16px;text-align:center;">
-        <div style="font-family:var(--font-mono);font-size:10px;color:#FF4500;letter-spacing:2px;margin-bottom:8px;" id="voice-status">CONNECTING...</div>
-        <div style="display:flex;gap:4px;justify-content:center;align-items:center;height:32px;margin-bottom:12px;">
-          <div class="vbar"></div><div class="vbar"></div><div class="vbar"></div><div class="vbar"></div><div class="vbar"></div>
-        </div>
-        <button onclick="stopVoiceSession()" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:#888;font-family:var(--font-mono);font-size:10px;padding:8px 20px;cursor:pointer;letter-spacing:1px;">END SESSION</button>
-      </div>
-    </div>
-
-    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:#FF4500;margin-bottom:10px;">PENDING DECISIONS</div>
-    <div id="decisions-list">
-      <div style="font-family:var(--font-mono);font-size:12px;color:#444;">Loading...</div>
-    </div>
-
-  </div>
+</main>
 </div>
 
-<!-- ═══ TAB: TASKS ═══ -->
-<div id="tab-tasks" class="tab-content">
-  <div class="page-header">
-    <div class="page-title">✓ TASKS</div>
-    <div class="page-subtitle">OPEN TASKS · AWAITING YOUR ACTION</div>
-  </div>
-  <div class="page-content">
-    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:#FF4500;margin-bottom:10px;">OPEN TASKS</div>
-    <div id="tasks-list">
-      <div style="font-family:var(--font-mono);font-size:12px;color:#444;">Loading...</div>
+<!-- ═══ DECISIONS DRAWER ═══ -->
+<div id="decisions-panel">
+  <div style="flex:1" onclick="closeDecisions()"></div>
+  <div class="decisions-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">⏳ Pending Decisions</div>
+      <button class="btn-close" onclick="closeDecisions()">✕</button>
     </div>
-    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:#444;margin:24px 0 10px;">COMPLETED</div>
-    <div id="tasks-done-list">
-      <div style="font-family:var(--font-mono);font-size:12px;color:#333;">Loading...</div>
+    <div class="drawer-body" id="decisions-body">
+      <div style="color:var(--text-muted);font-size:12px">Loading…</div>
     </div>
   </div>
 </div>
 
-<div id="tab-team" class="tab-content">
-  <!-- Mobile tab bar -->
-  <div class="de-mobile-tabs" id="de-mobile-tabs">
-    <button class="de-mobile-tab-btn active" data-pane="agents" onclick="deMobileShowPane('agents')">&#9685; DEs</button>
-    <button class="de-mobile-tab-btn" data-pane="sessions" onclick="deMobileShowPane('sessions')">&#9889; SESSIONS</button>
-    <button class="de-mobile-tab-btn" data-pane="profile" onclick="deMobileShowPane('profile')">&#9432; PROFILE</button>
-  </div>
-  <div class="de-layout">
-    <div class="de-sidebar">
-      <div class="de-sidebar-header">DIGITAL EMPLOYEES</div>
-      <div id="de-list-cards">Loading...</div>
+<!-- ═══ CREATE DE PANEL ═══ -->
+<div id="create-panel">
+  <div class="create-modal">
+    <div class="create-header">
+      <div class="create-title">Create Digital Employee</div>
+      <button class="btn-close" onclick="closeCreate()">✕</button>
     </div>
-    <div class="de-center-pane" id="de-center-pane">
-      <div style="color:var(--text-muted);font-size:12px;margin:40px auto;text-align:center">← Select a Digital Employee</div>
+    <div class="create-body">
+      <div class="wizard-nav">
+        <button class="wnav-btn active" id="wnav-0" onclick="goStep(0)">IDENTITY</button>
+        <button class="wnav-btn" id="wnav-1" onclick="goStep(1)">MISSION</button>
+        <button class="wnav-btn" id="wnav-2" onclick="goStep(2)">AUTONOMY</button>
+        <button class="wnav-btn" id="wnav-3" onclick="goStep(3)">EVALUATION</button>
+        <button class="wnav-btn" id="wnav-4" onclick="goStep(4)">RESEARCH</button>
+      </div>
+
+      <!-- Step 0: Identity -->
+      <div class="wstep active" id="wstep-0">
+        <div class="f-row">
+          <div class="f-group">
+            <label class="f-label">SLUG NAME</label>
+            <input class="f-input" id="f-name" placeholder="cfo, ops, growth…" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'');updatePreview()">
+            <div class="f-hint">Lowercase, no spaces. Used as the agent directory.</div>
+          </div>
+          <div class="f-group">
+            <label class="f-label">DISPLAY NAME</label>
+            <input class="f-input" id="f-display" placeholder="CFO, OPS LEAD…">
+          </div>
+        </div>
+        <div class="f-group">
+          <label class="f-label">ROLE DESCRIPTION</label>
+          <input class="f-input" id="f-role-input" placeholder="Chief Financial Officer · Cost Intelligence">
+        </div>
+        <div class="f-group">
+          <label class="f-label">COLOR</label>
+          <div class="color-row" id="color-row">
+            <div class="color-swatch sel" style="background:#FF4500" data-c="#FF4500" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#22c55e" data-c="#22c55e" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#6366f1" data-c="#6366f1" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#0ea5e9" data-c="#0ea5e9" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#f59e0b" data-c="#f59e0b" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#ec4899" data-c="#ec4899" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#a855f7" data-c="#a855f7" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#14b8a6" data-c="#14b8a6" onclick="pickColor(this)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 1: Mission -->
+      <div class="wstep" id="wstep-1">
+        <div class="f-group">
+          <label class="f-label">MISSION STATEMENT</label>
+          <textarea class="f-textarea" id="f-mission" rows="4" placeholder="One to three sentences. What does this employee own? What's the single most important outcome they're responsible for?"></textarea>
+        </div>
+        <div class="f-group">
+          <label class="f-label">KPIs / GOALS</label>
+          <div class="list-builder" id="lb-kpis"></div>
+          <button class="btn-add" onclick="addItem('lb-kpis','e.g. Daily cost stays within $500')">+ Add KPI</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Autonomy -->
+      <div class="wstep" id="wstep-2">
+        <p style="font-size:12px;color:var(--text-sec);line-height:1.6;margin-bottom:16px">
+          Define what this employee can do at each level. This is injected directly into <strong>job.md</strong> and controls when the agent pauses to ask for approval.
+        </p>
+        <div class="f-group">
+          <label class="f-label" style="color:#22c55e">LEVEL 0 — Acts autonomously, no notification needed</label>
+          <div class="list-builder" id="lb-l0"></div>
+          <button class="btn-add" onclick="addItem('lb-l0','e.g. Read metrics.json and log.jsonl')">+ Add action</button>
+        </div>
+        <div class="f-group">
+          <label class="f-label" style="color:#FFC800">LEVEL 1 — Acts, then documents (reversible)</label>
+          <div class="list-builder" id="lb-l1"></div>
+          <button class="btn-add" onclick="addItem('lb-l1','e.g. Deploy a new page to Cloudflare')">+ Add action</button>
+        </div>
+        <div class="f-group">
+          <label class="f-label" style="color:#FF4500">LEVEL 2 — Requires your explicit approval first</label>
+          <div class="list-builder" id="lb-l2"></div>
+          <button class="btn-add" onclick="addItem('lb-l2','e.g. Disable a cron job entirely')">+ Add action</button>
+        </div>
+        <div class="f-group">
+          <label class="f-label" style="color:var(--red)">HARD CONSTRAINTS — Never allowed, regardless of reasoning</label>
+          <div class="list-builder" id="lb-constraints"></div>
+          <button class="btn-add" onclick="addItem('lb-constraints','e.g. Never access billing credentials')">+ Add constraint</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Evaluation -->
+      <div class="wstep" id="wstep-3">
+        <p style="font-size:12px;color:var(--text-sec);line-height:1.6;margin-bottom:16px">
+          How does this employee know if it's doing a good job? These criteria are embedded in the agent's mission prompt and used to update <strong>metrics.json</strong> after each run.
+        </p>
+        <div class="f-group">
+          <label class="f-label">SUCCESS CRITERIA</label>
+          <div class="list-builder" id="lb-eval"></div>
+          <button class="btn-add" onclick="addItem('lb-eval','e.g. Cost stayed within budget for 7 consecutive days')">+ Add criterion</button>
+        </div>
+        <div class="f-group">
+          <label class="f-label">RUN SCHEDULE</label>
+          <select class="f-select" id="f-schedule">
+            <option value="manual">Manual only (start via portal or API)</option>
+            <option value="hourly">Every hour</option>
+            <option value="3x_daily">3× daily (08:00, 14:00, 20:00 UTC)</option>
+            <option value="daily">Once daily (08:00 UTC)</option>
+            <option value="weekly">Once weekly (Monday 08:00 UTC)</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label class="f-label">DATA SOURCES</label>
+          <div class="f-hint" style="margin-bottom:8px">URLs or file paths this agent will read as part of its observation loop.</div>
+          <div class="list-builder" id="lb-sources"></div>
+          <button class="btn-add" onclick="addItem('lb-sources','e.g. http://localhost:3002/api/summary')">+ Add source</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Research -->
+      <div class="wstep" id="wstep-4">
+        <div class="f-group">
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label-text">Enable autoresearch</div>
+              <div class="toggle-hint">Agent proactively researches topics and writes findings to its memory.</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="f-autoresearch" onchange="toggleResearch(this.checked)">
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+        </div>
+        <div id="research-fields" style="display:none">
+          <div class="f-group">
+            <label class="f-label">RESEARCH QUERIES</label>
+            <div class="f-hint" style="margin-bottom:8px">Topics this agent will search, summarize, and track over time.</div>
+            <div class="list-builder" id="lb-queries"></div>
+            <button class="btn-add" onclick="addItem('lb-queries','e.g. Latest AI infrastructure cost benchmarks')">+ Add query</button>
+          </div>
+          <div class="f-group">
+            <label class="f-label">RESEARCH FREQUENCY</label>
+            <select class="f-select" id="f-research-freq">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="manual">On demand only</option>
+            </select>
+          </div>
+        </div>
+        <div class="preview-box">
+          <div class="preview-box-label">WILL GENERATE</div>
+          <div class="preview-tree">
+            📁 agents/<span id="preview-name">name</span>/<br>
+            &nbsp;&nbsp;📄 de.json<br>
+            &nbsp;&nbsp;📄 job.md <span style="color:var(--text-muted)">(auto-generated from your inputs)</span><br>
+            &nbsp;&nbsp;📄 metrics.json<br>
+            &nbsp;&nbsp;📄 memory.md<br>
+            &nbsp;&nbsp;📁 sessions/<br>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="de-resize-handle" id="de-resize-handle" title="Drag to resize"></div>
-    <div class="de-profile-pane" id="de-profile-pane">
-      <div style="color:var(--text-muted);font-size:12px;margin-top:40px;text-align:center">Agent profile appears here</div>
+    <div class="create-footer">
+      <button class="btn-prev" id="btn-prev" onclick="prevStep()" style="visibility:hidden">← BACK</button>
+      <div class="mono" style="font-size:10px;color:var(--text-muted)" id="step-label">Step 1 of 5</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-next" id="btn-next" onclick="nextStep()">NEXT →</button>
+        <button class="btn-create-de" id="btn-create-de" style="display:none" onclick="createDE()">⚡ CREATE</button>
+      </div>
     </div>
   </div>
 </div>
 
-  <!-- ═══ TAB: ACTIVITY ═══ -->
-
-  <div id="tab-activity" class="tab-content">
-    <div class="page-header">
-      <div class="page-title">🔍 ACTIVITY</div>
-      <div class="page-subtitle">AUTONOMOUS AGENT ACTIONS · TRUST BUT VERIFY</div>
-    </div>
-    <div class="page-content">
-      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:#FF4500;margin-bottom:10px;">AGENT AUDIT LOG</div>
-      <div id="audit-log-list">
-        <div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">Loading...</div>
-      </div>
-    </div>
-  </div>
-
-  <div id="tab-system" class="tab-content">
-    <div class="page-header">
-      <div style="padding-bottom:16px">
-        <div class="page-title">SYSTEM</div>
-        <div class="page-subtitle">CRON · PAGES · DOMAINS</div>
-      </div>
-    </div>
-
-    <div class="page-content">
-
-      <!-- Cron Jobs -->
-      <div class="section-label">CRON JOBS</div>
-      <div id="cron-live">
-        <div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">Loading...</div>
-      </div>
-
-        </div>
-      </div>
-
-      <!-- Live Pages -->
-      <div class="section-label">LIVE PAGES</div>
-      <div class="card">
-        <div class="card-inner">
-          <div class="live-page-row">
-            <span class="live-page-name">tasks.trillion-initiative.com</span>
-            <a href="https://tasks.trillion-initiative.com" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">okr.trillion-initiative.com</span>
-            <a href="https://okr.trillion-initiative.com" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">agent-school.trillion-initiative.com</span>
-            <a href="https://agent-school.trillion-initiative.com" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">ngo-crm-flyraising.pages.dev</span>
-            <a href="https://ngo-crm-flyraising.pages.dev" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">acnur-os.human-altruism.org</span>
-            <a href="https://acnur-os.human-altruism.org" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">costs.enzoduit.com</span>
-            <a href="https://costs.enzoduit.com" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">ideas.enzoduit.com</span>
-            <a href="https://ideas.enzoduit.com" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">decisions.enzoduit.com</span>
-            <a href="https://decisions.enzoduit.com" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">os.enzoduit.com</span>
-            <a href="https://os.enzoduit.com" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">free-agentskills.org</span>
-            <a href="https://free-agentskills.org" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">flyraising.com</span>
-            <a href="https://flyraising.com" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-          <div class="live-page-row">
-            <span class="live-page-name">human-altruism.org</span>
-            <a href="https://human-altruism.org" target="_blank" class="visit-link">VISIT →</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Domains -->
-      <div class="section-label">ALL DOMAINS (27)</div>
-      <div class="domain-chips">
-        <span class="domain-chip">trillion-initiative.com</span>
-        <span class="domain-chip">enzoduit.com</span>
-        <span class="domain-chip">flyraising.com</span>
-        <span class="domain-chip">human-altruism.org</span>
-        <span class="domain-chip">free-agentskills.org</span>
-        <span class="domain-chip">augedo.com</span>
-        <span class="domain-chip">acnur-os.human-altruism.org</span>
-        <span class="domain-chip">os.enzoduit.com</span>
-        <span class="domain-chip">costs.enzoduit.com</span>
-        <span class="domain-chip">ideas.enzoduit.com</span>
-        <span class="domain-chip">decisions.enzoduit.com</span>
-        <span class="domain-chip">tasks.trillion-initiative.com</span>
-        <span class="domain-chip">okr.trillion-initiative.com</span>
-        <span class="domain-chip">agent-school.trillion-initiative.com</span>
-        <span class="domain-chip">ngo-crm-flyraising.pages.dev</span>
-        <span class="domain-chip">agent-portal-ti.pages.dev</span>
-        <span class="domain-chip">vwupass.com</span>
-        <span class="domain-chip">childfund.augedo.com</span>
-        <span class="domain-chip">kowb.augedo.com</span>
-        <span class="domain-chip">l5-2.augedo.com</span>
-        <span class="domain-chip">oscar.augedo.com</span>
-        <span class="domain-chip">mail.flyraising.com</span>
-        <span class="domain-chip">app.flyraising.com</span>
-        <span class="domain-chip">api.flyraising.com</span>
-        <span class="domain-chip">school.augedo.com</span>
-        <span class="domain-chip">geo.augedo.com</span>
-        <span class="domain-chip">inbox.enzoduit.com</span>
-      </div>
-      <div style="height:12px"></div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════ TAB: WORKSPACE ═════ -->
-  <div id="tab-workspace" class="tab-content">
-    <div class="page-header">
-      <div style="padding-bottom:16px">
-        <div class="page-title">WORKSPACE</div>
-        <div class="page-subtitle">AGENTIC LIVING · FILES</div>
-      </div>
-    </div>
-    <div class="page-content">
-      <div class="section-label">AGENTIC LIVING</div>
-      <div id="ws-file-list"></div>
-
-      <!-- File viewer modal -->
-      <div id="ws-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:200;overflow-y:auto;padding:16px;">
-        <div style="max-width:680px;margin:0 auto;background:#141414;border:1px solid rgba(255,255,255,0.08);padding:24px;position:relative;">
-          <button onclick="document.getElementById('ws-modal').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button>
-          <div id="ws-modal-title" style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.15em;color:#FF4500;text-transform:uppercase;margin-bottom:20px;padding-right:32px;"></div>
-          <div id="ws-modal-body" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#CCC;line-height:1.7;white-space:pre-wrap;word-break:break-word;"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════ TAB: SETTINGS ═════ -->
-  <div id="tab-settings" class="tab-content">
-    <div class="page-header">
-      <div style="padding-bottom:16px">
-        <div class="page-title">SETTINGS</div>
-        <div class="page-subtitle">CREDENTIALS & ACCESS</div>
-      </div>
-    </div>
-
-    <div class="page-content">
-
-      <div class="section-label">CREDENTIALS</div>
-
-      <div class="cred-card" onclick="revealCred(0)">
-        <div class="cred-label">ANTHROPIC API KEY</div>
-        <div class="cred-val" id="cred-0">sk-ant-••••••••••••••••••••••</div>
-        <div class="cred-reveal-hint" id="hint-0">TAP TO REVEAL</div>
-      </div>
-
-      <div class="cred-card" onclick="revealCred(1)">
-        <div class="cred-label">CLOUDFLARE API TOKEN</div>
-        <div class="cred-val" id="cred-1">••••••••••••••••••••••••••••••••••••••••</div>
-        <div class="cred-reveal-hint" id="hint-1">TAP TO REVEAL</div>
-      </div>
-
-      <div class="cred-card" onclick="revealCred(2)">
-        <div class="cred-label">RAILWAY TOKEN</div>
-        <div class="cred-val" id="cred-2">••••••••••••••••••••••••••••••••••••••••</div>
-        <div class="cred-reveal-hint" id="hint-2">TAP TO REVEAL</div>
-      </div>
-
-      <div class="cred-card" onclick="revealCred(3)">
-        <div class="cred-label">HETZNER API TOKEN</div>
-        <div class="cred-val" id="cred-3">••••••••••••••••••••••••••••••••••••••••</div>
-        <div class="cred-reveal-hint" id="hint-3">TAP TO REVEAL</div>
-      </div>
-
-      <div class="cred-card" onclick="revealCred(4)">
-        <div class="cred-label">GARMIN SESSION</div>
-        <div class="cred-val" id="cred-4">••••••••••••••••••••••••••••••••••••••••</div>
-        <div class="cred-reveal-hint" id="hint-4">TAP TO REVEAL</div>
-      </div>
-
-      <div class="cred-card" onclick="revealCred(5)">
-        <div class="cred-label">GMAIL OAUTH TOKEN</div>
-        <div class="cred-val" id="cred-5">••••••••••••••••••••••••••••••••••••••••</div>
-        <div class="cred-reveal-hint" id="hint-5">TAP TO REVEAL</div>
-      </div>
-
-      <div class="cred-card" onclick="revealCred(6)">
-        <div class="cred-label">OPENCLAW GATEWAY TOKEN</div>
-        <div class="cred-val" id="cred-6">••••••••••••••••••••••••••••••••••••••••</div>
-        <div class="cred-reveal-hint" id="hint-6">TAP TO REVEAL</div>
-      </div>
-
-      <div class="cred-card" onclick="revealCred(7)">
-        <div class="cred-label">DECISIONS API KEY</div>
-        <div class="cred-val" id="cred-7">••••••••••••••••••••••••••••••••••••••••</div>
-        <div class="cred-reveal-hint" id="hint-7">TAP TO REVEAL</div>
-      </div>
-
-      <!-- Access & Security -->
-      <div class="section-label">ZERO TRUST PROTECTED</div>
-      <div class="card">
-        <div class="card-inner">
-          <ul class="zt-list">
-            <li class="zt-item"><div class="zt-dot"></div>os.enzoduit.com</li>
-            <li class="zt-item"><div class="zt-dot"></div>costs.enzoduit.com</li>
-            <li class="zt-item"><div class="zt-dot"></div>ideas.enzoduit.com</li>
-            <li class="zt-item"><div class="zt-dot"></div>decisions.enzoduit.com</li>
-          </ul>
-        </div>
-      </div>
-
-      <div style="height:12px"></div>
-    </div>
-  </div>
-
-</div><!-- /app -->
-
-<!-- ═══════════════════ BOTTOM NAV ═══════════════════ -->
-<nav id="bottom-nav">
-  <button class="nav-btn active" data-tab="overview" onclick="showTab('overview')">
-    <span class="nav-icon">◈</span>
-    <span>OVERVIEW</span>
-  </button>
-  <button class="nav-btn" data-tab="decisions" onclick="showTab('decisions')">
-    <span class="nav-icon">🎙</span>
-    <span>DECISIONS</span>
-  </button>
-  <button class="nav-btn" data-tab="tasks" onclick="showTab('tasks')">
-    <span class="nav-icon">✓</span>
-    <span>TASKS</span>
-  </button>
-  <button class="nav-btn" data-tab="team" onclick="showTab('team');deInit()">
-    <span class="nav-icon">⚡</span>
-    <span>AGENTS</span>
-  </button>
-  <button class="nav-btn" data-tab="activity" onclick="showTab('activity')">
-    <span class="nav-icon">🔍</span>
-    <span>ACTIVITY</span>
-  </button>
-  <button class="nav-btn" data-tab="system" onclick="showTab('system')">
-    <span class="nav-icon">⊞</span>
-    <span>SYSTEM</span>
-  </button>
-  <button class="nav-btn" data-tab="workspace" onclick="showTab('workspace')">
-    <span class="nav-icon">📁</span>
-    <span>FILES</span>
-  </button>
-  <button class="nav-btn" data-tab="settings" onclick="showTab('settings')">
-    <span class="nav-icon">⚙</span>
-    <span>SETTINGS</span>
-  </button>
-</nav>
-
 <script>
-// ── Tab Switching ──
-function showTab(name) {
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  document.querySelector('[data-tab="' + name + '"]').classList.add('active');
-  if (name === 'decisions') { setTimeout(loadDecisionsList, 100); loadDecisionsForVoice(); }
-  if (name === 'tasks') setTimeout(loadTasks, 100);
-  if (name === 'activity') setTimeout(loadAuditLog, 100);
-  if (name === 'system') setTimeout(loadSystemData, 100);
-  if (name === 'settings') setTimeout(loadSettingsData, 100);
-  if (name === 'workspace') { if (typeof loadWorkspace === 'function') loadWorkspace(); }
-  window.scrollTo(0, 0);
-  if (name === 'team') loadDecisions();
+/* ═══ STATE ═══ */
+let selectedDE = null;
+let selectedColor = '#FF4500';
+let wizardStep = 0;
+const STEPS = 5;
+let chatPoller = null;
+
+/* ═══ UTILS ═══ */
+const $ = id => document.getElementById(id);
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function timeAgo(iso){
+  if(!iso)return'';
+  const d=Date.now()-new Date(iso);
+  if(d<0)return'just now';
+  const m=Math.floor(d/60000),h=Math.floor(d/3600000),dd=Math.floor(d/86400000);
+  return dd>0?dd+'d ago':h>0?h+'h ago':m>0?m+'m ago':'just now';
 }
+const STATUS_ICON={complete:'✅',paused_human:'⏳',running:'🔄',error:'❌',queued:'📋',max_iterations_reached:'🔄'};
 
-// ── Agent Toggle ──
-function toggleAgent(id) {
-  const body = document.getElementById('body-' + id);
-  const chevron = document.getElementById('chevron-' + id);
-  if (!body) return;
-  const open = body.classList.toggle('open');
-  if (chevron) chevron.classList.toggle('open', open);
-}
+/* ═══ CLOCK ═══ */
+function tick(){const n=new Date();const el=$('live-time');if(el)el.textContent=String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0');}
+setInterval(tick,1000);tick();
 
-// ── Agent Data — live from /agents-data ──
-async function loadAgentsData() {
-  try {
-    const r = await fetch('/agents-data');
-    const data = await r.json();
-    if (!data.agents) return;
-    for (const [agent, info] of Object.entries(data.agents)) {
-      updateAgentCard(agent, info);
-    }
-  } catch(e) {
-    console.warn('agents-data fetch failed:', e.message);
-  }
-}
+/* ═══ MOBILE ═══ */
+function openSidebar(){$('sidebar').classList.add('open');$('sidebar-overlay').classList.add('visible');}
+function closeSidebar(){$('sidebar').classList.remove('open');$('sidebar-overlay').classList.remove('visible');}
 
-function updateAgentCard(agent, info) {
-  const m = info.metrics || {};
-  const pending = info.pending_decisions || 0;
-  const activity = info.recent_activity || [];
-
-  // Update KPI chips — agent-specific mappings
-  const kpiMap = {
-    max:    [
-      { val: m.monthly_spend != null ? '$' + m.monthly_spend.toFixed(0) : '—', label: 'MTH SPEND' },
-      { val: m.today_spend != null ? '$' + m.today_spend.toFixed(0) : '—', label: 'TODAY' },
-      { val: pending, label: 'DECISIONS', alert: pending > 0 },
-    ],
-    aria:   [
-      { val: m.situations_total ?? '—', label: 'SITUATIONS' },
-      { val: m.server_status === 'ok' ? '● UP' : '● DOWN', label: 'SERVER', color: m.server_status === 'ok' ? 'var(--green)' : 'var(--red)' },
-      { val: pending, label: 'PROPOSALS', alert: pending > 0 },
-    ],
-    geo:    [
-      { val: m.brand_total != null ? m.brand_total + '/' + m.brand_max : '—', label: 'BRAND' },
-      { val: m.flyraising_total != null ? m.flyraising_total + '/' + m.flyraising_max : '—', label: 'FLYRAISING' },
-      { val: m.total != null ? m.total + '/' + m.total_max : '—', label: 'TOTAL' },
-    ],
-    ops:    [
-      { val: m.services_up != null ? m.services_up + '/' + (m.services_total ?? '?') : '—', label: 'SERVICES UP', color: m.services_up === m.services_total ? 'var(--green)' : 'var(--red)' },
-      { val: m.incidents_open ?? '—', label: 'INCIDENTS', alert: (m.incidents_open || 0) > 0 },
-      { val: m.uptime_pct != null ? m.uptime_pct.toFixed(0) + '%' : '—', label: 'UPTIME' },
-    ],
-    coach:  [
-      { val: m.weekly_km != null ? m.weekly_km + 'km' : '—', label: 'KM/WK' },
-      { val: m.avg_hr ?? '—', label: 'AVG HR' },
-      { val: m.injury_flags != null ? (m.injury_flags === 0 ? '✓' : m.injury_flags + ' ⚠') : '—', label: 'INJURIES', alert: (m.injury_flags || 0) > 0 },
-    ],
-    scribe: [
-      { val: m.experiments_documented ?? '—', label: 'EXPERIMENTS' },
-      { val: m.pending_approvals ?? '—', label: 'PENDING', alert: (m.pending_approvals || 0) > 0 },
-      { val: m.harvest_ran_today ? '✓ TODAY' : '—', label: 'HARVEST' },
-    ],
-    flow:   [
-      { val: m.avg_user_msgs_per_task_7d != null ? m.avg_user_msgs_per_task_7d.toFixed(2) : '—', label: 'MSGS/TASK' },
-      { val: m.tasks_completed_7d ?? '—', label: 'TASKS/7D' },
-      { val: pending, label: 'PROPOSALS', alert: pending > 0 },
-    ],
-    shield: [
-      { val: m.open_vulnerabilities ?? '—', label: 'OPEN VULNS', color: (m.open_vulnerabilities || 0) === 0 ? 'var(--green)' : 'var(--red)', alert: (m.open_vulnerabilities || 0) > 0 },
-      { val: m.last_scan ? 'TODAY' : '—', label: 'LAST SCAN' },
-      { val: m.auto_fixed ?? '—', label: 'FIXED' },
-    ],
-    grow_vwupass: [
-      { val: m.soav_vwupass_combined != null ? m.soav_vwupass_combined + '%' : '—', label: 'SoAV COMBINED', color: (m.soav_vwupass_combined || 0) >= 60 ? 'var(--green)' : 'var(--orange)' },
-      { val: m.leads_q3_captured != null ? m.leads_q3_captured + '/' + (m.leads_q3_goal ?? 3) : '—', label: 'Q3 LEADS', alert: (m.leads_q3_captured || 0) < (m.leads_q3_goal || 3) },
-      { val: pending, label: 'DECISIONS', alert: pending > 0 },
-    ],
-  };
-
-  const kpis = kpiMap[agent];
-  if (!kpis) return;
-
-  // Update KPI chips
-  const card = document.querySelector(`[onclick="toggleAgent('${agent}')"]`)?.closest('.agent-card')
-    || document.querySelector(`[id="body-${agent}"]`)?.closest('.agent-card');
-  if (!card) return;
-
-  const chips = card.querySelectorAll('.kpi-chip');
-  kpis.forEach((kpi, i) => {
-    if (!chips[i]) return;
-    const valEl = chips[i].querySelector('.kpi-val');
-    const lblEl = chips[i].querySelector('.kpi-label');
-    if (valEl) {
-      valEl.textContent = String(kpi.val);
-      if (kpi.color) valEl.style.color = kpi.color;
-      else if (kpi.alert) valEl.style.color = 'var(--orange)';
-    }
-    if (lblEl && kpi.label) lblEl.textContent = kpi.label;
-  });
-
-  // Update badge
-  const badge = card.querySelector('.agent-badge');
-  if (badge && pending > 0) {
-    badge.textContent = pending + ' PENDING';
-    badge.style.background = 'rgba(255,100,0,0.15)';
-    badge.style.color = 'var(--orange)';
-  }
-
-  // Update activity log in body
-  const body = document.getElementById('body-' + agent);
-  if (body && activity.length > 0) {
-    const existing = body.querySelectorAll('.activity-entry');
-    // Prepend new activity
-    const frag = document.createDocumentFragment();
-    activity.slice(0, 3).forEach(act => {
-      const div = document.createElement('div');
-      div.className = 'activity-entry';
-      const ts = act.ts ? new Date(act.ts).toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit', timeZone:'UTC'}) + ' UTC' : '';
-      div.innerHTML = `<span class="ts">${ts}</span> — ${act.summary}`;
-      frag.appendChild(div);
-    });
-    // Replace first child or prepend
-    if (body.firstChild) {
-      body.insertBefore(frag, body.firstChild);
-    } else {
-      body.appendChild(frag);
-    }
-    // Remove old static entries if there are too many
-    const allEntries = body.querySelectorAll('.activity-entry');
-    if (allEntries.length > 5) {
-      for (let i = 5; i < allEntries.length; i++) allEntries[i].remove();
-    }
-  }
-}
-
-// Load agents data on page load and every 5 min
-loadAgentsData();
-setInterval(loadAgentsData, 300000);
-
-// ── Cron All Toggle ──
-function toggleCronAll(btn) {
-  const el = document.getElementById('cron-all');
-  const open = el.classList.toggle('open');
-  btn.textContent = open ? '▲ HIDE ALL JOBS' : btn.textContent.replace('▲','▼');
-}
-
-// ── Live Time ──
-function updateTime() {
-  const now = new Date();
-  const h = String(now.getUTCHours()).padStart(2, '0');
-  const m = String(now.getUTCMinutes()).padStart(2, '0');
-  const s = String(now.getUTCSeconds()).padStart(2, '0');
-  const el = document.getElementById('live-time');
-  if (el) el.textContent = h + ':' + m + ':' + s + ' UTC';
-}
-setInterval(updateTime, 1000);
-updateTime();
-
-// ── Tool Pings ──
-const TOOLS = [
-  { id: 'tasks', url: 'https://tasks.trillion-initiative.com' },
-  { id: 'okr', url: 'https://okr.trillion-initiative.com' },
-  { id: 'agentschool', url: 'https://agent-school.trillion-initiative.com' },
-  { id: 'ngocrm', url: 'https://ngo-crm-flyraising.pages.dev' },
-  { id: 'acnur', url: 'https://acnur-os.human-altruism.org' },
-  { id: 'costs', url: 'https://costs.enzoduit.com' },
-  { id: 'linkedin', url: 'https://ideas.enzoduit.com' },
-  { id: 'humaninput', url: 'http://188.245.214.39:8765/health' },
-];
-
-async function pingTools() {
-  for (const t of TOOLS) {
-    const dot = document.getElementById('dot-' + t.id);
-    if (!dot) continue;
-    try {
-      await fetch(t.url, { mode: 'no-cors', signal: AbortSignal.timeout(3000) });
-      dot.style.background = '#00C864';
-    } catch {
-      dot.style.background = '#555555';
-    }
-  }
-}
-
-pingTools();
-setInterval(pingTools, 60000);
-
-// ── Decisions API ──
-
-function renderDecisions(pending) {
-  const container = document.getElementById('decisions-container');
-  const badge = document.getElementById('decisions-badge');
-  if (!container) return;
-
-  if (!pending || pending.length === 0) {
-    container.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">No pending decisions. All clear.</div>';
-    if (badge) badge.style.display = 'none';
-    return;
-  }
-
-  if (badge) {
-    badge.textContent = pending.length;
-    badge.style.display = 'inline-block';
-  }
-
-  const urgencyLabel = {2: 'HIGH', 1: 'MED', 0: 'LOW'};
-  const urgencyColor = {2: 'var(--orange)', 1: 'var(--yellow)', 0: 'var(--text-sec)'};
-
-  container.innerHTML = pending.map(d => {
-    const agent = (d.agent || d._agent || '?').toUpperCase();
-    const urgency = d.level !== undefined ? d.level : 0;
-    const title = d.title || '';
-    const proposed = d.proposed_action || '';
-    const desc = d.description || '';
-    const id = d.id || '';
-    const uLabel = urgencyLabel[urgency] || 'LOW';
-    const uColor = urgencyColor[urgency] || 'var(--text-sec)';
-
-    // Format created_at timestamp as relative age + absolute date
-    let ageStr = '';
-    const createdAt = d.created_at || d.timestamp || '';
-    if (createdAt) {
-      const created = new Date(createdAt);
-      const now = new Date();
-      const diffMs = now - created;
-      const diffH = Math.floor(diffMs / 3600000);
-      const diffD = Math.floor(diffMs / 86400000);
-      const dateStr = created.toLocaleDateString('en-GB', {day:'2-digit',month:'short'});
-      const timeStr = created.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',hour12:false});
-      if (diffH < 1) ageStr = 'just now';
-      else if (diffH < 24) ageStr = `${diffH}h ago`;
-      else if (diffD < 7) ageStr = `${diffD}d ago`;
-      else ageStr = `${diffD}d ago`;
-      ageStr = `${dateStr} ${timeStr} · ${ageStr}`;
-    }
-
-    return `<div class="approval-card" id="dec-${id}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-        <div class="approval-title">${agent}: ${title}</div>
-        <span style="font-size:10px;font-family:monospace;color:${uColor};flex-shrink:0;margin-left:8px">${uLabel}</span>
-      </div>
-      ${ageStr ? `<div style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-bottom:4px">🕐 ${ageStr}</div>` : ''}
-      ${proposed ? `<div class="approval-desc">${proposed}</div>` : ''}
-      ${desc && desc !== proposed ? `<div class="approval-desc" style="font-size:11px;color:var(--text-muted)">${desc.substring(0, 120)}${desc.length > 120 ? '…' : ''}</div>` : ''}
-      <div class="approval-actions">
-        <button class="btn-approve" onclick="doDecide('${id}','approve')">APPROVE</button>
-        <button class="btn-sendback" onclick="showSendback('${id}')">SEND BACK ↩</button>
-        <button class="btn-reject" onclick="doDecide('${id}','reject')">REJECT</button>
-      </div>
-      <div id="sendback-form-${id}" style="display:none;margin-top:8px;">
-        <textarea class="sendback-input" id="sendback-note-${id}" rows="3" placeholder="Your feedback for the agent — what should be reconsidered or changed?"></textarea>
-        <div style="display:flex;gap:6px;margin-top:6px;">
-          <button class="btn-sendback" style="flex:1" onclick="doSendback('${id}')">SEND FEEDBACK ↩</button>
-          <button class="btn-reject" style="flex:0.4;font-size:10px" onclick="hideSendback('${id}')">CANCEL</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function loadDecisions() {
-  try {
-    const r = await fetch('/decisions');
-    const data = await r.json();
-    renderDecisions(data.pending || []);
-  } catch(e) {
-    const container = document.getElementById('decisions-container');
-    if (container) container.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">No pending decisions.</div>';
-  }
-}
-
-async function doDecide(id, action) {
-  const card = document.getElementById('dec-' + id);
-  try {
-    const r = await fetch('/decide', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: id, action: action })
-    });
-    if (r.ok) {
-      if (card) {
-        card.style.opacity = '0.4';
-        const title = card.querySelector('.approval-title');
-        if (title) title.textContent = action === 'approve' ? '✓ APPROVED' : '✗ REJECTED';
-        const btns = card.querySelector('.approval-actions');
-        if (btns) btns.style.display = 'none';
-      }
-    }
-  } catch (e) {
-    if (card) {
-      card.style.opacity = '0.4';
-      const title = card.querySelector('.approval-title');
-      if (title) title.textContent = action === 'approve' ? '✓ APPROVED (offline)' : '✗ REJECTED (offline)';
-      const btns = card.querySelector('.approval-actions');
-      if (btns) btns.style.display = 'none';
-    }
-  }
-}
-
-function showSendback(id) {
-  const form = document.getElementById('sendback-form-' + id);
-  if (form) { form.style.display = 'block'; }
-}
-
-function hideSendback(id) {
-  const form = document.getElementById('sendback-form-' + id);
-  if (form) { form.style.display = 'none'; }
-}
-
-async function doSendback(id) {
-  const noteEl = document.getElementById('sendback-note-' + id);
-  const note = noteEl ? noteEl.value.trim() : '';
-  if (!note) { alert('Please add feedback before sending back.'); return; }
-  const card = document.getElementById('dec-' + id);
-  try {
-    const r = await fetch('/decide', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: id, action: 'sendback', note: note })
-    });
-    if (r.ok) {
-      if (card) {
-        card.style.opacity = '0.5';
-        card.style.borderColor = 'rgba(255,180,0,0.5)';
-        const title = card.querySelector('.approval-title');
-        if (title) title.textContent = '↩ SENT BACK — agent will revise';
-        const btns = card.querySelector('.approval-actions');
-        if (btns) btns.style.display = 'none';
-        const form = document.getElementById('sendback-form-' + id);
-        if (form) form.style.display = 'none';
-      }
-    }
-  } catch(e) {
-    alert('Error sending back: ' + e.message);
-  }
-}
-
-// Legacy shims for old hardcoded calls
-async function approveDecision(id) { return doDecide(id, 'approve'); }
-async function rejectDecision(id) { return doDecide(id, 'reject'); }
-
-// ── Credentials Reveal ──
-const CREDS = [
-  'Load from /workspace/railway/cloudflare-config.json → anthropic_key',
-  'Load from /workspace/railway/cloudflare-config.json → token',
-  'Load from /workspace/railway/ → railway token',
-  'Load from workspace → hetzner token',
-  'Load from /workspace/garmin/ → session token',
-  'Load from /workspace/gmail/ → oauth token',
-  'Load from openclaw config → gateway token',
-  'Load from /workspace/railway/ → decisions api key',
-];
-
-const revealState = {};
-
-function revealCred(i) {
-  const el = document.getElementById('cred-' + i);
-  const hint = document.getElementById('hint-' + i);
-  if (!revealState[i]) {
-    el.classList.add('revealed');
-    el.textContent = CREDS[i];
-    hint.textContent = 'TAP TO HIDE';
-    revealState[i] = true;
-  } else {
-    el.classList.remove('revealed');
-    el.textContent = '••••••••••••••••••••••••••••••••••••••••';
-    hint.textContent = 'TAP TO REVEAL';
-    revealState[i] = false;
-  }
-}
-
-</script>
-<script>
-// ── DECISIONS TAB ──────────────────────────────────────────────────────────
-async function loadDecisionsList() {
-  var list = document.getElementById('decisions-list');
-  if (!list) return;
-  try {
-    var r = await fetch('/decisions');
-    var data = await r.json();
-    var pending = data.pending || [];
-    if (pending.length === 0) {
-      list.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">No pending decisions · All clear ✓</div>';
-      return;
-    }
-    var uc = {high:'#FF4444',medium:'#FFC800',low:'#888'};
-    var html = '';
-    for (var i = 0; i < pending.length; i++) {
-      var d = pending[i];
-      var agent = (d.agent||'?').toUpperCase();
-      var title = (d.title||'').replace(/[\u23F3\u1F4A1\u26A0\uFE0F\u{1F680}-\u{1FFFF}]/gu,'').trim();
-      var urgencyRaw = d.urgency;
-      var urgency = typeof urgencyRaw === 'number'
-        ? (urgencyRaw >= 2 ? 'high' : urgencyRaw === 1 ? 'medium' : 'low')
-        : (urgencyRaw || 'medium');
-      var color = uc[urgency]||'#888';
-      var did = d.id||'';
-      // Build full detail text
-      var desc = d.description || '';
-      var proposed = d.proposed_action || '';
-      var impact = d.estimated_impact || d.impact || '';
-      var detailHtml = '';
-      if (proposed) detailHtml += '<div style="margin-top:8px;font-size:11px;color:#aaa;"><span style="color:#666;font-family:var(--font-mono);font-size:10px;">PROPOSED:</span><br>' + proposed.replace(/\n/g,'<br>') + '</div>';
-      if (desc && desc !== proposed) detailHtml += '<div style="margin-top:6px;font-size:11px;color:#888;">' + desc.replace(/\n/g,'<br>') + '</div>';
-      if (impact) detailHtml += '<div style="margin-top:6px;font-size:10px;color:#666;font-style:italic;">' + impact.replace(/\n/g,'<br>') + '</div>';
-
-      html += '<div style="background:#141414;border:1px solid #1C1C1C;padding:12px 14px;margin-bottom:8px;" id="dec' + i + '">';
-      // Header row: urgency + agent + title + expand + action buttons
-      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">';
-      html += '<div style="min-width:0;flex:1;cursor:pointer;" onclick="toggleDecDetail(' + i + ')">';
-      html += '<div style="font-family:var(--font-mono);font-size:10px;color:' + color + ';margin-bottom:3px;">' + urgency.toUpperCase() + ' · ' + agent + '</div>';
-      html += '<div style="font-size:12px;color:#F0F0F0;">' + title + ' <span style="color:#555;font-size:10px;" id="dectog' + i + '">▼</span></div>';
-      html += '</div>';
-      html += '<div style="display:flex;gap:6px;flex-shrink:0;margin-top:2px;">';
-      html += '<button data-id="' + did + '" data-action="approve" data-idx="' + i + '" onclick="qd(this.dataset.id,this.dataset.action,this.dataset.idx)" style="background:rgba(0,200,100,0.1);border:1px solid rgba(0,200,100,0.3);color:#00C864;font-family:var(--font-mono);font-size:10px;padding:5px 10px;cursor:pointer;">✓</button>';
-      html += '<button data-id="' + did + '" data-action="reject" data-idx="' + i + '" onclick="qd(this.dataset.id,this.dataset.action,this.dataset.idx)" style="background:rgba(255,68,68,0.1);border:1px solid rgba(255,68,68,0.3);color:#FF4444;font-family:var(--font-mono);font-size:10px;padding:5px 10px;cursor:pointer;">✗</button>';
-      if (d.session_id) { html += '<button onclick="deJumpToSession(\'' + (d.agent||'') + '\',\'' + d.session_id + '\')" style="background:none;border:1px solid var(--text-muted);color:var(--text-muted);font-family:\'JetBrains Mono\',monospace;font-size:9px;padding:5px 10px;cursor:pointer;margin-left:2px">→ SESSION</button>'; }
-      html += '</div></div>';
-      // Collapsible detail section (hidden by default)
-      html += '<div id="decdetail' + i + '" style="display:none;border-top:1px solid #1C1C1C;margin-top:10px;padding-top:8px;">';
-      html += detailHtml;
-      html += '<div style="margin-top:10px;">';
-      html += '<textarea id="decnote' + i + '" placeholder="Optional: conditions, instructions, context for the agent..." rows="2" style="width:100%;box-sizing:border-box;background:#0A0A0A;border:1px solid #2a2a2a;color:#ccc;font-family:var(--font-mono);font-size:11px;padding:8px;resize:vertical;outline:none;"></textarea>';
-      html += '</div>';
-      html += '</div>';
-      html += '</div>';
-    }
-    list.innerHTML = html;
-  } catch(e) {
-    if (list) list.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">Error: ' + e.message + '</div>';
-  }
-}
-
-function toggleDecDetail(i) {
-  var el = document.getElementById('decdetail' + i);
-  var tog = document.getElementById('dectog' + i);
-  if (!el) return;
-  var hidden = el.style.display === 'none';
-  el.style.display = hidden ? 'block' : 'none';
-  if (tog) tog.textContent = hidden ? '▲' : '▼';
-}
-
-async function qd(id, action, index) {
-  var noteEl = document.getElementById('decnote' + index);
-  var note = noteEl ? noteEl.value.trim() : '';
-  var el = document.getElementById('dec' + index);
-  if (el) el.style.opacity = '0.4';
-  try {
-    await fetch('/decide', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({id: id, action: action, note: note})
-    });
-    var label = action === 'approve' ? '✓ APPROVED' : '✗ REJECTED';
-    var color = action === 'approve' ? '#00C864' : '#FF4444';
-    var noteDisplay = note ? '<div style="font-size:10px;color:#666;margin-top:4px;font-style:italic;">"' + note + '"</div>' : '';
-    if (el) el.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;color:' + color + ';padding:8px;">' + label + noteDisplay + '</div>';
-  } catch(e) { if (el) el.style.opacity = '1'; }
-}
-// ── END DECISIONS TAB ──────────────────────────────────────────────────────
-
-</script>
-<script>
-
-// ── NATIVE VOICE SESSION (WebSocket / pure browser APIs) ──────────────────
-var _voiceWs = null;
-var _voiceStream = null;
-var _voiceAudioCtx = null;
-var _voiceProcessor = null;
-var _voiceSourceNode = null;
-var _voiceQueue = [];
-var _voicePlaying = false;
-
-function setVoiceStatus(text) {
-  var el = document.getElementById('voice-status');
-  if (el) el.textContent = text;
-}
-
-async function loadSettingsData() {
-  var el = document.getElementById('settings-creds-list');
-  if (!el) return;
-  try {
-    var r = await fetch('/settings-data');
-    var d = await r.json();
-    var creds = d.credentials || [];
-    var gwStatus = d.gateway_status || 'unknown';
-    var html = '';
-    creds.forEach(function(c) {
-      var color = c.status === 'ok' ? 'var(--green)' : c.status === 'error' ? 'var(--red)' : 'var(--yellow)';
-      html += '<div class="cred-card" style="cursor:default">';
-      html += '<div class="cred-label">' + c.label + '</div>';
-      html += '<div class="cred-val" style="color:#888;font-size:11px;">' + c.masked + '</div>';
-      html += '<div style="font-family:var(--font-mono);font-size:9px;color:' + color + ';margin-top:2px;">' + c.status.toUpperCase() + '</div>';
-      html += '</div>';
-    });
-    html += '<div class="cred-card" style="cursor:default;">';
-    html += '<div class="cred-label">OPENCLAW GATEWAY</div>';
-    html += '<div style="font-family:var(--font-mono);font-size:10px;color:' + (gwStatus === 'ok' ? 'var(--green)' : 'var(--yellow)') + ';">' + gwStatus.toUpperCase() + '</div>';
-    html += '</div>';
-    el.innerHTML = html;
-  } catch(e) {
-    if (el) el.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">Error: ' + e.message + '</div>';
-  }
-}
-
-async function loadSystemData() {
-  var el = document.getElementById('cron-live');
-  if (!el) return;
-  el.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">Loading...</div>';
-  try {
-    var r = await fetch('/system-data');
-    var d = await r.json();
-    var jobs = d.jobs || [];
-    var errorJobs = jobs.filter(function(j) { return j.errors > 0; });
-    var okJobs = jobs.filter(function(j) { return j.errors === 0 && j.enabled; });
-    var disabledJobs = jobs.filter(function(j) { return !j.enabled; });
-
-    var html = '<div class="card"><div class="card-inner">';
-
-    // Summary badge
-    if (errorJobs.length > 0) {
-      html += '<div class="error-summary-badge"><div class="error-badge-dot"></div>';
-      html += '<span class="error-badge-text">' + errorJobs.length + ' JOB' + (errorJobs.length > 1 ? 'S' : '') + ' WITH ERRORS</span></div>';
-    } else {
-      html += '<div style="font-family:var(--font-mono);font-size:10px;color:#00C864;letter-spacing:1px;margin-bottom:10px;">✓ ALL ' + okJobs.length + ' JOBS OK</div>';
-    }
-
-    // Error jobs first
-    html += '<div class="cron-table">';
-    errorJobs.forEach(function(j) {
-      var label = j.lastError && j.lastError.includes('timeout') ? 'TIMEOUT' : 'ERROR';
-      html += '<div class="cron-row">';
-      html += '<span class="cron-name">' + j.name.substring(0,45) + '</span>';
-      html += '<span class="cron-badge badge-error">' + label + (j.errors > 1 ? ' ×' + j.errors : '') + '</span>';
-      html += '</div>';
-    });
-    html += '</div>';
-
-    // All jobs toggle
-    html += '<button class="show-all-toggle" onclick="toggleCronAll(this)">▼ SHOW ALL ' + jobs.length + ' JOBS</button>';
-    html += '<div id="cron-all"><div style="height:10px"></div><div class="cron-table">';
-    jobs.forEach(function(j) {
-      var badge = '';
-      if (!j.enabled) badge = '<span class="cron-badge" style="color:#555;background:rgba(255,255,255,0.03)">DISABLED</span>';
-      else if (j.errors > 0) badge = '<span class="cron-badge badge-error">ERR ×' + j.errors + '</span>';
-      else badge = '<span class="cron-badge badge-ok">OK</span>';
-      html += '<div class="cron-row"><span class="cron-name">' + j.name.substring(0,45) + '</span>' + badge + '</div>';
-    });
-    html += '</div></div>';
-    html += '</div></div>';
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">Error: ' + e.message + '</div>';
-  }
-}
-
-async function loadAuditLog() {
-  var list = document.getElementById('audit-log-list');
-  if (!list) return;
-  list.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">Loading...</div>';
-  try {
-    var r = await fetch('/audit-log');
-    var data = await r.json();
-    var entries = data.entries || [];
-    if (entries.length === 0) {
-      list.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">No activity logged yet.</div>';
-      return;
-    }
-    var levelColor = {0: '#555', 1: '#FFC800', 2: '#FF4500'};
-    var html = '';
-    entries.forEach(function(e, i) {
-      var ts = e.ts ? new Date(e.ts).toLocaleString('en', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) + ' UTC' : '';
-      var agent = (e.agent||'?').toUpperCase();
-      var lvl = e.level != null ? e.level : 0;
-      var lc = levelColor[lvl] || '#555';
-      var revertible = e.revertible && e.revert_prompt;
-      var entryId = e.id || ('entry-' + i);
-
-      html += '<div style="background:#141414;border:1px solid #1C1C1C;padding:12px 14px;margin-bottom:8px;" id="audit-' + i + '">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">';
-      html += '<div style="flex:1;min-width:0;">';
-      html += '<div style="font-family:var(--font-mono);font-size:10px;color:' + lc + ';margin-bottom:3px;">L' + lvl + ' · ' + agent + ' · ' + ts + '</div>';
-      html += '<div style="font-size:12px;color:#F0F0F0;">' + (e.action||'') + '</div>';
-      if (e.detail) html += '<div style="font-size:11px;color:#888;margin-top:4px;">' + e.detail + '</div>';
-      if (e.artifact) html += '<div style="font-family:var(--font-mono);font-size:10px;color:#555;margin-top:4px;">' + e.artifact + '</div>';
-      html += '</div>';
-      if (revertible) {
-        html += '<div style="flex-shrink:0;margin-top:2px;">';
-        html += '<button onclick="revertAction(\'' + entryId + '\',' + i + ')" style="background:rgba(255,68,68,0.1);border:1px solid rgba(255,68,68,0.3);color:#FF4444;font-family:var(--font-mono);font-size:10px;padding:5px 10px;cursor:pointer;white-space:nowrap;">↩ REVERT</button>';
-        html += '</div>';
-      }
-      html += '</div></div>';
-    });
-    list.innerHTML = html;
-  } catch(e) {
-    list.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#888;padding:12px;">Error: ' + e.message + '</div>';
-  }
-}
-
-async function revertAction(entryId, index) {
-  var el = document.getElementById('audit-' + index);
-  if (el) el.style.opacity = '0.4';
-  try {
-    var r = await fetch('/revert', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: entryId })
-    });
-    var data = await r.json();
-    if (data.ok) {
-      if (el) el.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;color:#FFC800;padding:8px;">↩ REVERT QUEUED — agent will undo within 2 min</div>';
-    } else {
-      if (el) { el.style.opacity = '1'; alert('Revert failed: ' + (data.error||'unknown')); }
-    }
-  } catch(e) {
-    if (el) el.style.opacity = '1';
-  }
-}
-
-async function loadDecisionsForVoice() {
-  var btn = document.getElementById('voice-start-btn');
-  var lbl = document.getElementById('voice-start-label');
-  if (btn) { btn.disabled = true; btn.style.background = '#222'; btn.style.color = '#555'; btn.style.cursor = 'not-allowed'; }
-  if (lbl) lbl.textContent = 'LOADING DECISIONS...';
-  window._voiceLivePrompt = null;
-  try {
-    var resp = await fetch('/decisions');
-    var data = await resp.json();
-    var pending = data.pending || [];
-    var lines = ['You are Enzo\'s AI assistant managing decisions from his digital employees.', ''];
-    if (pending.length === 0) {
-      lines.push('CURRENT PENDING DECISIONS: 0 - all clear.');
-      lines.push('Start by saying: "No pending decisions from your team right now. All clear."');
-    } else {
-      lines.push('CURRENT PENDING DECISIONS (' + pending.length + ' total):');
-      lines.push('');
-      pending.forEach(function(d, i) {
-        var urg = typeof d.urgency === 'number'
-          ? (d.urgency >= 2 ? 'HIGH' : d.urgency === 1 ? 'MEDIUM' : 'LOW')
-          : String(d.urgency || 'medium').toUpperCase();
-        lines.push((i+1) + '. [' + urg + '] ' + (d.agent||'?').toUpperCase() + ': ' + (d.title||''));
-        if (d.proposed_action) lines.push('   Proposed: ' + d.proposed_action);
-        if (d.reasoning_context) lines.push('   Context: ' + d.reasoning_context);
-        lines.push('   ID: ' + (d.id||''));
-        lines.push('');
-      });
-      lines.push('Read each one. Ask approve or reject. Accept verbal conditions. Be concise - Enzo is mobile.');
-    }
-    window._voiceLivePrompt = lines.join('\n');
-    var firstMsg = pending.length === 0
-      ? 'Hey Enzo. No pending decisions right now. All clear.'
-      : 'Hey Enzo. You have ' + pending.length + ' decision' + (pending.length > 1 ? 's' : '') + ' from your team. Let\'s go.';
-
-    // PATCH ElevenLabs agent — must succeed before button enables
-    if (lbl) lbl.textContent = 'UPDATING VOICE AGENT...';
-    var patchResp = await fetch('/update-voice-prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: window._voiceLivePrompt, first_message: firstMsg })
-    });
-    if (!patchResp.ok) throw new Error('Agent PATCH failed: ' + patchResp.status);
-
-    // Enable button only after successful PATCH
-    if (btn) {
-      btn.disabled = false;
-      btn.style.background = '#FF4500';
-      btn.style.color = '#0A0A0A';
-      btn.style.cursor = 'pointer';
-    }
-    if (lbl) lbl.textContent = pending.length === 0
-      ? 'START VOICE SESSION · ALL CLEAR'
-      : 'START VOICE SESSION · ' + pending.length + ' DECISION' + (pending.length > 1 ? 'S' : '');
-  } catch(e) {
-    console.error('loadDecisionsForVoice error:', e);
-    if (lbl) lbl.textContent = 'ERROR — RETRY';
-    if (btn) { btn.disabled = false; btn.style.background = '#555'; btn.style.color = '#999'; btn.style.cursor = 'pointer'; }
-  }
-}
-
-async function startVoiceSession() {
-  document.getElementById('voice-session-idle').style.display = 'none';
-  document.getElementById('voice-session-active').style.display = 'block';
-  setVoiceStatus('REQUESTING MIC...');
-
-  try {
-    // 1. Request microphone permission first (triggers browser dialog)
-    _voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-
-    setVoiceStatus('CONNECTING...');
-
-    // 2a. Prompt already loaded by loadDecisionsForVoice() — skip fetch here
-
-    // 2b. Fetch signed URL via server-side proxy (key stored as CF Pages env var)
-    var r = await fetch('/elevenlabs-signed-url');
-    if (!r.ok) throw new Error('Signed URL fetch failed: ' + r.status);
-    var urlData = await r.json();
-    var signed_url = urlData.signed_url;
-
-    // 3. Open WebSocket
-    _voiceWs = new WebSocket(signed_url);
-
-    _voiceWs.onopen = function() {
-      setVoiceStatus('LISTENING...');
-      // Send prompt override first (before audio chunks)
-      window._voiceOverrideSent = false;
-      if (window._voiceLivePrompt) {
-        try {
-          _voiceWs.send(JSON.stringify({
-            type: 'conversation_initiation_client_data',
-            conversation_config_override: {
-              agent: { prompt: { prompt: window._voiceLivePrompt } }
-            }
-          }));
-        } catch(e) { console.warn('override send failed:', e); }
-      }
-      _setupMicCapture();
-    };
-
-    _voiceWs.onmessage = async function(event) {
-      var msg;
-      try { msg = JSON.parse(event.data); } catch(e) { return; }
-
-      if (msg.type === 'audio') {
-        setVoiceStatus('AGENT SPEAKING...');
-        _enqueueAgentAudio(msg.audio_event.audio_base_64);
-      } else if (msg.type === 'agent_response') {
-        setVoiceStatus('AGENT SPEAKING...');
-      } else if (msg.type === 'user_transcript') {
-        setVoiceStatus('LISTENING...');
-      } else if (msg.type === 'interruption') {
-        _voiceQueue = [];
-        _voicePlaying = false;
-        setVoiceStatus('LISTENING...');
-      } else if (msg.type === 'client_tool_call') {
-        var toolCall = msg.client_tool_call;
-        var result = await _executeVoiceTool(toolCall.tool_name, toolCall.parameters);
-        if (_voiceWs && _voiceWs.readyState === WebSocket.OPEN) {
-          _voiceWs.send(JSON.stringify({
-            type: 'client_tool_result',
-            tool_call_id: toolCall.tool_call_id,
-            result: JSON.stringify(result),
-            is_error: false
-          }));
-        }
-      }
-    };
-
-    _voiceWs.onerror = function(e) {
-      console.error('Voice WS error:', e);
-      setVoiceStatus('CONNECTION ERROR');
-    };
-
-    _voiceWs.onclose = function() {
-      setVoiceStatus('SESSION ENDED');
-      _cleanupVoice();
-      setTimeout(function() {
-        document.getElementById('voice-session-active').style.display = 'none';
-        document.getElementById('voice-session-idle').style.display = 'block';
-        setVoiceStatus('CONNECTING...');
-      }, 1500);
-    };
-
-  } catch(e) {
-    console.error('Voice session error:', e);
-    setVoiceStatus('ERROR: ' + (e.message || 'UNKNOWN'));
-    _cleanupVoice();
-    setTimeout(function() {
-      document.getElementById('voice-session-active').style.display = 'none';
-      document.getElementById('voice-session-idle').style.display = 'block';
-    }, 2500);
-  }
-}
-
-function _setupMicCapture() {
-  try {
-    _voiceAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-    if (_voiceAudioCtx.state === 'suspended') _voiceAudioCtx.resume();
-
-    _voiceSourceNode = _voiceAudioCtx.createMediaStreamSource(_voiceStream);
-
-    // ScriptProcessorNode — broad compat incl. iOS Safari
-    var bufferSize = 4096;
-    _voiceProcessor = _voiceAudioCtx.createScriptProcessor(bufferSize, 1, 1);
-
-    _voiceProcessor.onaudioprocess = function(e) {
-      if (!_voiceWs || _voiceWs.readyState !== WebSocket.OPEN) return;
-      var float32 = e.inputBuffer.getChannelData(0);
-      var pcm16 = _float32ToPcm16(float32);
-      var b64 = _arrayBufferToBase64(pcm16.buffer);
-      _voiceWs.send(JSON.stringify({ user_audio_chunk: b64 }));
-    };
-
-    _voiceSourceNode.connect(_voiceProcessor);
-    _voiceProcessor.connect(_voiceAudioCtx.destination);
-  } catch(e) {
-    console.error('Mic capture setup error:', e);
-    setVoiceStatus('MIC ERROR: ' + e.message);
-  }
-}
-
-function _float32ToPcm16(float32Array) {
-  var pcm = new Int16Array(float32Array.length);
-  for (var i = 0; i < float32Array.length; i++) {
-    var s = Math.max(-1, Math.min(1, float32Array[i]));
-    pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-  }
-  return pcm;
-}
-
-function _arrayBufferToBase64(buffer) {
-  var bytes = new Uint8Array(buffer);
-  var binary = '';
-  var chunk = 8192;
-  for (var i = 0; i < bytes.byteLength; i += chunk) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-
-function _enqueueAgentAudio(base64Pcm) {
-  _voiceQueue.push(base64Pcm);
-  if (!_voicePlaying) _playNextAudio();
-}
-
-function _playNextAudio() {
-  if (!_voiceQueue.length || !_voiceAudioCtx) {
-    _voicePlaying = false;
-    if (!_voiceQueue.length) setVoiceStatus('LISTENING...');
-    return;
-  }
-  _voicePlaying = true;
-  var b64 = _voiceQueue.shift();
-  try {
-    var binary = atob(b64);
-    var bytes = new Uint8Array(binary.length);
-    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    var pcm = new Int16Array(bytes.buffer);
-    var float32 = new Float32Array(pcm.length);
-    for (var j = 0; j < pcm.length; j++) {
-      float32[j] = pcm[j] / (pcm[j] < 0 ? 0x8000 : 0x7FFF);
-    }
-    var audioBuffer = _voiceAudioCtx.createBuffer(1, float32.length, 16000);
-    audioBuffer.copyToChannel(float32, 0);
-    var src = _voiceAudioCtx.createBufferSource();
-    src.buffer = audioBuffer;
-    src.connect(_voiceAudioCtx.destination);
-    src.onended = function() { _playNextAudio(); };
-    src.start();
-  } catch(e) {
-    console.error('Audio playback error:', e);
-    _voicePlaying = false;
-    _playNextAudio();
-  }
-}
-
-async function _executeVoiceTool(toolName, params) {
-  if (toolName === 'approve_decision' || toolName === 'reject_decision') {
-    var action = toolName === 'approve_decision' ? 'approve' : 'reject';
-    var decisionId = (params && (params.id || params.decision_id)) || '';
-    try {
-      var r = await fetch('/decide', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: decisionId, action: action })
-      });
-      var result = await r.json();
-      loadDecisionsList();
-      return { success: true, result: result };
-    } catch(e) {
-      return { success: false, error: e.message };
-    }
-  }
-  return { success: false, error: 'Unknown tool: ' + toolName };
-}
-
-function _cleanupVoice() {
-  if (_voiceProcessor) { try { _voiceProcessor.disconnect(); } catch(e) {} _voiceProcessor = null; }
-  if (_voiceSourceNode) { try { _voiceSourceNode.disconnect(); } catch(e) {} _voiceSourceNode = null; }
-  if (_voiceAudioCtx) { try { _voiceAudioCtx.close(); } catch(e) {} _voiceAudioCtx = null; }
-  if (_voiceStream) { _voiceStream.getTracks().forEach(function(t) { t.stop(); }); _voiceStream = null; }
-  _voiceWs = null;
-  _voiceQueue = [];
-  _voicePlaying = false;
-}
-
-async function stopVoiceSession() {
-  if (_voiceWs) { try { _voiceWs.close(); } catch(e) {} }
-  _cleanupVoice();
-  document.getElementById('voice-session-active').style.display = 'none';
-  document.getElementById('voice-session-idle').style.display = 'block';
-  setVoiceStatus('CONNECTING...');
-  loadDecisionsList();
-}
-// ── END NATIVE VOICE SESSION ───────────────────────────────────────────────
-
-// ══════════════════════════════════════════════════════
-// TASKS
-// ══════════════════════════════════════════════════════
-async function loadTasks() {
-  const openEl = document.getElementById('tasks-list');
-  const doneEl = document.getElementById('tasks-done-list');
-  openEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#444;">Loading...</div>';
-  try {
-    const r = await fetch('/tasks?t=' + Date.now());
-    const data = await r.json();
-    renderTasks(data.open || [], openEl, false);
-    renderTasks((data.done || []).slice(-5).reverse(), doneEl, true);
-  } catch(e) {
-    openEl.innerHTML = '<div style="color:#666;font-family:var(--font-mono);font-size:12px;">Error: ' + e.message + '</div>';
-  }
-}
-
-function renderTasks(tasks, el, isDone) {
-  if (!tasks.length) {
-    el.innerHTML = '<div style="font-family:var(--font-mono);font-size:12px;color:#333;">' + (isDone ? 'No completed tasks yet.' : 'No open tasks — all clear.') + '</div>';
-    return;
-  }
-  el.innerHTML = tasks.map(t => `
-    <div style="background:#141414;border:1px solid ${isDone ? '#2a2a2a' : '#FF4500'};padding:16px;margin-bottom:10px;${isDone ? 'opacity:0.5' : ''}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
-        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:2px;color:${isDone ? '#444' : '#FF4500'};">[${(t.agent||'').toUpperCase()}] · ${isDone ? '✓ DONE' : 'OPEN'}</div>
-        <div style="font-family:var(--font-mono);font-size:9px;color:#333;">${(t.created_at||'').slice(0,10)}</div>
-      </div>
-      <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#e0e0e0;margin-bottom:10px;">${escHtml(t.title||'')}</div>
-      <div style="font-family:var(--font-mono);font-size:11px;color:#888;line-height:1.6;margin-bottom:12px;white-space:pre-wrap;">${escHtml(t.action_text||'')}</div>
-      ${t.estimated_impact ? `<div style="font-family:var(--font-mono);font-size:10px;color:#555;margin-bottom:12px;">IMPACT: ${escHtml(t.estimated_impact)}</div>` : ''}
-      ${!isDone ? `<button onclick="markTaskDone('${t.id}', this)" style="background:#FF4500;border:none;color:#fff;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:2px;padding:10px 20px;cursor:pointer;width:100%;">MARK AS DONE ✓</button>` : `<div style="font-family:var(--font-mono);font-size:10px;color:#333;">Completed: ${(t.done_at||'').slice(0,10)}</div>`}
-    </div>
-  `).join('');
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-async function markTaskDone(taskId, btn) {
-  btn.disabled = true;
-  btn.textContent = 'SAVING...';
-  try {
-    const r = await fetch('/task-done', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: taskId })
-    });
-    const data = await r.json();
-    if (data.ok) {
-      btn.textContent = '✓ DONE';
-      btn.style.background = '#1a3a1a';
-      setTimeout(() => loadTasks(), 800);
-    } else {
-      btn.textContent = 'ERROR — RETRY';
-      btn.disabled = false;
-    }
-  } catch(e) {
-    btn.textContent = 'ERROR — RETRY';
-    btn.disabled = false;
-  }
-}
-// ── END TASKS ─────────────────────────────────────────
-
-</script>
-
-<script>
-// Load workspace files from external JSON
-(function() {
-  function renderWorkspace(data) {
-    var container = document.getElementById('ws-file-list');
-    if (!container) return;
-    container.innerHTML = '';
-    var files = data.files;
-    var icons = data.icons || {};
-    Object.keys(files).forEach(function(name) {
-      var icon = icons[name] || '📄';
-      var size = Math.round(files[name].length / 1024 * 10) / 10;
-      var el = document.createElement('div');
-      el.className = 'card';
-      el.style.cssText = 'cursor:pointer;margin-bottom:8px;';
-      el.innerHTML = '<div class="card-inner" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
-        '<div style="display:flex;align-items:center;gap:12px;">' +
-        '<span style="font-size:20px;">' + icon + '</span>' +
-        '<div><div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#F0F0F0;">' + name + '</div>' +
-        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:#555;margin-top:2px;">' + size + ' KB</div></div>' +
-        '</div>' +
-        '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:#FF4500;letter-spacing:0.1em;">OPEN →</span>' +
-        '</div>';
-      el.onclick = function() {
-        document.getElementById('ws-modal-title').textContent = name;
-        document.getElementById('ws-modal-body').textContent = files[name];
-        document.getElementById('ws-modal').style.display = 'block';
-        document.getElementById('ws-modal').scrollTop = 0;
-      };
-      container.appendChild(el);
-    });
-  }
-
-  function loadWorkspace() {
-    fetch('/ws-data.json?v=' + Date.now())
-      .then(function(r) { return r.json(); })
-      .then(function(data) { renderWorkspace(data); })
-      .catch(function(e) {
-        var c = document.getElementById('ws-file-list');
-        if (c) c.innerHTML = '<div style="font-size:12px;color:#555;padding:8px 0;">Could not load files.</div>';
-      });
-  }
-
-  // Load immediately + on tab switch
-  loadWorkspace();
-})();
-
-</script>
-<script>
-// ── DIGITAL EMPLOYEES TAB ──────────────────────────────────────────────────
-let deSelectedDE=null,deSelectedSession=null,deRefreshTimer=null;
-function deStopRefresh(){if(deRefreshTimer){clearInterval(deRefreshTimer);deRefreshTimer=null;}}
-function deStartRefresh(name,sid){
-  deStopRefresh();
-  deRefreshTimer=setInterval(async()=>{
-    try{
-      const r=await fetch(`https://decisions.enzoduit.com/de/${name}/sessions/${sid}`, {headers: {'Authorization': 'Bearer os-decisions-2026-xK9mP'}});const s=await r.json();
-      const c=document.getElementById('de-steps-container');
-      if(c)c.innerHTML=(s.steps||[]).map(step=>deRenderStep(step)).join('');
-      const si={complete:'✅',paused_human:'⏳',running:'🔄',error:'❌',paused_colleague:'💬',queued:'📋',max_iterations_reached:'🔄'};
-      const hdr=document.getElementById('de-session-status');
-      if(hdr)hdr.textContent=si[s.status]||'◌';
-      if(s.status!=='running'&&s.status!=='queued'){deStopRefresh();const ind=document.getElementById('de-live-indicator');if(ind)ind.style.display='none';deSelect(deSelectedDE);}
-    }catch(e){}
-  },3000);
-}
-
-async function deInit(){await deLoadList();}
-
-async function deLoadList(){
+/* ═══ DE LIST ═══ */
+async function loadList(){
   try{
-    const r=await fetch('https://decisions.enzoduit.com/de-list', {headers: {'Authorization': 'Bearer os-decisions-2026-xK9mP'}});const d=await r.json();
+    const r=await fetch('/de-list');const d=await r.json();
     const des=d.des||[];
-    const c=document.getElementById('de-list-cards');if(!c)return;
+    const c=$('de-list');
+    if(!des.length){c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No employees yet.<br>Click + NEW to create one.</div>';return;}
     c.innerHTML=des.map(de=>`
-      <div class="de-card" id="de-card-${de.name}" onclick="deSelect('${de.name}')">
+      <div class="de-item ${selectedDE===de.name?'active':''}" id="di-${de.name}" onclick="selectDE('${de.name}')">
         <div class="de-dot" style="background:${de.color||'#FF4500'}"></div>
-        <div style="min-width:0">
-          <div class="mono" style="font-size:11px;font-weight:700;color:var(--text)">${de.display_name||de.name.toUpperCase()}</div>
-          <div style="font-size:10px;color:var(--text-muted);line-height:1.3;margin-top:1px">${(de.role||'').substring(0,30)}</div>
-          ${(de.pending_decisions||0)>0?`<div style="font-size:9px;color:var(--orange);margin-top:2px">⚠ ${de.pending_decisions} pending</div>`:''}
-          ${de.last_session?`<div style="font-size:9px;color:var(--text-muted);margin-top:2px">${deTimeAgo(de.last_session.created_at)}</div>`:''}
+        <div class="de-item-info">
+          <div class="de-item-name">${esc(de.display_name||de.name.toUpperCase())}</div>
+          <div class="de-item-role">${esc((de.role||'').substring(0,28))}</div>
         </div>
+        ${(de.pending_decisions||0)>0?`<div class="de-badge">${de.pending_decisions}</div>`:''}
       </div>`).join('');
-  }catch(e){const c=document.getElementById('de-list-cards');if(c)c.innerHTML='<div style="color:var(--red);font-size:10px;padding:8px">Failed to load</div>';}
+    const total=des.reduce((s,d)=>s+(d.pending_decisions||0),0);
+    const pill=$('decisions-pill');
+    if(pill){pill.textContent=`⏳ ${total} decision${total!==1?'s':''}`;pill.classList.toggle('active',total>0);}
+  }catch(e){$('de-list').innerHTML='<div style="padding:16px;font-size:11px;color:var(--red)">Failed to load</div>';}
 }
 
-// mdToHtml: minimal markdown → HTML
-function mdToHtml(text){
-  if(!text)return'';
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/^# (.+)$/gm,'<div style="font-size:13px;font-weight:700;color:var(--text);margin:8px 0 4px">$1</div>')
-    .replace(/^## (.+)$/gm,'<div style="font-size:12px;font-weight:600;color:var(--text-sec);margin:6px 0 3px">$1</div>')
-    .replace(/^---$/gm,'<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">')
-    .replace(/^[\*\-] (.+)$/gm,'<div style="padding-left:12px">· $1</div>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`(.+?)`/g,'<code style="background:var(--surface2);border-radius:3px;padding:1px 4px;font-family:\'JetBrains Mono\',monospace;font-size:0.9em">$1</code>')
-    .replace(/\n/g,'<br>');
-}
-
-async function deSelect(name){
-  deStopRefresh();
-  deSelectedDE=name;deSelectedSession=null;
-  document.querySelectorAll('.de-card').forEach(c=>c.classList.remove('active'));
-  const card=document.getElementById('de-card-'+name);if(card)card.classList.add('active');
-  const center=document.getElementById('de-center-pane');
-  const profile=document.getElementById('de-profile-pane');
-  if(center)center.innerHTML='<div style="color:var(--text-muted);font-size:11px;padding:20px">Loading...</div>';
-  if(profile)profile.innerHTML='<div style="color:var(--text-muted);font-size:11px;padding:20px">Loading...</div>';
+async function selectDE(name){
+  selectedDE=name;
+  closeSidebar();
+  document.querySelectorAll('.de-item').forEach(el=>el.classList.remove('active'));
+  const item=$('di-'+name);if(item)item.classList.add('active');
+  $('empty-state').style.display='none';
+  $('de-view').classList.add('visible');
   try{
-    const r=await fetch('https://decisions.enzoduit.com/de/'+name, {headers: {'Authorization': 'Bearer os-decisions-2026-xK9mP'}});const de=await r.json();
-    deRenderCenter(name,de.sessions||de.recent_sessions||[]);
-    deRenderProfilePane(de);
+    const r=await fetch('/de/'+name);const de=await r.json();
+    $('dv-name').textContent=de.display_name||name.toUpperCase();
+    $('dv-role').textContent=de.role||'';
+    const av=$('dv-avatar');
+    av.textContent=(de.display_name||name)[0].toUpperCase();
+    av.style.background=de.color||'#FF4500';
+    switchTab('chat');
+    $('chat-messages').innerHTML=`<div style="color:var(--text-muted);font-size:12px;text-align:center;margin-top:48px">Send a message to start a session with <strong>${esc(de.display_name||name.toUpperCase())}</strong>.</div>`;
+  }catch(e){}
+}
+
+/* ═══ TABS ═══ */
+function switchTab(name){
+  const names=['chat','progress','profile'];
+  document.querySelectorAll('.de-tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
+  document.querySelectorAll('.tab-pane').forEach((p,i)=>p.classList.toggle('active',names[i]===name));
+  if(name==='progress'&&selectedDE)loadProgress(selectedDE);
+  if(name==='profile'&&selectedDE)loadProfile(selectedDE);
+}
+
+/* ═══ CHAT ═══ */
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+function chatKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}}
+
+async function sendChat(){
+  const input=$('chat-input');
+  const msg=(input.value||'').trim();
+  if(!msg||!selectedDE)return;
+  input.value='';input.style.height='';
+  const sendBtn=$('btn-send');sendBtn.disabled=true;
+  const msgs=$('chat-messages');
+  msgs.innerHTML+=`<div class="msg-user">${esc(msg)}</div>`;
+  const tid='t'+Date.now();
+  msgs.innerHTML+=`<div class="thinking-wrap" id="${tid}"><div class="thinking-dots"><span></span><span></span><span></span></div><span id="${tid}-lbl">Starting…</span></div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+  try{
+    const r=await fetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:selectedDE,trigger_type:'chat',trigger_context:msg})});
+    const d=await r.json();
+    if(!d.ok)throw new Error(d.error||'Failed to start');
+    chatPoll(selectedDE,d.session_id,tid,sendBtn);
   }catch(e){
-    if(center)center.innerHTML=`<div style="color:var(--red);padding:20px">Error: ${e.message}</div>`;
+    $(tid)?.remove();
+    msgs.innerHTML+=`<div class="msg-agent"><div class="step-bubble" style="border-color:var(--red)"><div class="step-bubble-label" style="color:var(--red)">ERROR</div><div class="step-bubble-body">${esc(e.message)}</div></div></div>`;
+    sendBtn.disabled=false;msgs.scrollTop=msgs.scrollHeight;
   }
-  // On mobile: auto-switch to sessions pane after selecting a DE
-  if(window.innerWidth<=767)deMobileShowPane('sessions');
 }
 
-function deRenderCenter(deName,sessions){
-  const center=document.getElementById('de-center-pane');if(!center)return;
-  const si={complete:'✅',paused_human:'⏳',running:'🔄',error:'❌',paused_colleague:'💬',queued:'📋',max_iterations_reached:'🔄'};
-  const sessionCards=sessions.length
-    ? sessions.map(s=>`
-        <div class="de-session-card" id="de-sc-${s.id}" onclick="deLoadSession('${deName}','${s.id}')">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px">${si[s.status]||'◌'}</span>
-            <span class="mono" style="font-size:9px;color:var(--text-muted)">${deTimeAgo(s.created_at)}</span>
-          </div>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:3px">${s.trigger_type||'cron'} · ${s.step_count||0} steps</div>
-          ${s.summary?`<div style="font-size:11px;color:var(--text-sec);margin-top:4px;line-height:1.4">${s.summary.substring(0,70)}${s.summary.length>70?'…':''}</div>`:''}
-        </div>`).join('')
-    : '<div style="color:var(--text-muted);font-size:11px;padding:16px">No sessions yet. Click ▶ START to begin.</div>';
-  center.innerHTML=`
-    <div class="de-center-header">
-      <span class="mono" style="flex:1;font-size:11px;font-weight:700;color:var(--text)">${deName.toUpperCase()}</span>
-      <button class="de-start-btn" id="de-start-btn" onclick="deStartSession()">▶ START</button>
-      <button class="de-new-btn" id="de-new-btn" onclick="deNewSession()">＋ NEW SESSION</button>
-    </div>
-    <div id="de-new-session-area" style="display:none">
-      <div class="de-new-session-form">
-        <div class="mono" style="font-size:10px;color:var(--text-muted);margin-bottom:8px">Message to ${deName.toUpperCase()}:</div>
-        <textarea id="de-new-session-msg" rows="3" placeholder="Describe what you need..."></textarea>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button onclick="deNewSessionCancel()" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-sec);cursor:pointer">Cancel</button>
-          <button onclick="deNewSessionSend('${deName}')" style="flex:2;background:var(--orange);border:none;border-radius:6px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#fff;cursor:pointer">▶ Send</button>
-        </div>
-      </div>
-    </div>
-    <div id="de-session-list" style="flex:1;overflow-y:auto">${sessionCards}</div>`;
+function chatPoll(de,sid,tid,sendBtn){
+  const msgs=$('chat-messages');
+  let last=0,attempts=0;
+  $('dv-live').style.display='inline-flex';
+  if(chatPoller)clearInterval(chatPoller);
+  chatPoller=setInterval(async()=>{
+    try{
+      const r=await fetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
+      const steps=s.steps||[];
+      if(steps.length>last){
+        steps.slice(last).forEach(step=>{const el=renderChatStep(step);if(el){msgs.innerHTML+=el;}});
+        last=steps.length;msgs.scrollTop=msgs.scrollHeight;
+      }
+      const lbl=$(`${tid}-lbl`);
+      if(lbl)lbl.textContent=`${steps.length} steps…`;
+      if(s.status!=='running'&&s.status!=='queued'){
+        clearInterval(chatPoller);
+        $(tid)?.remove();
+        $('dv-live').style.display='none';
+        sendBtn.disabled=false;
+        if(s.summary)msgs.innerHTML+=`<div class="msg-agent"><div class="msg-summary">${esc(s.summary)}</div></div>`;
+        if(s.status==='paused_human'){msgs.innerHTML+=`<div class="msg-agent"><div class="step-bubble" style="border-color:var(--yellow)"><div class="step-bubble-label" style="color:var(--yellow)">⏳ DECISION NEEDED</div><div class="step-bubble-body">This employee needs your approval to continue. Check the Decisions panel.</div></div></div>`;loadDecisionsPending();}
+        msgs.scrollTop=msgs.scrollHeight;
+        loadList();
+      }
+      if(++attempts>120)clearInterval(chatPoller);
+    }catch(e){}
+  },2500);
 }
 
-function deRenderProfilePane(de){
-  const profile=document.getElementById('de-profile-pane');if(!profile)return;
-  const profileContent=`
-    <div style="margin-bottom:16px">
-      <div class="mono" style="font-size:9px;color:var(--text-muted);letter-spacing:0.1em">${de.role||''}</div>
-      <div style="font-size:18px;font-weight:700;color:${de.color||'var(--orange)'};margin:4px 0 2px">${de.display_name||de.name?.toUpperCase()}</div>
-    </div>
-    <div class="section-label">MISSION</div>
-    <p style="font-size:12px;color:var(--text-sec);line-height:1.7;margin-bottom:16px">${de.mission||'—'}</p>
-    <div class="section-label">KPIs</div>
-    <ul style="font-size:11px;color:var(--text-sec);padding-left:14px;margin-bottom:16px;line-height:1.8">${(de.kpis||[]).map(k=>`<li>${k}</li>`).join('')}</ul>
-    <div class="section-label">AUTONOMY</div>
-    <div style="margin-bottom:16px">
-      ${deLevel('Level 0 — No Approval','#22c55e',de.responsibilities?.level_0||[])}
-      ${deLevel('Level 1 — Do + Document','#FFC800',de.responsibilities?.level_1||[])}
-      ${deLevel('Level 2 — Approval Required','#FF4500',de.responsibilities?.level_2||[])}
-    </div>
-    ${(de.hard_constraints||[]).length?`<div class="section-label">HARD CONSTRAINTS</div><ul style="font-size:11px;color:var(--red);padding-left:14px;margin-bottom:16px;line-height:1.8">${de.hard_constraints.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}
-    <div class="section-label">TRIGGERS</div>
-    <div style="margin-bottom:16px">${(de.triggers||[]).map(t=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px"><div class="mono" style="font-size:9px;color:var(--orange);letter-spacing:0.1em;margin-bottom:3px">${(t.type||'').toUpperCase()}</div><div style="font-size:11px;color:var(--text)">${t.schedule||t.description||''}</div>${t.schedule&&t.description?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${t.description}</div>`:''}</div>`).join('')}</div>
-    <div class="section-label">COLLEAGUES</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${(de.colleagues||[]).map(c=>`<span style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-muted)">${c.toUpperCase()}</span>`).join('')}</div>
-    <div class="section-label">DATA SOURCES</div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:16px;line-height:1.8">${(de.data_sources||[]).map(s=>`<div>· ${s}</div>`).join('')}</div>`;
-  const workspaceContent=`<div id="de-workspace-body"><div style="color:var(--text-muted);font-size:12px">Loading workspace...</div></div>`;
-  profile.innerHTML=`
-    <div class="de-profile-tabs">
-      <div class="de-profile-tab active" id="de-ptab-profile" onclick="deProfileTab('profile')">PROFILE</div>
-      <div class="de-profile-tab" id="de-ptab-workspace" onclick="deProfileTab('workspace')">WORKSPACE</div>
-    </div>
-    <div id="de-profile-content-profile" class="de-profile-body">${profileContent}</div>
-    <div id="de-profile-content-workspace" class="de-profile-body" style="display:none">${workspaceContent}</div>`;
-}
-
-function deProfileTab(tab){
-  document.querySelectorAll('.de-profile-tab').forEach(t=>t.classList.remove('active'));
-  const activeTab=document.getElementById('de-ptab-'+tab);
-  if(activeTab)activeTab.classList.add('active');
-  ['profile','workspace'].forEach(t=>{
-    const el=document.getElementById('de-profile-content-'+t);
-    if(el)el.style.display=t===tab?'block':'none';
-  });
-  if(tab==='workspace'&&deSelectedDE)deRenderWorkspace(deSelectedDE);
-}
-
-async function deLoadSession(deName,sessionId){
-  deSelectedSession=sessionId;
-  document.querySelectorAll('.de-session-card').forEach(c=>c.classList.remove('active'));
-  const sc=document.getElementById('de-sc-'+sessionId);if(sc)sc.classList.add('active');
-  const center=document.getElementById('de-center-pane');
-  if(center)center.innerHTML='<div style="padding:20px;color:var(--text-muted);font-size:11px">Loading session...</div>';
-  try{
-    const r=await fetch(`https://decisions.enzoduit.com/de/${deName}/sessions/${sessionId}`, {headers: {'Authorization': 'Bearer os-decisions-2026-xK9mP'}});const s=await r.json();
-    const si={complete:'✅',paused_human:'⏳',running:'🔄',error:'❌',paused_colleague:'💬',queued:'📋',max_iterations_reached:'🔄'};
-    const isLive=s.status==='running'||s.status==='queued';
-    if(isLive)deStartRefresh(deName,sessionId);
-    if(center)center.innerHTML=`
-      <div class="de-center-header">
-        <button onclick="deStopRefresh();deBackToList()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:0;line-height:1">←</button>
-        <div style="flex:1;min-width:0;margin-left:8px">
-          <div class="mono" style="font-size:9px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.id||sessionId}</div>
-          <div style="font-size:12px;margin-top:2px"><span id="de-session-status">${si[s.status]||'◌'}</span> <strong>${s.trigger_type||'cron'}</strong> · ${(s.steps||[]).length} steps · ${deTimeAgo(s.created_at)}</div>
-        </div>
-        ${isLive?'<span id="de-live-indicator" style="background:var(--red);color:#fff;font-size:9px;font-family:monospace;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:0.08em;animation:pulse 1.5s infinite">🔴 LIVE</span>':''}
-      </div>
-      <div style="overflow-y:auto;flex:1;padding:16px">
-        ${s.trigger_context?`<div style="font-size:11px;color:var(--text-muted);margin-bottom:16px;padding:8px 12px;background:var(--surface);border-radius:6px">${s.trigger_context}</div>`:''}
-        <div id="de-steps-container">${(s.steps||[]).map(step=>deRenderStep(step)).join('')}</div>
-        ${!s.steps||!s.steps.length?'<div style="color:var(--text-muted);font-size:11px">No steps recorded yet.</div>':''}
-      </div>`;
-  }catch(e){if(center)center.innerHTML=`<div style="color:var(--red);padding:20px">Error: ${e.message}</div>`;}
-}
-
-function deBackToList(){
-  if(deSelectedDE)deSelect(deSelectedDE);
-}
-
-function deRenderStep(step){
+function renderChatStep(step){
   const cfg={
-    trigger:{label:'TRIGGER',color:'#6366F1',bg:'rgba(99,102,241,0.08)'},
-    reasoning:{label:'THINKING',color:'#888',bg:'rgba(255,255,255,0.03)'},
-    action:{label:'ACTION',color:'#FF4500',bg:'rgba(255,69,0,0.08)'},
-    observation:{label:'RESULT',color:'#22c55e',bg:'rgba(34,197,94,0.08)'},
-    decision_request:{label:'⏳ DECISION NEEDED',color:'#FFC800',bg:'rgba(255,200,0,0.08)'},
-    decision_response:{label:'✓ DECIDED',color:'#22c55e',bg:'rgba(34,197,94,0.06)'},
-    colleague_request:{label:'💬 ASKING',color:'#a855f7',bg:'rgba(168,85,247,0.08)'},
-    colleague_response:{label:'💬 REPLY',color:'#a855f7',bg:'rgba(168,85,247,0.05)'},
-    complete:{label:'✅ COMPLETE',color:'#22c55e',bg:'rgba(34,197,94,0.06)'},
+    reasoning:{label:'THINKING',color:'var(--text-muted)',show:true,italic:true},
+    action:{label:'ACTION',color:'var(--accent)',show:true},
+    observation:{label:'RESULT',color:'var(--green)',show:true},
+    decision_request:{label:'⏳ DECISION NEEDED',color:'var(--yellow)',show:true},
+    trigger:{show:false},complete:{show:false},
   };
-  const c=cfg[step.type]||{label:(step.type||'STEP').toUpperCase(),color:'var(--text-muted)',bg:'var(--surface)'};
+  const c=cfg[step.type];if(!c||!c.show)return'';
+  let body='';
+  if(step.type==='reasoning')body=`<div class="step-bubble-body" style="${c.italic?'font-style:italic':''}">${esc((step.content||'').substring(0,200))}</div>`;
+  else if(step.type==='action')body=`<div class="step-bubble-body step-bubble-mono" style="color:var(--accent)">→ ${esc(step.tool||'')} <span style="color:var(--text-muted)">${esc((typeof step.input==='string'?step.input:JSON.stringify(step.input||{})).substring(0,80))}</span></div>`;
+  else if(step.type==='observation'){const err=(step.result||'').toLowerCase().includes('error');body=`<div class="step-bubble-body step-bubble-mono" style="color:${err?'var(--red)':'var(--green)'}">${esc((step.result||'').substring(0,200))}</div>`;}
+  else if(step.type==='decision_request')body=`<div class="step-bubble-body"><strong>${esc(step.title||'')}</strong></div>`;
+  return`<div class="msg-agent"><div class="step-bubble" style="border-color:${c.color}"><div class="step-bubble-label" style="color:${c.color}">${c.label}</div>${body}</div></div>`;
+}
+
+/* ═══ PROGRESS ═══ */
+async function loadProgress(de){
+  try{
+    const r=await fetch(`/de/${de}/sessions`);const d=await r.json();
+    const sessions=d.sessions||[];
+    const list=$('prog-session-list');if(!list)return;
+    list.innerHTML=sessions.length
+      ?sessions.map(s=>`<div class="prog-session" onclick="loadSteps('${de}','${s.id}',this)">
+          <div class="prog-session-top"><span>${STATUS_ICON[s.status]||'◌'}</span><span class="prog-session-trigger">${esc(s.trigger_type||'cron')}</span></div>
+          <div class="prog-session-meta">${timeAgo(s.created_at)} · ${s.step_count||0} steps</div>
+          ${s.summary?`<div class="prog-session-summary">${esc(s.summary.substring(0,60))}${s.summary.length>60?'…':''}</div>`:''}
+        </div>`).join('')
+      :'<div style="padding:12px;font-size:11px;color:var(--text-muted)">No sessions yet.</div>';
+  }catch(e){}
+}
+
+async function loadSteps(de,sid,el){
+  document.querySelectorAll('.prog-session').forEach(e=>e.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const pane=$('prog-steps');pane.innerHTML='<div class="prog-empty">Loading…</div>';
+  try{
+    const r=await fetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
+    const isLive=s.status==='running'||s.status==='queued';
+    const render=()=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
+        <div class="mono" style="font-size:10px;color:var(--text-muted)">${esc(s.id||sid)}</div>
+        ${isLive?'<span class="live-badge">LIVE</span>':''}
+      </div>
+      ${(s.steps||[]).map(renderStep).join('')||'<div class="prog-empty">No steps yet.</div>'}`;
+    pane.innerHTML=render();
+    if(isLive){const t=setInterval(async()=>{const r2=await fetch(`/de/${de}/sessions/${sid}`);const s2=await r2.json();s.steps=s2.steps;s.status=s2.status;pane.innerHTML=render();if(s2.status!=='running'&&s2.status!=='queued')clearInterval(t);},2500);}
+  }catch(e){pane.innerHTML=`<div class="prog-empty">Error: ${esc(e.message)}</div>`;}
+}
+
+function renderStep(step){
+  const cfg={
+    trigger:{l:'TRIGGER',c:'#6366f1',bg:'rgba(99,102,241,0.07)'},
+    reasoning:{l:'THINKING',c:'var(--text-muted)',bg:'rgba(255,255,255,0.02)'},
+    action:{l:'ACTION',c:'var(--accent)',bg:'rgba(255,69,0,0.07)'},
+    observation:{l:'RESULT',c:'var(--green)',bg:'rgba(0,200,100,0.07)'},
+    decision_request:{l:'⏳ DECISION NEEDED',c:'var(--yellow)',bg:'rgba(255,200,0,0.07)'},
+    decision_response:{l:'✓ DECIDED',c:'var(--green)',bg:'rgba(0,200,100,0.05)'},
+    complete:{l:'✅ COMPLETE',c:'var(--green)',bg:'rgba(0,200,100,0.05)'},
+    colleague_request:{l:'💬 COLLEAGUE',c:'#a855f7',bg:'rgba(168,85,247,0.07)'},
+  };
+  const cv=cfg[step.type]||{l:(step.type||'').toUpperCase(),c:'var(--text-muted)',bg:'var(--surface)'};
   const ts=step.ts?new Date(step.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
   let body='';
-  if(step.type==='trigger'||step.type==='reasoning'){
-    if(step.content){
-      const rendered=mdToHtml(step.content.substring(0,600)+(step.content.length>600?'…':''));
-      body+=step.type==='reasoning'
-        ?`<div style="font-size:13px;color:var(--text-muted);line-height:1.7;font-style:italic">${rendered}</div>`
-        :`<div style="font-size:13px;color:var(--text-sec);line-height:1.7">${rendered}</div>`;
-    }
-  }else if(step.type==='action'){
-    if(step.tool)body+=`<div class="mono" style="font-size:12px;color:var(--orange);font-weight:700;margin-bottom:4px">→ ${step.tool}</div>`;
-    if(step.input)body+=`<div class="mono" style="font-size:10px;color:var(--text-muted);word-break:break-all">${(typeof step.input==='string'?step.input:JSON.stringify(step.input,null,2)).substring(0,300)}</div>`;
-    if(step.content)body+=`<div class="mono" style="font-size:11px;color:var(--text-sec);margin-top:6px;white-space:pre-wrap;word-break:break-word">${step.content.substring(0,400)}</div>`;
-  }else if(step.type==='observation'){
-    if(step.result){
-      const isErr=step.result.toLowerCase().includes('error')||step.result.toLowerCase().includes('fail');
-      body+=`<div class="mono" style="font-size:11px;color:${isErr?'var(--red)':'var(--green)'};margin-top:4px;white-space:pre-wrap;word-break:break-all">${step.result.substring(0,400)}${step.result.length>400?'…':''}</div>`;
-    }
-    if(step.content&&!step.result)body+=`<div style="font-size:12px;color:var(--text-sec);margin-top:4px">${step.content.substring(0,400)}</div>`;
-  }else{
-    if(step.content)body+=`<div style="font-size:12px;color:var(--text-sec);line-height:1.6;white-space:pre-wrap;word-break:break-word">${step.content.substring(0,400)}${step.content.length>400?'…':''}</div>`;
-    if(step.tool)body+=`<div class="mono" style="font-size:11px;color:${c.color};margin-top:6px">→ ${step.tool}</div>`;
-    if(step.input)body+=`<div class="mono" style="font-size:10px;color:var(--text-muted);margin-top:3px;word-break:break-all">${(typeof step.input==='string'?step.input:JSON.stringify(step.input)).substring(0,200)}</div>`;
-    if(step.result)body+=`<div style="font-size:11px;color:var(--text-sec);margin-top:5px;border-top:1px solid rgba(255,255,255,0.05);padding-top:5px">${step.result.substring(0,300)}${step.result.length>300?'…':''}</div>`;
-  }
-  if(step.summary)body+=`<div style="font-size:12px;color:var(--text);margin-top:5px;font-style:italic">${step.summary.substring(0,300)}</div>`;
-  if(step.colleague)body+=`<div style="font-size:12px;color:#a855f7;margin-top:5px">→ ${step.colleague}: ${(step.message||'').substring(0,120)}</div>`;
-  if(step.title)body+=`<div style="font-size:12px;color:var(--yellow);margin-top:4px;font-weight:600">${step.title}</div>`;
-  return`<div class="de-step" style="border-color:${c.color};background:${c.bg}">
-    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-      <span class="de-step-label" style="color:${c.color}">${c.label}</span>
-      <span class="mono" style="font-size:9px;color:var(--text-muted)">${ts}</span>
-    </div>${body}</div>`;
+  if(step.content)body+=`<div class="step-card-body">${esc(step.content.substring(0,400))}</div>`;
+  if(step.tool)body+=`<div class="step-card-body step-card-mono" style="color:${cv.c}">→ ${esc(step.tool)}</div>`;
+  if(step.input){const inp=typeof step.input==='string'?step.input:JSON.stringify(step.input,null,2);body+=`<div class="step-card-body step-card-mono" style="color:var(--text-muted);font-size:10px">${esc(inp.substring(0,300))}</div>`;}
+  if(step.result){const err=step.result.toLowerCase().includes('error');body+=`<div class="step-card-body step-card-mono" style="color:${err?'var(--red)':'var(--green)'}">${esc(step.result.substring(0,300))}</div>`;}
+  if(step.summary)body+=`<div class="step-card-body" style="color:var(--text)">${esc(step.summary.substring(0,200))}</div>`;
+  if(step.title)body+=`<div class="step-card-body" style="color:var(--yellow);font-weight:600">${esc(step.title)}</div>`;
+  if(step.colleague)body+=`<div class="step-card-body" style="color:#a855f7">→ ${esc(step.colleague)}: ${esc((step.message||'').substring(0,100))}</div>`;
+  return`<div class="step-card" style="border-color:${cv.c};background:${cv.bg}">
+    <div class="step-card-label" style="color:${cv.c}">${cv.l}<span class="step-card-ts">${ts}</span></div>${body}</div>`;
 }
 
-async function deStartSession(){
-  if(!deSelectedDE)return;
-  const btn=document.getElementById('de-start-btn');
-  if(btn){btn.disabled=true;btn.textContent='...';}
+/* ═══ PROFILE ═══ */
+async function loadProfile(de){
+  const inner=$('profile-inner');
   try{
-    const r=await fetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:deSelectedDE,trigger_type:'user',trigger_context:'Manual session started by Ed via portal'})});
-    const d=await r.json();
-    if(d.ok){
-      if(btn){btn.textContent='✅ QUEUED';setTimeout(()=>{btn.textContent='▶ START';btn.disabled=false;},3000);}
-      setTimeout(()=>deSelect(deSelectedDE),2000);
-    }else{if(btn){btn.textContent='❌ ERR: '+(d.error||'unknown');setTimeout(()=>{btn.textContent='▶ START';btn.disabled=false;},3000);}}
-  }catch(e){if(btn){btn.textContent='❌ '+e.message.substring(0,20);setTimeout(()=>{btn.textContent='▶ START';btn.disabled=false;},3000);}}
+    const r=await fetch('/de/'+de);const d=await r.json();
+    const respGroup=(title,color,items)=>!items?.length?'':
+      `<div class="resp-group"><span class="resp-group-label" style="color:${color};background:${color}1a">${title}</span>
+       <ul class="resp-list">${items.map(i=>`<li style="border-color:${color}40">${esc(i)}</li>`).join('')}</ul></div>`;
+    inner.innerHTML=`
+      <div class="prof-section"><div class="prof-label">MISSION</div><div class="prof-mission">${esc(d.mission||'—')}</div></div>
+      ${d.kpis?.length?`<div class="prof-section"><div class="prof-label">KPIs</div><ul class="kpi-list">${d.kpis.map(k=>`<li>${esc(k)}</li>`).join('')}</ul></div>`:''}
+      <div class="prof-section"><div class="prof-label">AUTONOMY LEVELS</div>
+        ${respGroup('Level 0 — Autonomous','#22c55e',d.responsibilities?.level_0)}
+        ${respGroup('Level 1 — Document','#FFC800',d.responsibilities?.level_1)}
+        ${respGroup('Level 2 — Approval Required','#FF4500',d.responsibilities?.level_2)}
+      </div>
+      ${d.hard_constraints?.length?`<div class="prof-section"><div class="prof-label">HARD CONSTRAINTS</div><ul class="kpi-list">${d.hard_constraints.map(c=>`<li style="color:var(--red)">${esc(c)}</li>`).join('')}</ul></div>`:''}
+      ${d.triggers?.length?`<div class="prof-section"><div class="prof-label">TRIGGERS</div>${d.triggers.map(t=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px"><div class="mono" style="font-size:9px;color:var(--accent);margin-bottom:3px">${esc((t.type||'').toUpperCase())}</div><div style="font-size:12px;color:var(--text)">${esc(t.schedule||t.description||'')}</div></div>`).join('')}</div>`:''}
+      ${d.data_sources?.length?`<div class="prof-section"><div class="prof-label">DATA SOURCES</div><div class="mono" style="font-size:11px;color:var(--text-muted);line-height:1.9">${d.data_sources.map(s=>`<div>· ${esc(s)}</div>`).join('')}</div></div>`:''}`;
+  }catch(e){inner.innerHTML=`<div style="color:var(--red);font-size:12px">Error: ${esc(e.message)}</div>`;}
 }
 
-function deNewSession(){
-  const area=document.getElementById('de-new-session-area');
-  if(area){area.style.display=area.style.display==='none'?'block':'none';}
-}
-
-function deNewSessionCancel(){
-  const area=document.getElementById('de-new-session-area');
-  if(area)area.style.display='none';
-  const msg=document.getElementById('de-new-session-msg');
-  if(msg)msg.value='';
-}
-
-async function deNewSessionSend(deName){
-  const msg=document.getElementById('de-new-session-msg');
-  const text=(msg?msg.value:'').trim();
-  if(!text)return;
-  const sendBtn=document.querySelector('#de-new-session-area button:last-child');
-  if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='Sending...';}
+/* ═══ RUN ═══ */
+async function deRun(){
+  if(!selectedDE)return;
+  const btn=$('btn-run');btn.disabled=true;btn.textContent='…';
   try{
-    const r=await fetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:deName,trigger_type:'user_message',trigger_context:text})});
+    const r=await fetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:selectedDE,trigger_type:'user',trigger_context:'Manual run triggered via portal'})});
     const d=await r.json();
-    const area=document.getElementById('de-new-session-area');
-    if(d.ok){
-      if(area)area.innerHTML='<div style="padding:14px;font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--green)">✅ Queued</div>';
-      setTimeout(()=>{if(area)area.style.display='none';deSelect(deName);},2000);
-    }else{
-      if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='▶ Send';}
-      alert('Error: '+(d.error||'unknown'));
-    }
-  }catch(e){if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='▶ Send';}alert('Error: '+e.message);}
+    if(d.ok){btn.textContent='✅ QUEUED';switchTab('progress');setTimeout(()=>loadProgress(selectedDE),1000);setTimeout(()=>{btn.textContent='▶ RUN';btn.disabled=false;},3000);}
+    else{btn.textContent='❌';setTimeout(()=>{btn.textContent='▶ RUN';btn.disabled=false;},3000);}
+  }catch(e){btn.textContent='❌';setTimeout(()=>{btn.textContent='▶ RUN';btn.disabled=false;},3000);}
 }
 
-function deRenderWorkspace(deName) {
-  fetch(`https://decisions.enzoduit.com/de/${deName}/workspace`, {headers: {'Authorization': 'Bearer os-decisions-2026-xK9mP'}})
-    .then(r => r.json())
-    .then(data => {
-      const files = data.files || [];
-      const container = document.getElementById('de-workspace-body');
-      if (!container) return;
-      container.innerHTML = `
-        <div style="margin-bottom:16px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input type="file" id="de-upload-input" style="display:none" onchange="deUploadFile('${deName}')">
-            <button onclick="document.getElementById('de-upload-input').click()" style="background:var(--orange);border:none;color:#fff;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:6px 12px;border-radius:6px;cursor:pointer">＋ UPLOAD FILE</button>
-            <span id="de-upload-status" style="font-size:10px;color:var(--text-muted)"></span>
-          </label>
+/* ═══ DECISIONS ═══ */
+function openDecisions(){$('decisions-panel').classList.add('open');loadDecisionsPending();}
+function closeDecisions(){$('decisions-panel').classList.remove('open');}
+async function loadDecisionsPending(){
+  const body=$('decisions-body');
+  try{
+    const r=await fetch('/decisions');const d=await r.json();
+    const pending=d.pending||[];
+    const pill=$('decisions-pill');
+    if(pill){pill.textContent=`⏳ ${pending.length} decision${pending.length!==1?'s':''}`;pill.classList.toggle('active',pending.length>0);}
+    if(!pending.length){body.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:8px 0">No pending decisions ✓</div>';return;}
+    body.innerHTML=pending.map(d=>`
+      <div class="dec-card" id="dc-${d.id}">
+        <div class="dec-agent">${esc((d.agent||'?').toUpperCase())}</div>
+        <div class="dec-title">${esc(d.title||'')}</div>
+        ${d.description?`<div class="dec-desc">${esc(d.description)}</div>`:''}
+        ${d.proposed_action?`<div class="dec-proposed">Proposed: ${esc(d.proposed_action)}</div>`:''}
+        <div class="dec-actions">
+          <button class="btn-approve" onclick="decide('${d.id}','approve')">✓ APPROVE</button>
+          <button class="btn-reject" onclick="decide('${d.id}','reject')">✗ REJECT</button>
         </div>
-        ${files.length === 0
-          ? '<div style="color:var(--text-muted);font-size:11px">No files yet. Upload files to share with this DE.</div>'
-          : files.map(f => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-              <div>
-                <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text)">${f.name}</div>
-                <div style="font-size:10px;color:var(--text-muted)">${f.size_kb}KB · ${f.modified}</div>
-              </div>
-              <button onclick="deViewFile('${deName}','${f.name}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);background:none;padding:4px 10px;border:1px solid var(--border);border-radius:4px;cursor:pointer">👁 VIEW</button>
-            </div>
-          `).join('')
-        }
-      `;
-    })
-    .catch(e => {
-      const c = document.getElementById('de-workspace-body');
-      if (c) c.innerHTML = `<div style="color:var(--text-muted);font-size:11px">Workspace unavailable</div>`;
-    });
+      </div>`).join('');
+  }catch(e){body.innerHTML='<div style="color:var(--text-muted);font-size:12px">Unavailable</div>';}
+}
+async function decide(id,action){
+  const card=$('dc-'+id);
+  try{await fetch('/decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,action})});}catch(e){}
+  if(card){card.style.opacity='0.4';card.querySelector('.dec-actions').style.display='none';}
+  setTimeout(loadDecisionsPending,1000);
 }
 
-async function deUploadFile(deName) {
-  const input = document.getElementById('de-upload-input');
-  const status = document.getElementById('de-upload-status');
-  if (!input || !input.files[0]) return;
-  const file = input.files[0];
-  if (status) status.textContent = 'Uploading...';
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    const r = await fetch(`/de/${deName}/workspace/upload`, {method:'POST', body: form});
-    const d = await r.json();
-    if (status) status.textContent = d.ok ? '✅ Uploaded' : '❌ ' + (d.error || 'Error');
-    if (d.ok) setTimeout(() => deRenderWorkspace(deName), 500);
-  } catch(e) {
-    if (status) status.textContent = '❌ ' + e.message;
-  }
+/* ═══ CREATE WIZARD ═══ */
+function openCreate(){
+  wizardStep=0;goStep(0);
+  ['lb-kpis','lb-l0','lb-l1','lb-l2','lb-constraints','lb-eval','lb-sources','lb-queries'].forEach(id=>{const el=$(id);if(el)el.innerHTML='';});
+  $('f-name').value='';$('f-display').value='';$('f-role-input').value='';$('f-mission').value='';
+  $('f-autoresearch').checked=false;toggleResearch(false);
+  selectedColor='#FF4500';
+  document.querySelectorAll('.color-swatch').forEach((s,i)=>s.classList.toggle('sel',i===0));
+  $('preview-name').textContent='name';
+  $('create-panel').classList.add('open');
+}
+function closeCreate(){$('create-panel').classList.remove('open');}
+function updatePreview(){const n=$('f-name')?.value||'name';const p=$('preview-name');if(p)p.textContent=n;}
+function pickColor(el){document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('sel'));el.classList.add('sel');selectedColor=el.dataset.c;}
+function goStep(n){
+  wizardStep=n;
+  document.querySelectorAll('.wstep').forEach((s,i)=>s.classList.toggle('active',i===n));
+  document.querySelectorAll('.wnav-btn').forEach((b,i)=>{b.classList.toggle('active',i===n);b.classList.toggle('done',i<n);});
+  $('btn-prev').style.visibility=n===0?'hidden':'visible';
+  $('btn-next').style.display=n===STEPS-1?'none':'inline-block';
+  $('btn-create-de').style.display=n===STEPS-1?'inline-block':'none';
+  $('step-label').textContent=`Step ${n+1} of ${STEPS}`;
+  updatePreview();
+}
+function nextStep(){if(wizardStep<STEPS-1)goStep(wizardStep+1);}
+function prevStep(){if(wizardStep>0)goStep(wizardStep-1);}
+function addItem(id,placeholder){
+  const c=$(id);const row=document.createElement('div');row.className='list-row';
+  row.innerHTML=`<input type="text" placeholder="${esc(placeholder)}"><button class="btn-rm" onclick="this.parentElement.remove()" title="Remove">×</button>`;
+  c.appendChild(row);row.querySelector('input').focus();
+}
+function getItems(id){return Array.from(document.querySelectorAll(`#${id} input`)).map(i=>i.value.trim()).filter(Boolean);}
+function toggleResearch(on){$('research-fields').style.display=on?'block':'none';}
+
+async function createDE(){
+  const name=($('f-name').value||'').trim();
+  if(!name){alert('Please enter a slug name.');goStep(0);return;}
+  const btn=$('btn-create-de');btn.disabled=true;btn.textContent='Creating…';
+  const payload={
+    name,display_name:$('f-display').value.trim()||name.toUpperCase(),
+    role:$('f-role-input').value.trim(),color:selectedColor,
+    mission:$('f-mission').value.trim(),
+    kpis:getItems('lb-kpis'),
+    responsibilities:{level_0:getItems('lb-l0'),level_1:getItems('lb-l1'),level_2:getItems('lb-l2')},
+    hard_constraints:getItems('lb-constraints'),
+    self_evaluation:{criteria:getItems('lb-eval'),schedule:$('f-schedule').value},
+    data_sources:getItems('lb-sources'),
+    autoresearch:{enabled:$('f-autoresearch').checked,queries:getItems('lb-queries'),schedule:($('f-research-freq')?.value||'daily')},
+  };
+  try{
+    const r=await fetch('/de/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(!d.ok)throw new Error(d.error||'Create failed');
+    closeCreate();await loadList();await selectDE(name);
+  }catch(e){alert('Error: '+e.message);btn.disabled=false;btn.textContent='⚡ CREATE';}
 }
 
-function deLevel(title,color,items){
-  if(!items.length)return'';
-  return`<div style="margin-bottom:10px"><div style="font-size:10px;color:${color};font-weight:600;margin-bottom:4px">${title}</div><ul style="font-size:11px;color:var(--text-sec);padding-left:14px;line-height:1.7;margin:0">${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`;
-}
-
-function deTimeAgo(iso){
-  if(!iso)return'';
-  const diff=Date.now()-new Date(iso).getTime();
-  if(diff<0)return'just now';
-  const m=Math.floor(diff/60000),h=Math.floor(diff/3600000),d=Math.floor(diff/86400000);
-  if(d>0)return d+'d ago';if(h>0)return h+'h ago';if(m>0)return m+'m ago';return'just now';
-}
-// ── File viewer popup ─────────────────────────────────────────────────────
-function deViewFile(deName, filename) {
-  let modal = document.getElementById('de-file-viewer');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'de-file-viewer';
-    modal.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);z-index:9999;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
-    modal.innerHTML = `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:min(840px,100%);max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface2)">
-          <div class="mono" style="font-size:12px;font-weight:700;color:var(--text)" id="de-fv-name"></div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <span id="de-fv-size" style="font-size:10px;color:var(--text-muted)"></span>
-            <button onclick="document.getElementById('de-file-viewer').style.display='none'" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;padding:0;line-height:1">×</button>
-          </div>
-        </div>
-        <pre id="de-fv-content" style="padding:20px;overflow:auto;flex:1;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-sec);line-height:1.7;white-space:pre-wrap;word-break:break-word;margin:0;background:var(--bg)"></pre>
-      </div>`;
-    modal.addEventListener('click', e => { if(e.target===modal) modal.style.display='none'; });
-    document.body.appendChild(modal);
-  }
-  document.getElementById('de-fv-name').textContent = filename;
-  document.getElementById('de-fv-size').textContent = '';
-  document.getElementById('de-fv-content').textContent = 'Loading...';
-  modal.style.display = 'flex';
-  fetch(`https://decisions.enzoduit.com/de/${deName}/workspace/${encodeURIComponent(filename)}`, {headers: {'Authorization': 'Bearer os-decisions-2026-xK9mP'}})
-    .then(r => r.json())
-    .then(d => {
-      document.getElementById('de-fv-content').textContent = d.content || '[Empty file]';
-      document.getElementById('de-fv-size').textContent = d.size_kb ? d.size_kb + 'KB' : '';
-    })
-    .catch(e => { document.getElementById('de-fv-content').textContent = 'Error: ' + e.message; });
-}
-
-// ── Mobile pane navigation ───────────────────────────────────────────
-function deMobileShowPane(pane) {
-  const isMobile = window.innerWidth <= 767;
-  if (!isMobile) return;
-  const map = {agents: '.de-sidebar', sessions: '#de-center-pane', profile: '#de-profile-pane'};
-  document.querySelectorAll('.de-sidebar, #de-center-pane, #de-profile-pane').forEach(el => el.classList.remove('mobile-active'));
-  const el = document.querySelector(map[pane]);
-  if (el) el.classList.add('mobile-active');
-  document.querySelectorAll('.de-mobile-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pane === pane));
-}
-
-function deJumpToSession(deName, sessionId) {
-  showTab('team');
-  deInit();
-  setTimeout(async () => {
-    await deSelect(deName);
-    setTimeout(() => deLoadSession(deName, sessionId), 600);
-  }, 800);
-}
-
-// ── Profile pane resizer ────────────────────────────────────────────────────
-(function(){
-  let resizing=false,startX=0,startW=0;
-  const KEY='de-profile-w';
-  function init(){
-    const handle=document.getElementById('de-resize-handle');
-    const pane=document.getElementById('de-profile-pane');
-    if(!handle||!pane)return;
-    const saved=localStorage.getItem(KEY);
-    if(saved)pane.style.width=parseInt(saved)+'px';
-    handle.addEventListener('mousedown',e=>{
-      resizing=true;startX=e.clientX;startW=pane.offsetWidth;
-      handle.classList.add('dragging');
-      document.body.style.cssText+='cursor:col-resize;user-select:none;';
-      e.preventDefault();
-    });
-    document.addEventListener('mousemove',e=>{
-      if(!resizing)return;
-      const w=Math.min(620,Math.max(180,startW+(startX-e.clientX)));
-      pane.style.width=w+'px';
-    });
-    document.addEventListener('mouseup',()=>{
-      if(!resizing)return;
-      resizing=false;
-      handle.classList.remove('dragging');
-      document.body.style.cursor='';
-      document.body.style.userSelect='';
-      localStorage.setItem(KEY,pane.offsetWidth);
-    });
-  }
-  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
-})();
-// ── END DIGITAL EMPLOYEES TAB ──────────────────────────────────────────────────
-
+/* ═══ INIT ═══ */
+loadList();
+setInterval(loadList,60000);
 </script>
-
-
 </body>
 </html>

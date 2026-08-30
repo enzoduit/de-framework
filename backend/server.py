@@ -166,6 +166,9 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/de-start':
             return session_start_routes.handle_de_start(self, body)
 
+        if path == '/de/create':
+            return de_routes.handle_de_create(self, body)
+
         self.send_json(404, {'error': 'not found'})
 
 
