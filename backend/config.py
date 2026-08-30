@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 # ── Server ─────────────────────────────────────────────────────────────────
-PORT = int(os.environ.get('DE_API_PORT', 8766))
+PORT = int(os.environ.get('PORT') or os.environ.get('DE_API_PORT', 8766))
 
 # ── Auth ────────────────────────────────────────────────────────────────────
 AUTH_TOKEN = os.environ.get('DE_API_TOKEN', '')
