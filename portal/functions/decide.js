@@ -1,22 +1,33 @@
+// POST /decide — approve or reject a pending decision
 export async function onRequestPost(context) {
+  const apiUrl = context.env.DE_API_URL;
+  const apiToken = context.env['DE_API_TOKEN'];
+
+  if (!apiUrl || !apiToken) {
+    return new Response(
+      JSON.stringify({ ok: false, error: 'Backend not configured.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+    );
+  }
+
   try {
-    const body = await context.request.json();
-    const resp = await fetch('https://decisions.enzoduit.com/decide', {
+    const body = await context.request.text();
+    const resp = await fetch(apiUrl.replace(/\/$/, '') + '/decide', {
       method: 'POST',
-      headers: { 
-        'Authorization': 'Bearer os-decisions-2026-xK9mP',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
+      headers: { Authorization: 'Bearer ' + apiToken, 'Content-Type': 'application/json' },
+      body,
     });
-    const data = await resp.json();
+    const text = await resp.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { ok: false, error: text }; }
     return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      status: resp.status,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
-  } catch(e) {
-    return new Response(JSON.stringify({error: e.message}), {
+  } catch (e) {
+    return new Response(JSON.stringify({ ok: false, error: e.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
 }
@@ -26,7 +37,7 @@ export async function onRequestOptions() {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-    }
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
   });
 }

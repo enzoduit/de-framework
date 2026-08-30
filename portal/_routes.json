@@ -1,20 +1,11 @@
 {
   "version": 1,
   "include": [
-    "/decisions",
-    "/decide",
-    "/update-voice-prompt",
-    "/agents-data",
-    "/audit-log",
-    "/revert",
-    "/system-data",
-    "/settings-data",
-    "/tasks",
-    "/task-done",
-    "/elevenlabs-signed-url",
     "/de-list",
     "/de/*",
-    "/de-start"
+    "/de-start",
+    "/decisions",
+    "/decide"
   ],
   "exclude": []
 }

@@ -1,21 +1,30 @@
-export async function onRequestGet(context) {
+// GET /decisions — return pending and resolved decisions
+export async function onRequest(context) {
+  const apiUrl = context.env.DE_API_URL;
+  const apiToken = context.env['DE_API_TOKEN'];
+
+  if (!apiUrl || !apiToken) {
+    return new Response(
+      JSON.stringify({ pending: [], resolved: [], ok: false, error: 'Backend not configured.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+    );
+  }
+
   try {
-    const resp = await fetch('https://decisions.enzoduit.com/decisions?t=' + Date.now(), {
-      headers: { 'Authorization': 'Bearer os-decisions-2026-xK9mP' },
-      cf: { cacheEverything: false },
+    const resp = await fetch(apiUrl.replace(/\/$/, '') + '/decisions', {
+      headers: { Authorization: 'Bearer ' + apiToken },
     });
-    const data = await resp.json();
+    const text = await resp.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { pending: [], error: text }; }
     return new Response(JSON.stringify(data), {
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-store'
-      },
+      status: resp.status,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
     });
-  } catch(e) {
-    return new Response(JSON.stringify({error: e.message, pending: []}), {
+  } catch (e) {
+    return new Response(JSON.stringify({ pending: [], error: e.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
 }
