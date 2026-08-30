@@ -1,16 +1,16 @@
 // POST /de/setup-chat — proxy to backend conversational setup assistant
 export async function onRequestPost({ request, env }) {
   const upstream = env.DE_API_URL;
-  const token = ***;
+  const token = env["DE_API_TOKEN"];
   if (!upstream || !token) {
-    return new Response(JSON.stringify({ ok: false, error: 'DE_API_URL or DE_API_TOKEN not configured' }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
+    return new Response(JSON.stringify({ ok: false, error: 'Backend not configured. Set DE_API_URL and DE_API_TOKEN in Cloudflare Pages environment variables.' }), {
+      status: 503, headers: { 'Content-Type': 'application/json' },
     });
   }
   const body = await request.text();
-  const resp = await fetch(`${upstream}/de/setup-chat`, {
+  const resp = await fetch(upstream.replace(/\/$/, '') + '/de/setup-chat', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ***}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
     body,
   });
   const data = await resp.text();

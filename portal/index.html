@@ -1073,7 +1073,10 @@ async function sendSetup(){
     }
   }catch(e){
     $(tid)?.remove();
-    appendSetupMsg('ai','⚠ Error: '+e.message);
+    const noBackend=e.message&&(e.message.includes('not configured')||e.message.includes('503')||e.message.includes('502'));
+    appendSetupMsg('ai', noBackend
+      ? 'This is the **template version** \u2014 no backend is connected yet.\n\nTo use the AI setup assistant:\n1. Run the backend server (\`python backend/server.py\`)\n2. Set **DE_API_URL** and **DE_API_TOKEN** in Cloudflare Pages → Settings → Environment Variables\n3. Redeploy the portal\n\nSee the README for the full quickstart.'
+      : '⚠ ' + e.message);
   }finally{
     btn.disabled=false;
   }
