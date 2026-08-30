@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: de-framework
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start.sh
+    envVars:
+      - key: AGENTS_DIR
+        value: /tmp/de-agents
+      - key: DE_API_TOKEN
+        value: de-demo-2026
+      - key: DE_MODEL
+        value: claude-haiku-4-5
+      - key: ANTHROPIC_API_KEY
+        sync: false
