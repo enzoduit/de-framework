@@ -8,12 +8,13 @@ Session lifecycle:
 """
 
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-WORKSPACE = Path("/root/.openclaw/workspace")
-AGENTS_DIR = WORKSPACE / "agents"
+# Path from environment variable — no hardcoded assumptions
+AGENTS_DIR = Path(os.environ.get("AGENTS_DIR", "./agents"))
 
 
 def _now_iso() -> str:

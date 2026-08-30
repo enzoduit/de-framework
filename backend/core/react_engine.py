@@ -28,21 +28,21 @@ try:
 except ImportError:
     WorkSession = None  # backward compat — session support is optional
 
-WORKSPACE = Path("/root/.openclaw/workspace")
-AGENTS_DIR = WORKSPACE / "agents"
+# All paths from environment variables — no hardcoded assumptions
+AGENTS_DIR = Path(os.environ.get("AGENTS_DIR", "./agents"))
 PORTAL_INBOX = AGENTS_DIR / "portal-inbox.jsonl"
-ENV_FILE = WORKSPACE / "trillion-initiative" / ".env"
+DECISIONS_API_URL = os.environ.get("DECISIONS_API_URL", "")
 
 
 def _load_api_key() -> str:
-    """Load Anthropic API key from .env file."""
-    try:
-        for line in ENV_FILE.read_text().splitlines():
-            if line.startswith("ANTHROPIC_API_KEY="):
-                return line.split("=", 1)[1].strip()
-    except Exception as e:
-        raise RuntimeError(f"Could not load ANTHROPIC_API_KEY from {ENV_FILE}: {e}")
-    raise RuntimeError("ANTHROPIC_API_KEY not found in .env")
+    """Load Anthropic API key from ANTHROPIC_API_KEY environment variable."""
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if key:
+        return key
+    raise RuntimeError(
+        "ANTHROPIC_API_KEY environment variable not set. "
+        "Export it before running: export ANTHROPIC_API_KEY=sk-ant-..."
+    )
 
 
 def _now_iso() -> str:
@@ -66,13 +66,13 @@ class ReActEngine:
         mission: str,
         tools: list,
         max_iterations: int = 5,
-        model: str = "claude-haiku-4-5",
+        model: str = None,  # defaults to DE_MODEL env var, then claude-haiku-4-5
         session=None,  # optional WorkSession instance
     ):
         self.agent_name = agent_name
         self.mission = mission
         self.max_iterations = max_iterations
-        self.model = model
+        self.model = model or os.environ.get("DE_MODEL", "claude-haiku-4-5")
 
         # Session tracking (optional — backward compat)
         self.session = session  # WorkSession instance or None
@@ -289,18 +289,20 @@ class ReActEngine:
         with open(PORTAL_INBOX, "a") as f:
             f.write(json.dumps(portal_entry) + "\n")
 
-        # Try to notify decisions API
-        try:
-            import urllib.request
-            req = urllib.request.Request(
-                "http://localhost:8765/ingest",
-                data=json.dumps(portal_entry).encode(),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            urllib.request.urlopen(req, timeout=3)
-        except Exception:
-            pass  # API not available — that's fine
+        # Notify decisions API if DECISIONS_API_URL is configured
+        if DECISIONS_API_URL:
+            try:
+                import urllib.request
+                ingest_url = DECISIONS_API_URL.rstrip("/") + "/ingest"
+                req = urllib.request.Request(
+                    ingest_url,
+                    data=json.dumps(portal_entry).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                urllib.request.urlopen(req, timeout=3)
+            except Exception:
+                pass  # API not available — decisions still written to disk
 
         # Track in session
         if self.session is not None:

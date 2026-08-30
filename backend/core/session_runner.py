@@ -8,14 +8,15 @@ with standard tools, logs every step to the session file.
 """
 
 import json
+import os
 import sys
 import subprocess
 import urllib.request
 from pathlib import Path
 from datetime import datetime, timezone
 
-WORKSPACE = Path('/root/.openclaw/workspace')
-AGENTS_DIR = WORKSPACE / 'agents'
+# Path from environment variable — no hardcoded assumptions
+AGENTS_DIR = Path(os.environ.get('AGENTS_DIR', './agents'))
 
 def _now():
     return datetime.now(timezone.utc).isoformat()
@@ -68,7 +69,7 @@ def tool_exec(inp):
     try:
         result = subprocess.run(
             cmd, shell=True, capture_output=True, text=True, timeout=30,
-            cwd=str(WORKSPACE)
+            cwd=str(AGENTS_DIR)
         )
         out = (result.stdout + result.stderr).strip()
         return out[:3000] if out else '(no output)'
@@ -343,15 +344,16 @@ Review your session history to understand what you were doing before pausing.
 
     tools = build_tools(de_name)
 
-    # MAX gets more iterations for deep analysis
-    max_iter = 14 if de_name == 'max' else 8
+    # Max iterations: per-agent override in de.json (max_iterations), else DE_MAX_ITERATIONS env, else 8
+    default_max_iter = int(os.environ.get('DE_MAX_ITERATIONS', 8))
+    max_iter = de_info.get('max_iterations', default_max_iter)
 
     engine = ReActEngine(
         agent_name=de_name,
         mission=mission,
         tools=tools,
         max_iterations=max_iter,
-        model='claude-haiku-4-5',
+        model=de_info.get('model') or os.environ.get('DE_MODEL', 'claude-haiku-4-5'),
         session=session,
     )
 
