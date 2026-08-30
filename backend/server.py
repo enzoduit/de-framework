@@ -28,6 +28,7 @@ from backend.routes import (
     session_start_routes,
     system_routes,
     signup_routes,
+    setup_routes,
 )
 
 
@@ -168,6 +169,9 @@ class DEHandler(BaseHTTPRequestHandler):
 
         if path == '/de/create':
             return de_routes.handle_de_create(self, body)
+
+        if path == '/de/setup-chat':
+            return setup_routes.handle_setup_chat(self, body)
 
         self.send_json(404, {'error': 'not found'})
 
