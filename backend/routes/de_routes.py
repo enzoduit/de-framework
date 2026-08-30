@@ -3,8 +3,73 @@ DE Routes — /de-list, /de/<name>, /de/<name>/sessions, /de/<name>/sessions/<id
 """
 
 import json
+import uuid as _uuid
+from datetime import datetime, timedelta, timezone as _tz
 from pathlib import Path
 from backend.config import AGENTS_BASE, DE_NAMES, now_iso
+
+
+def _compute_next_run(frequency: str, time_utc: str = '08:00') -> str:
+    """Compute the next ISO datetime for a given frequency and UTC time."""
+    h, m = 8, 0
+    if ':' in time_utc:
+        try: h, m = map(int, time_utc.split(':'))
+        except: pass
+    now = datetime.now(_tz.utc)
+    candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    if candidate <= now:
+        candidate += timedelta(days=1)
+    return candidate.isoformat()
+
+
+def handle_de_schedule_get(handler, de_name: str):
+    """GET /de/<name>/schedule"""
+    schedule_file = AGENTS_BASE / de_name / 'schedule.json'
+    if not schedule_file.exists():
+        return handler.send_json(200, {'activities': [], 'de': de_name})
+    try:
+        return handler.send_json(200, json.loads(schedule_file.read_text()))
+    except Exception:
+        return handler.send_json(200, {'activities': [], 'de': de_name})
+
+
+def handle_de_schedule_post(handler, de_name: str, body: dict):
+    """POST /de/<name>/schedule — add or update a schedule activity."""
+    schedule_file = AGENTS_BASE / de_name / 'schedule.json'
+    try:
+        schedule = json.loads(schedule_file.read_text()) if schedule_file.exists() else {'activities': []}
+    except Exception:
+        schedule = {'activities': []}
+
+    activity = {
+        'id': _uuid.uuid4().hex[:8],
+        'title': body.get('title', 'Scheduled activity'),
+        'frequency': body.get('frequency', 'once'),
+        'time_utc': body.get('time_utc', '08:00'),
+        'trigger_context': body.get('trigger_context', ''),
+        'created_by': body.get('created_by', 'user'),
+        'last_run_at': None,
+        'next_run_at': body.get('next_run_at') or _compute_next_run(
+            body.get('frequency', 'once'), body.get('time_utc', '08:00')
+        ),
+        'run_count': 0,
+    }
+
+    existing_id = body.get('id')
+    activities = schedule.setdefault('activities', [])
+    if existing_id:
+        for i, a in enumerate(activities):
+            if a.get('id') == existing_id:
+                activities[i] = {**a, **activity, 'id': existing_id, 'run_count': a.get('run_count', 0)}
+                break
+        else:
+            activities.append(activity)
+    else:
+        activities.append(activity)
+
+    schedule['updated_at'] = now_iso()
+    schedule_file.write_text(json.dumps(schedule, indent=2))
+    return handler.send_json(201, {'ok': True, 'activity': activity})
 
 
 def _discover_de_names():
@@ -165,6 +230,29 @@ def _generate_job_md(p: dict) -> str:
     lines.append('7. End with a clear summary of what you did and what the current state is.')
     lines.append('')
     lines.append('Be specific and action-oriented. Verify changes worked before declaring success.')
+    lines.append('')
+    lines.append('## Scheduling your next activity')
+    lines.append('Use the **schedule_next_activity** tool to plan your next session. Call it when:')
+    lines.append('- You find something that needs follow-up (e.g. fixed a bug → schedule a check that it held)')
+    lines.append('- A task is too large for one session → schedule the next step')
+    lines.append('- You want to establish a recurring pattern beyond your default schedule')
+    lines.append('Always include specific questions in the trigger_context so future-you knows exactly what to focus on.')
+
+    # Work schedule
+    schedule_entries = p.get('schedule', [])
+    if schedule_entries:
+        lines.append('')
+        lines.append('## Work Schedule')
+        lines.append('')
+        for entry in schedule_entries:
+            freq = entry.get('frequency', 'daily').upper()
+            time_utc = entry.get('time_utc', '08:00')
+            title = entry.get('title', 'Scheduled activity')
+            ctx = entry.get('trigger_context', '')
+            lines.append(f'### {title} ({freq} at {time_utc} UTC)')
+            if ctx:
+                lines.append(ctx)
+            lines.append('')
 
     return '\n'.join(lines)
 
@@ -230,6 +318,27 @@ def handle_de_create(handler, body: dict):
 
         # memory.md — empty
         (de_dir / 'memory.md').write_text(f'# {de_json["display_name"]} — Memory\n\nCreated {now_iso()}. No entries yet.\n')
+
+        # schedule.json — auto-generated from setup chat schedule entries
+        schedule_entries = body.get('schedule', [])
+        initial_schedule = {'activities': [], 'updated_at': now_iso()}
+        for entry in schedule_entries:
+            activity = {
+                'id': _uuid.uuid4().hex[:8],
+                'title': entry.get('title', ''),
+                'frequency': entry.get('frequency', 'daily'),
+                'time_utc': entry.get('time_utc', '08:00'),
+                'trigger_context': entry.get('trigger_context', ''),
+                'created_by': 'setup',
+                'last_run_at': None,
+                'next_run_at': _compute_next_run(
+                    entry.get('frequency', 'daily'),
+                    entry.get('time_utc', '08:00'),
+                ),
+                'run_count': 0,
+            }
+            initial_schedule['activities'].append(activity)
+        (de_dir / 'schedule.json').write_text(json.dumps(initial_schedule, indent=2))
 
         return handler.send_json(201, {'ok': True, 'name': name, 'dir': str(de_dir)})
     except Exception as e:
@@ -306,6 +415,10 @@ def handle_de_get(handler, parts):
             return handler.send_json(404, {'error': f'Session not found: {session_id}'})
         session_data = json.loads(session_file.read_text())
         return handler.send_json(200, session_data)
+
+    # GET /de/<name>/schedule  — scheduled activities
+    if len(parts) == 3 and parts[2] == 'schedule':
+        return handle_de_schedule_get(handler, de_name)
 
     # GET /de/<name>/workspace  — list workspace files
     if len(parts) == 3 and parts[2] == 'workspace':

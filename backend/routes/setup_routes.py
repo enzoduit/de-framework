@@ -27,6 +27,13 @@ You need to collect:
 7. **Run schedule** — how often it should run (manual, hourly, 3x_daily, daily, weekly)
 8. **Data sources** — optional URLs or file paths it should read (e.g. an API endpoint for metrics)
 9. **Autoresearch** — optional: should it proactively research topics and update its knowledge base?
+10. **Work schedule** — Plan 2-4 recurring activities. This is what makes the agent proactive, not just reactive. For each entry provide:
+   - title: e.g. "Daily security check"
+   - frequency: daily | weekly | monthly
+   - time_utc: HH:MM UTC
+   - trigger_context: the SPECIFIC questions/focus for that session — what to check, what to look for, what to challenge. This text is injected directly into the agent's prompt when that session starts.
+
+   Always include at minimum: one operational/monitoring check (daily or more frequent) + one weekly self-evaluation that challenges the agent on its KPIs.
 
 Start by asking what problem the agent should solve or what task it should own. Build the config conversationally from the answers. Don't ask for all fields at once.
 
@@ -55,15 +62,31 @@ When you have gathered enough for a complete, working configuration, include you
     "enabled": false,
     "queries": [],
     "schedule": "daily"
-  }
+  },
+  "schedule": [
+    {
+      "title": "Daily operational check",
+      "frequency": "daily",
+      "time_utc": "08:00",
+      "trigger_context": "Run your daily check. Questions to ask yourself: [specific to this agent's role]. Fix what you can at Level 0. Document everything you find."
+    },
+    {
+      "title": "Weekly self-evaluation",
+      "frequency": "weekly",
+      "time_utc": "09:00",
+      "trigger_context": "Weekly self-evaluation. Did you meet your KPIs this week? What improved? What failed? What will you do differently? Update memory.md with key insights."
+    }
+  ]
 }
 ---END---
 
 Rules:
-- Only output ---CONFIG--- when you have all required fields (name, mission, at least 1 KPI, at least 1 action per level, at least 1 constraint).
+- Only output ---CONFIG--- when you have all required fields (name, mission, at least 1 KPI, at least 1 action per level, at least 1 constraint, at least 2 schedule entries).
 - name must be lowercase letters, digits, hyphens only (e.g. "cost-monitor", "ops-lead").
 - Choose a fitting color: #FF4500 (orange/ops), #22c55e (green/finance), #6366f1 (purple/research), #0ea5e9 (blue/infra), #f59e0b (amber/content), #ec4899 (pink/marketing), #a855f7 (violet/data), #14b8a6 (teal/growth).
-- Schedule values: manual | hourly | 3x_daily | daily | weekly
+- self_evaluation.schedule values: manual | hourly | 3x_daily | daily | weekly
+- schedule[].frequency values: daily | weekly | monthly | once
+- trigger_context in schedule entries must be SPECIFIC and role-relevant — what exactly does the agent check, what questions does it ask itself? This is what it reads at the start of each scheduled run.
 - If autoresearch is enabled, include at least 1 query."""
 
 

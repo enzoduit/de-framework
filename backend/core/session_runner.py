@@ -99,6 +99,62 @@ def tool_read_json(inp):
     except Exception as e:
         return f'Error: {e}'
 
+def make_tool_schedule_activity(de_name):
+    """Factory: returns the schedule_next_activity tool fn bound to de_name."""
+    def _impl(inp):
+        import uuid as _uid
+        from datetime import datetime, timedelta, timezone
+        title = inp.get('title', 'Scheduled activity')
+        trigger_context = inp.get('trigger_context', '')
+        frequency = inp.get('frequency', 'once')
+        time_utc = inp.get('time_utc', '08:00')
+        next_run_in = inp.get('next_run_in', '')
+        now = datetime.now(timezone.utc)
+        if next_run_in:
+            unit = next_run_in[-1] if next_run_in else 'h'
+            try:
+                val = int(next_run_in[:-1])
+            except ValueError:
+                val = 24
+            delta = timedelta(hours=val) if unit == 'h' else (
+                timedelta(days=val) if unit == 'd' else timedelta(weeks=val))
+            next_run_at = (now + delta).isoformat()
+        else:
+            h, m = 8, 0
+            if ':' in time_utc:
+                try: h, m = map(int, time_utc.split(':'))
+                except: pass
+            candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            if candidate <= now:
+                candidate += timedelta(days=1)
+            next_run_at = candidate.isoformat()
+        activity = {
+            'id': _uid.uuid4().hex[:8],
+            'title': title, 'frequency': frequency, 'time_utc': time_utc,
+            'trigger_context': trigger_context, 'created_by': 'agent',
+            'last_run_at': None, 'next_run_at': next_run_at, 'run_count': 0,
+        }
+        schedule_file = AGENTS_DIR / de_name / 'schedule.json'
+        try:
+            schedule = json.loads(schedule_file.read_text()) if schedule_file.exists() else {'activities': []}
+        except Exception:
+            schedule = {'activities': []}
+        schedule.setdefault('activities', []).append(activity)
+        schedule['updated_at'] = _now()
+        schedule_file.write_text(json.dumps(schedule, indent=2))
+        # Portal notification
+        entry = {'ts': _now(), 'agent': de_name, 'level': 0, 'type': 'scheduled',
+                 'title': f'\U0001f4c5 Scheduled: {title}',
+                 'body': f'Next: {next_run_at} | {frequency} | {trigger_context[:150]}'}
+        inbox = AGENTS_DIR / 'portal-inbox.jsonl'
+        AGENTS_DIR.mkdir(parents=True, exist_ok=True)
+        with open(inbox, 'a') as f:
+            f.write(json.dumps(entry) + '\n')
+        return {'status': 'scheduled', 'activity_id': activity['id'],
+                'next_run_at': next_run_at, 'title': title}
+    return _impl
+
+
 def tool_update_metrics(inp):
     """Update the DE's metrics.json with provided key-value pairs."""
     de_name = inp.get('de_name', '')
@@ -137,6 +193,45 @@ def tool_write_portal_inbox(inp):
     return f'Written to portal-inbox: {message[:80]}'
 
 # ── Build tools list for ReActEngine ───────────────────────────────────────
+
+def _get_schedule_context(de_name, de_dir):
+    """Return schedule context string to inject into the session mission."""
+    schedule_file = de_dir / 'schedule.json'
+    if not schedule_file.exists():
+        return ''
+    try:
+        schedule_data = json.loads(schedule_file.read_text())
+        activities = schedule_data.get('activities', [])
+        now_dt = datetime.now(timezone.utc)
+        due, upcoming = [], []
+        for a in activities:
+            nr = a.get('next_run_at', '')
+            if not nr:
+                continue
+            try:
+                nr_dt = datetime.fromisoformat(nr.replace('Z', '+00:00'))
+                if nr_dt <= now_dt:
+                    due.append(a)
+                else:
+                    upcoming.append(a)
+            except Exception:
+                pass
+        parts = []
+        if due:
+            parts.append('## SCHEDULED ACTIVITIES DUE THIS SESSION')
+            for a in due:
+                parts.append(f'\n### {a["title"]} ({a.get("frequency", "once")})')
+                if a.get('trigger_context'):
+                    parts.append(a['trigger_context'])
+        if upcoming and not due:
+            upcoming_sorted = sorted(upcoming, key=lambda x: x.get('next_run_at', ''))[:3]
+            parts.append('## UPCOMING SCHEDULED ACTIVITIES')
+            for a in upcoming_sorted:
+                parts.append(f'- {a["title"]}: next at {a.get("next_run_at", "?")} ({a.get("frequency", "once")})')
+        return '\n'.join(parts)
+    except Exception:
+        return ''
+
 
 def build_tools(de_name):
     return [
@@ -198,6 +293,23 @@ def build_tools(de_name):
                 'updates': {'type': 'object', 'description': 'Key-value pairs to update in metrics.json'},
             }},
             'fn': tool_update_metrics,
+        },
+        {
+            'name': 'schedule_next_activity',
+            'description': (
+                'Plan the next work session for this DE. Call when you find something needing '
+                'follow-up, or to establish a recurring check. The trigger_context is injected '
+                'as specific questions into that future session.'
+            ),
+            'input_schema': {'type': 'object', 'required': ['title', 'trigger_context'], 'properties': {
+                'title': {'type': 'string', 'description': 'Short activity name, e.g. "Follow up on incident #5"'},
+                'trigger_context': {'type': 'string', 'description': 'The questions and focus for the next session. Be specific: what to check, what to look for, what to fix.'},
+                'frequency': {'type': 'string', 'enum': ['once', 'daily', 'weekly', 'monthly'],
+                              'description': 'Recurrence. Use "once" for one-time follow-ups (default).'},
+                'next_run_in': {'type': 'string', 'description': 'Relative time: "2h", "1d", "1w". For one-time follow-ups.'},
+                'time_utc': {'type': 'string', 'description': 'UTC time for recurring runs, e.g. "08:00"'},
+            }},
+            'fn': make_tool_schedule_activity(de_name),
         },
         {
             'name': 'write_portal_inbox',
@@ -284,12 +396,16 @@ def main():
     display_name = de_info.get('display_name', de_name.upper())
     role = de_info.get('role', '')
 
+    # Load scheduled activities due this session
+    schedule_context = _get_schedule_context(de_name, de_dir)
+
     mission = f"""You are {display_name}, {role}.
 
 Your full job description and responsibilities:
 ---
 {job_md[:6000]}
 ---
+{schedule_context}
 
 CURRENT WORK SESSION:
 Trigger type: {trigger_type}

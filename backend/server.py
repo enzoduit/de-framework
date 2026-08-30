@@ -173,6 +173,11 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/de/setup-chat':
             return setup_routes.handle_setup_chat(self, body)
 
+        # POST /de/<name>/schedule — add/update a scheduled activity
+        if (len(parts) == 3 and parts[0] == 'de'
+                and parts[2] == 'schedule'):
+            return de_routes.handle_de_schedule_post(self, parts[1], body)
+
         self.send_json(404, {'error': 'not found'})
 
 
