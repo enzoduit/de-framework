@@ -473,6 +473,46 @@ textarea, input, select { font-family: inherit; }
 .sched-add-bar { padding:12px 20px; border-top:1px solid var(--border); background:var(--surface); flex-shrink:0; }
 .btn-add-sched { width:100%; background:none; border:1px dashed var(--border); border-radius:8px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-muted); cursor:pointer; transition:all 0.15s; }
 .btn-add-sched:hover { border-color:var(--accent); color:var(--accent); }
+
+/* ── 3-PANE SESSIONS VIEW ── */
+.de-view-body { display:flex; flex:1; overflow:hidden; }
+.de-sessions-panel {
+  width:260px; flex-shrink:0; border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.de-sessions-panel-hdr {
+  padding:10px 14px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--surface); flex-shrink:0;
+}
+.de-sessions-label { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.12em; color:var(--text-muted); }
+.de-sessions-list { flex:1; overflow-y:auto; }
+.de-steps-panel { display:none; flex-direction:column; overflow:hidden; flex:1; }
+.de-steps-panel-hdr {
+  padding:8px 12px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:4px;
+  background:var(--surface); flex-shrink:0;
+}
+.btn-back-sessions {
+  background:none; border:1px solid var(--border); border-radius:5px;
+  color:var(--text-muted); cursor:pointer; flex-shrink:0;
+  font-family:'JetBrains Mono',monospace; font-size:10px; padding:4px 8px; transition:all 0.15s;
+}
+.btn-back-sessions:hover { border-color:var(--text-sec); color:var(--text); }
+.de-sessions-resize-handle {
+  width:5px; background:transparent; cursor:col-resize; flex-shrink:0; transition:background 0.15s;
+}
+.de-sessions-resize-handle:hover, .de-sessions-resize-handle.dragging { background:var(--accent); }
+.de-detail-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:200px; }
+.de-detail-tabs { display:flex; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; }
+.de-detail-tab {
+  padding:10px 18px; background:none;
+  font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.1em;
+  color:var(--text-muted); border-bottom:2px solid transparent; cursor:pointer; transition:all 0.15s;
+}
+.de-detail-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.de-detail-content { display:none; flex:1; flex-direction:column; overflow:hidden; }
+.de-detail-content.active { display:flex; }
 /* ── MOBILE ── */
 .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99; }
 @media (max-width:767px) {
@@ -538,63 +578,80 @@ textarea, input, select { font-family: inherit; }
         <div class="de-header-name" id="dv-name">—</div>
         <div class="de-header-role" id="dv-role">—</div>
       </div>
-      <div class="de-header-actions">
-        <span class="live-badge" id="dv-live" style="display:none">LIVE</span>
-        <button class="btn-run" id="btn-run" onclick="deRun()">▶ RUN</button>
-      </div>
     </div>
 
-    <div class="de-tabs">
-      <button class="de-tab active" onclick="switchTab('chat')">💬 CHAT</button>
-      <button class="de-tab" onclick="switchTab('progress')">⚡ PROGRESS</button>
-      <button class="de-tab" onclick="switchTab('profile')">ℹ PROFILE</button>
-      <button class="de-tab" onclick="switchTab('schedule')">📅 SCHEDULE</button>
-    </div>
+    <!-- 3-PANE: Sessions (left, always visible) + Detail right (Chat/Profile/Schedule) -->
+    <div class="de-view-body">
 
-    <!-- CHAT -->
-    <div class="tab-pane active" id="tab-chat">
-      <div id="chat-messages">
-        <div style="color:var(--text-muted);font-size:12px;text-align:center;margin-top:48px">
-          Send a message to start a session with this employee.
+      <!-- LEFT: Sessions panel -->
+      <div class="de-sessions-panel">
+        <div class="de-sessions-panel-hdr">
+          <span class="de-sessions-label">SESSIONS</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="live-badge" id="dv-live" style="display:none">LIVE</span>
+            <button class="btn-run" id="btn-run" onclick="deRun()">▶ RUN</button>
+          </div>
+        </div>
+        <!-- Session list (default) -->
+        <div id="de-sessions-list" class="de-sessions-list">
+          <div style="padding:16px;font-size:11px;color:var(--text-muted)">Select a DE to view sessions.</div>
+        </div>
+        <!-- Steps view (shown when session is clicked) -->
+        <div id="de-steps-panel" class="de-steps-panel">
+          <div class="de-steps-panel-hdr">
+            <button class="btn-back-sessions" onclick="backToSessionsList()">← Sessions</button>
+            <div class="mono" id="de-steps-panel-id" style="font-size:9px;color:var(--text-muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px"></div>
+            <span class="live-badge" id="de-steps-live-badge" style="display:none">LIVE</span>
+          </div>
+          <div class="prog-steps" id="de-steps-panel-content" style="padding:12px 14px"></div>
         </div>
       </div>
-      <div class="chat-input-bar">
-        <textarea id="chat-input" rows="1"
-          placeholder="Message this employee… (Enter to send, Shift+Enter for newline)"
-          onkeydown="chatKey(event)" oninput="autoResize(this)"></textarea>
-        <button class="btn-send" id="btn-send" onclick="sendChat()">SEND</button>
-      </div>
-    </div>
 
-    <!-- PROGRESS -->
-    <div class="tab-pane" id="tab-progress">
-      <div class="progress-layout">
-        <div class="prog-sessions">
-          <div class="prog-sessions-hdr">SESSIONS</div>
-          <div id="prog-session-list"><div style="padding:12px;font-size:11px;color:var(--text-muted)">No sessions yet.</div></div>
-        </div>
-        <div class="prog-steps" id="prog-steps">
-          <div class="prog-empty">Select a session to view steps.</div>
-        </div>
-      </div>
-    </div>
+      <!-- Resize handle -->
+      <div class="de-sessions-resize-handle" id="de-sessions-resize-handle"></div>
 
-    <!-- PROFILE -->
-    <div class="tab-pane" id="tab-profile">
-      <div class="profile-scroll">
-        <div class="profile-inner" id="profile-inner">
-          <div style="color:var(--text-muted);font-size:12px">Loading…</div>
+      <!-- RIGHT: Chat / Profile / Schedule -->
+      <div class="de-detail-panel">
+        <div class="de-detail-tabs">
+          <button class="de-detail-tab active" id="dtab-chat" onclick="switchDetailTab('chat')">💬 CHAT</button>
+          <button class="de-detail-tab" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFIL</button>
+          <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
         </div>
-      </div>
-    </div>
 
-    <!-- SCHEDULE -->
-    <div class="tab-pane" id="tab-schedule">
-      <div class="sched-scroll" id="sched-scroll">
-        <div class="sched-empty">Loading schedule…</div>
-      </div>
-      <div class="sched-add-bar">
-        <button class="btn-add-sched" onclick="openAddSchedule()">＋ Add scheduled activity</button>
+        <!-- Chat -->
+        <div class="de-detail-content active" id="detail-chat">
+          <div id="chat-messages">
+            <div style="color:var(--text-muted);font-size:12px;text-align:center;margin-top:48px">
+              Send a message to start a session — or click a session on the left to view its steps.
+            </div>
+          </div>
+          <div class="chat-input-bar">
+            <textarea id="chat-input" rows="1"
+              placeholder="Message this employee… (Enter to send)"
+              onkeydown="chatKey(event)" oninput="autoResize(this)"></textarea>
+            <button class="btn-send" id="chat-send-btn" onclick="sendChat()">SEND</button>
+          </div>
+        </div>
+
+        <!-- Profile -->
+        <div class="de-detail-content" id="detail-profile">
+          <div class="profile-scroll">
+            <div class="profile-inner" id="profile-inner">
+              <div style="color:var(--text-muted);font-size:12px">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schedule -->
+        <div class="de-detail-content" id="detail-schedule">
+          <div class="sched-scroll" id="sched-scroll">
+            <div class="sched-empty">Loading schedule…</div>
+          </div>
+          <div class="sched-add-bar">
+            <button class="btn-add-sched" onclick="openAddSchedule()">＋ Add scheduled activity</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -902,6 +959,9 @@ async function selectDE(name){
   const item=$('di-'+name);if(item)item.classList.add('active');
   $('empty-state').style.display='none';
   $('de-view').classList.add('visible');
+  backToSessionsList();
+  switchDetailTab('chat');
+  loadSessionsPanel(name);
   try{
     const r=await apiFetch('/de/'+name);const de=await r.json();
     $('dv-name').textContent=de.display_name||name.toUpperCase();
@@ -909,8 +969,8 @@ async function selectDE(name){
     const av=$('dv-avatar');
     av.textContent=(de.display_name||name)[0].toUpperCase();
     av.style.background=de.color||'#FF4500';
-    switchTab('chat');
-    $('chat-messages').innerHTML=`<div style="color:var(--text-muted);font-size:12px;text-align:center;margin-top:48px">Send a message to start a session with <strong>${esc(de.display_name||name.toUpperCase())}</strong>.</div>`;
+    $('chat-messages').innerHTML=`<div style="color:var(--text-muted);font-size:12px;text-align:center;margin-top:48px">Send a message to <strong>${esc(de.display_name||name.toUpperCase())}</strong> to start a session — or select a session on the left.</div>`;
+    loadProfile(name);
   }catch(e){}
 }
 
@@ -975,6 +1035,7 @@ function chatPoll(de,sid,tid,sendBtn){
         if(s.status==='paused_human'){msgs.innerHTML+=`<div class="msg-agent"><div class="step-bubble" style="border-color:var(--yellow)"><div class="step-bubble-label" style="color:var(--yellow)">⏳ DECISION NEEDED</div><div class="step-bubble-body">This employee needs your approval to continue. Check the Decisions panel.</div></div></div>`;loadDecisionsPending();}
         msgs.scrollTop=msgs.scrollHeight;
         loadList();
+        loadSessionsPanel(de);
       }
       if(++attempts>120)clearInterval(chatPoller);
     }catch(e){}
@@ -1315,6 +1376,93 @@ function openAddSchedule() {
     else alert('Error: ' + (d.error || 'unknown'));
   }).catch(e => { if (!e.noBackend) alert('Error: ' + e.message); });
 }
+
+/* ═══ 3-PANE: SESSIONS PANEL + DETAIL TABS ═══ */
+async function loadSessionsPanel(de) {
+  const list = $('de-sessions-list');
+  if (!list) return;
+  list.innerHTML = '<div style="padding:12px;font-size:11px;color:var(--text-muted)">Loading…</div>';
+  try {
+    const r = await apiFetch(`/de/${de}/sessions`);
+    const d = await r.json();
+    const sessions = d.sessions || [];
+    if (!sessions.length) {
+      list.innerHTML = '<div style="padding:16px;font-size:11px;color:var(--text-muted)">No sessions yet.<br>Click ▶ RUN to start one.</div>';
+      return;
+    }
+    list.innerHTML = sessions.map(s => `
+      <div class="prog-session" onclick="showSessionSteps('${de}','${s.id}',this)">
+        <div class="prog-session-top">
+          <span>${STATUS_ICON[s.status]||'◌'}</span>
+          <span class="prog-session-trigger">${esc(s.trigger_type||'cron')}</span>
+          ${s.status==='running'?'<span class="live-badge" style="padding:1px 6px;font-size:8px;margin-left:4px">LIVE</span>':''} 
+        </div>
+        <div class="prog-session-meta">${timeAgo(s.created_at)} · ${s.step_count||0} steps</div>
+        ${s.summary?`<div class="prog-session-summary">${esc(s.summary.substring(0,60))}${s.summary.length>60?'…':''}</div>`:''}
+      </div>`).join('');
+  } catch(e) {
+    if (e.noBackend) { list.innerHTML = '<div style="padding:12px;font-size:11px;color:var(--text-muted)">Connect backend (⚙) to view sessions.</div>'; return; }
+    list.innerHTML = `<div style="padding:12px;font-size:11px;color:var(--red)">${esc(e.message)}</div>`;
+  }
+}
+
+async function showSessionSteps(de, sid, el) {
+  document.querySelectorAll('.prog-session').forEach(e => e.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const list = $('de-sessions-list');
+  const stepsPanel = $('de-steps-panel');
+  const stepsContent = $('de-steps-panel-content');
+  const stepsId = $('de-steps-panel-id');
+  if (list) list.style.display = 'none';
+  if (stepsPanel) { stepsPanel.style.display = 'flex'; stepsPanel.style.flexDirection = 'column'; }
+  if (stepsContent) stepsContent.innerHTML = '<div class="prog-empty">Loading…</div>';
+  if (stepsId) stepsId.textContent = sid;
+  const liveBadge = $('de-steps-live-badge');
+  try {
+    const r = await apiFetch(`/de/${de}/sessions/${sid}`);
+    const s = await r.json();
+    const isLive = s.status === 'running' || s.status === 'queued';
+    if (liveBadge) liveBadge.style.display = isLive ? 'inline-flex' : 'none';
+    stepsContent.innerHTML = (s.steps||[]).map(renderStep).join('') || '<div class="prog-empty">No steps yet.</div>';
+    stepsContent.scrollTop = stepsContent.scrollHeight;
+    if (isLive) {
+      const t = setInterval(async () => {
+        try {
+          const r2 = await apiFetch(`/de/${de}/sessions/${sid}`);
+          const s2 = await r2.json();
+          stepsContent.innerHTML = (s2.steps||[]).map(renderStep).join('');
+          stepsContent.scrollTop = stepsContent.scrollHeight;
+          if (s2.status !== 'running' && s2.status !== 'queued') {
+            clearInterval(t);
+            if (liveBadge) liveBadge.style.display = 'none';
+            loadSessionsPanel(de);
+          }
+        } catch(e2) { clearInterval(t); }
+      }, 2500);
+    }
+  } catch(e) {
+    if (stepsContent) stepsContent.innerHTML = `<div class="prog-empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function backToSessionsList() {
+  const list = $('de-sessions-list');
+  const stepsPanel = $('de-steps-panel');
+  const liveBadge = $('de-steps-live-badge');
+  if (list) list.style.display = '';
+  if (stepsPanel) stepsPanel.style.display = 'none';
+  if (liveBadge) liveBadge.style.display = 'none';
+}
+
+function switchDetailTab(name) {
+  const names = ['chat','profile','schedule'];
+  document.querySelectorAll('.de-detail-tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
+  document.querySelectorAll('.de-detail-content').forEach((c,i) => c.classList.toggle('active', names[i]===name));
+  if (name==='profile' && selectedDE) loadProfile(selectedDE);
+  if (name==='schedule' && selectedDE) loadSchedule(selectedDE);
+}
+// Keep old switchTab as alias for backward compat
+function switchTab(name) { if(name==='profile') switchDetailTab('profile'); else if(name==='schedule') switchDetailTab('schedule'); }
 /* ═══ INIT ═══ */
 loadList();
 setInterval(loadList,60000);
