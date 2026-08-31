@@ -19,4 +19,4 @@ for de_dir in examples/*/; do
 done
 
 echo "Starting DE Framework API on port ${PORT:-8766}..."
-python backend/server.py
+python3 backend/server.py
