@@ -880,7 +880,7 @@ let chatPoller = null;
 
 
 /* ═══ BACKEND CONFIG ═══ */
-function getBackendConfig(){try{const s=localStorage.getItem('de_backend');if(s){const c=JSON.parse(s);if(c.url)return c;}}catch{}return{url:'https://sports-hwy-hindu-gate.trycloudflare.com',token:'de-demo-2026'};}
+function getBackendConfig(){try{const s=localStorage.getItem('de_backend');if(s){const c=JSON.parse(s);if(c.url)return c;}}catch{}return{url:'https://priest-punch-doctor-provided.trycloudflare.com',token:'de-demo-2026'};}
 function isBackendConfigured(){const c=getBackendConfig();return!!(c.url&&c.token);}
 function updateGearIcon(){const g=$('btn-gear');if(!g)return;g.classList.toggle('btn-connected',isBackendConfigured());g.title=isBackendConfigured()?'Backend connected — click to change':'Connect your backend';}
 async function apiFetch(path,options={}){
