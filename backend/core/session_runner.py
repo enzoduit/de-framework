@@ -99,6 +99,96 @@ def tool_read_json(inp):
     except Exception as e:
         return f'Error: {e}'
 
+def make_tool_self_evaluate(de_name):
+    """Factory: returns the self_evaluate tool bound to de_name."""
+    def _impl(inp):
+        score = max(0, min(100, int(inp.get('score', 0))))
+        evaluation = inp.get('evaluation', '')
+        kpi_results = inp.get('kpi_results', {})
+
+        metrics_file = AGENTS_DIR / de_name / 'metrics.json'
+        try:
+            metrics = json.loads(metrics_file.read_text()) if metrics_file.exists() else {}
+        except Exception:
+            metrics = {}
+
+        # Update self-eval fields
+        metrics['last_self_eval'] = {
+            'timestamp': _now(),
+            'score': score,
+            'evaluation': evaluation,
+            'kpi_results': kpi_results,
+        }
+        history = metrics.get('self_eval_history', [])
+        history.append({'ts': _now(), 'score': score})
+        metrics['self_eval_history'] = history[-10:]  # keep last 10
+        metrics['last_updated'] = _now()
+        metrics_file.write_text(json.dumps(metrics, indent=2))
+
+        # Notify portal
+        entry = {
+            'ts': _now(), 'agent': de_name, 'level': 0, 'type': 'self_eval',
+            'title': f'\U0001f4ca Self-eval: {score}/100',
+            'body': evaluation[:300],
+        }
+        inbox = AGENTS_DIR / 'portal-inbox.jsonl'
+        AGENTS_DIR.mkdir(parents=True, exist_ok=True)
+        with open(inbox, 'a') as f:
+            f.write(json.dumps(entry) + '\n')
+
+        print(f'  [{de_name.upper()}:SELF_EVAL] Score: {score}/100')
+        return {'status': 'ok', 'score': score, 'recorded': True}
+    return _impl
+
+
+def tool_web_search(inp):
+    """Search the web via DuckDuckGo HTML (no API key required)."""
+    import urllib.request as _ur
+    import urllib.parse as _up
+    import re as _re
+
+    query = inp.get('query', '').strip()
+    num_results = min(int(inp.get('num_results', 5)), 10)
+    if not query:
+        return 'Error: query is required'
+
+    url = f'https://html.duckduckgo.com/html/?q={_up.quote(query)}'
+    try:
+        req = _ur.Request(url, headers={'User-Agent': 'Mozilla/5.0 (compatible; DE-Research/1.0)'})
+        with _ur.urlopen(req, timeout=15) as r:
+            html = r.read().decode('utf-8', errors='replace')
+    except Exception as e:
+        return f'Search failed: {e}'
+
+    results = []
+    # Extract result blocks from DuckDuckGo HTML
+    blocks = _re.findall(
+        r'<div class="result[^"]*".*?</div>\s*</div>',
+        html, _re.DOTALL
+    )
+    for block in blocks[:num_results * 2]:
+        title_m = _re.search(r'<a class="result__a"[^>]*>(.*?)</a>', block, _re.DOTALL)
+        snip_m = _re.search(r'<a class="result__snippet"[^>]*>(.*?)</a>', block, _re.DOTALL)
+        url_m = _re.search(r'<a class="result__a"[^>]*href="([^"]+)"', block)
+        if title_m:
+            title = _re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
+            snippet = _re.sub(r'<[^>]+>', '', snip_m.group(1)).strip() if snip_m else ''
+            link = url_m.group(1) if url_m else ''
+            if title:
+                results.append(f'• {title}\n  {snippet}' + (f'\n  {link}' if link else ''))
+        if len(results) >= num_results:
+            break
+
+    if not results:
+        # Fallback: extract any links
+        titles = _re.findall(r'class="result__a"[^>]*>([^<]+)<', html)[:num_results]
+        results = [f'• {t.strip()}' for t in titles if t.strip()]
+
+    if not results:
+        return f"No results found for: {query}"
+    return f"Web search results for '{query}':\n\n" + '\n\n'.join(results)
+
+
 def make_tool_schedule_activity(de_name):
     """Factory: returns the schedule_next_activity tool fn bound to de_name."""
     def _impl(inp):
@@ -295,6 +385,35 @@ def build_tools(de_name):
             'fn': tool_update_metrics,
         },
         {
+            'name': 'self_evaluate',
+            'description': (
+                'Record your self-evaluation after completing your work. Call this at the END of every session. '
+                'Score yourself 0-100 on how well you met your KPIs, summarize what you did, and rate each KPI individually.'
+            ),
+            'input_schema': {'type': 'object', 'required': ['score', 'evaluation'], 'properties': {
+                'score': {'type': 'integer', 'minimum': 0, 'maximum': 100,
+                          'description': 'Overall score 0-100: how well did you perform against your KPIs this session?'},
+                'evaluation': {'type': 'string',
+                               'description': 'One paragraph: what did you do, what worked, what missed, what will you improve next run?'},
+                'kpi_results': {'type': 'object',
+                                'description': 'Dict mapping each KPI to {status: met|partial|missed, note: str}'},
+            }},
+            'fn': make_tool_self_evaluate(de_name),
+        },
+        {
+            'name': 'web_search',
+            'description': (
+                'Search the web using DuckDuckGo (no API key needed). Use for autoresearch queries, fact-checking, '
+                'or gathering information. Returns top result titles + snippets.'
+            ),
+            'input_schema': {'type': 'object', 'required': ['query'], 'properties': {
+                'query': {'type': 'string', 'description': 'Search query'},
+                'num_results': {'type': 'integer', 'default': 5, 'minimum': 1, 'maximum': 10,
+                                'description': 'Number of results to return'},
+            }},
+            'fn': tool_web_search,
+        },
+        {
             'name': 'schedule_next_activity',
             'description': (
                 'Plan the next work session for this DE. Call when you find something needing '
@@ -417,15 +536,21 @@ Your workspace: {de_dir}
 Your files: metrics.json, memory.md, decisions.json (all in your directory)
 
 INSTRUCTIONS:
-1. Review your current metrics and recent activity
-2. Perform your regular duties appropriate to this trigger
-3. Document findings using write_portal_inbox for important items
-4. Update metrics.json with current KPIs using update_metrics
-5. If you need human approval, use request_human_decision (this pauses the session)
-6. If you need a colleague's input, use ask_colleague
-7. End with a clear summary of what you did
+1. Read your state: metrics.json, memory.md, recent log entries, schedule.json
+2. Check any SCHEDULED ACTIVITIES listed above and address them
+3. Perform your regular duties for this trigger type
+4. Document findings using write_portal_inbox for important items
+5. Update metrics.json using update_metrics
+6. AUTORESEARCH: if your job.md includes research queries and this is a research session, use web_search to research each query and write key findings to memory.md using write_file
+7. Use schedule_next_activity if something needs follow-up
+8. If you need human approval, use request_human_decision
+9. If you need a colleague's input, use ask_colleague
+10. MANDATORY — call self_evaluate at the END of EVERY session with:
+    - score: 0-100 (how well you met your KPIs)
+    - evaluation: honest paragraph on what you did and what to improve
+    - kpi_results: dict per KPI → {{status: met|partial|missed, note: ...}}
 
-Be specific and action-oriented. Don't just read files — analyze and act.
+Be specific and action-oriented. Verify changes before declaring success.
 Maximum 8 iterations. Work efficiently.
 """
 
