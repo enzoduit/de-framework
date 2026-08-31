@@ -68,8 +68,8 @@ class DEHandler(BaseHTTPRequestHandler):
         parts = [p for p in path.split('/') if p]
 
         # ── Public GET endpoints (no auth) ─────────────────────────────────
-        if path == '/health':
-            return self.send_json(200, {'status': 'ok'})
+        if path in ('/', '/health'):
+            return self.send_json(200, {'status': 'ok', 'service': 'de-framework'})
 
         if path == '/pageviews':
             return system_routes.handle_pageviews(self)
