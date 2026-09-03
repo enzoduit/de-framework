@@ -183,6 +183,21 @@ textarea, input, select { font-family: inherit; }
   font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
   padding: 0 18px; border-radius: 8px; height: 42px; flex-shrink: 0; transition: opacity 0.15s;
 }
+/* Message input bar in left sessions panel */
+.de-msg-bar {
+  padding:10px 12px; border-top:1px solid var(--border);
+  display:flex; gap:8px; align-items:flex-end;
+  background:var(--surface); flex-shrink:0;
+}
+#de-msg-input {
+  flex:1; background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px;
+  font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text);
+  resize:none; min-height:36px; max-height:100px; line-height:1.5; transition:border-color 0.15s;
+}
+#de-msg-input:focus { outline:none; border-color:var(--accent); }
+#de-msg-input::placeholder { color:var(--text-muted); }
+#de-msg-send { padding:0 14px; height:36px; font-size:16px; }
 .btn-send:hover { opacity: 0.85; }
 .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -658,6 +673,11 @@ textarea, input, select { font-family: inherit; }
           </div>
           <div class="prog-steps" id="de-steps-panel-content" style="padding:12px 14px"></div>
         </div>
+        <!-- Message input: type to start a session -->
+        <div class="de-msg-bar" id="de-msg-bar" style="display:none">
+          <textarea id="de-msg-input" rows="1" placeholder="Nachricht senden…" onkeydown="deMsgKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="btn-send" id="de-msg-send" onclick="deSendMsg()">↑</button>
+        </div>
       </div>
 
       <!-- Resize handle -->
@@ -666,28 +686,12 @@ textarea, input, select { font-family: inherit; }
       <!-- RIGHT: Chat / Profile / Schedule -->
       <div class="de-detail-panel">
         <div class="de-detail-tabs">
-          <button class="de-detail-tab active" id="dtab-chat" onclick="switchDetailTab('chat')">💬 CHAT</button>
-          <button class="de-detail-tab" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFIL</button>
+          <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFIL</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
         </div>
 
-        <!-- Chat -->
-        <div class="de-detail-content active" id="detail-chat">
-          <div id="chat-messages">
-            <div style="color:var(--text-muted);font-size:12px;text-align:center;margin-top:48px">
-              Send a message to start a session — or click a session on the left to view its steps.
-            </div>
-          </div>
-          <div class="chat-input-bar">
-            <textarea id="chat-input" rows="1"
-              placeholder="Message this employee… (Enter to send)"
-              onkeydown="chatKey(event)" oninput="autoResize(this)"></textarea>
-            <button class="btn-send" id="chat-send-btn" onclick="sendChat()">SEND</button>
-          </div>
-        </div>
-
         <!-- Profile -->
-        <div class="de-detail-content" id="detail-profile">
+        <div class="de-detail-content active" id="detail-profile">
           <div class="profile-scroll">
             <div class="profile-inner" id="profile-inner">
               <div style="color:var(--text-muted);font-size:12px">Loading…</div>
@@ -1016,6 +1020,7 @@ async function selectDE(name){
   backToSessionsList();
   switchDetailTab('profile');
   loadSessionsPanel(name);
+  const mb=$('de-msg-bar');if(mb)mb.style.display='flex';
   try{
     const r=await apiFetch('/de/'+name);const de=await r.json();
     $('dv-name').textContent=de.display_name||name.toUpperCase();
@@ -1038,9 +1043,22 @@ function switchTab(name){
   if(name==='schedule'&&selectedDE)loadSchedule(selectedDE);
 }
 
-/* ═══ CHAT ═══ */
+/* ═══ CHAT / MSG ═══ */
 function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
-function chatKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}}
+function deMsgKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();deSendMsg();}}
+async function deSendMsg(){
+  const input=$('de-msg-input');
+  const msg=(input.value||'').trim();
+  if(!msg||!selectedDE)return;
+  input.value='';input.style.height='';
+  const btn=$('de-msg-send');btn.disabled=true;btn.textContent='…';
+  try{
+    const r=await apiFetch('/de-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de_name:selectedDE,trigger_type:'chat',trigger_context:msg})});
+    const d=await r.json();
+    if(d.ok){btn.textContent='✓';setTimeout(()=>{btn.textContent='↑';btn.disabled=false;},1500);setTimeout(()=>loadSessionsPanel(selectedDE,d.session_id),800);}
+    else throw new Error(d.error||'Failed');
+  }catch(e){btn.textContent='!';setTimeout(()=>{btn.textContent='↑';btn.disabled=false;},2000);}
+}
 
 async function sendChat(){
   const input=$('chat-input');
@@ -1542,7 +1560,7 @@ function backToSessionsList() {
 }
 
 function switchDetailTab(name) {
-  const names = ['chat','profile','schedule'];
+  const names = ['profile','schedule'];
   document.querySelectorAll('.de-detail-tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.de-detail-content').forEach((c,i) => c.classList.toggle('active', names[i]===name));
   if (name==='profile' && selectedDE) loadProfile(selectedDE);
