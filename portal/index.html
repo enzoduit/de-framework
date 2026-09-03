@@ -986,7 +986,8 @@ function closeSidebar(){$('sidebar').classList.remove('open');$('sidebar-overlay
 /* ═══ DE LIST ═══ */
 async function loadList(){
   try{
-    const r=await apiFetch('/de-list');const d=await r.json();
+    if(!isBackendConfigured()){const c=$('de-list');c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No backend connected.<br><br>Click <strong>⚙</strong> (sidebar footer) to configure.</div>';return;}
+    const r=await apiFetch('/de-list');if(!r.ok&&r.status===401){const c=$('de-list');c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">Invalid token.<br><br>Click <strong>⚙</strong> to update.</div>';return;}const d=await r.json();
     const des=d.des||[];
     const c=$('de-list');
     if(!des.length){c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No employees yet.<br>Click + NEW to create one.</div>';return;}

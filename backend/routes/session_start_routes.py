@@ -6,7 +6,12 @@ import json
 import uuid
 import datetime
 import subprocess as _sp
+from pathlib import Path
 from backend.config import AGENTS_BASE, now_iso
+
+# session_runner.py lives next to this routes dir in backend/core/
+_BACKEND_DIR = Path(__file__).parent.parent  # backend/
+_SESSION_RUNNER = _BACKEND_DIR / 'core' / 'session_runner.py'
 
 
 def handle_session_start(handler, de_name, body):
@@ -58,10 +63,10 @@ def handle_session_start(handler, de_name, body):
     # Spawn session_runner.py in background
     _log = f'/tmp/session-{de_name}-{session_id}.log'
     _sp.Popen(
-        ['python3', str(AGENTS_BASE / 'session_runner.py'), de_name, session_id],
+        ['python3', str(_SESSION_RUNNER), de_name, session_id],
         stdout=open(_log, 'w'),
         stderr=_sp.STDOUT,
-        cwd=str(AGENTS_BASE),
+        cwd=str(_BACKEND_DIR.parent),  # workspace root (de-framework/)
     )
 
     return handler.send_json(200, {'ok': True, 'session_id': session_id})
