@@ -513,6 +513,59 @@ textarea, input, select { font-family: inherit; }
 .de-detail-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
 .de-detail-content { display:none; flex:1; flex-direction:column; overflow:hidden; }
 .de-detail-content.active { display:flex; }
+
+/* ── WORK SESSION CARDS ── */
+.ws-card {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.1s; border-left: 3px solid transparent;
+}
+.ws-card:hover { background: var(--surface2); }
+.ws-card.active { background: rgba(255,69,0,0.07); border-left-color: var(--accent); }
+.ws-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 6px; }
+.ws-trigger {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.08em; padding: 2px 7px; border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+}
+.ws-trigger-cron { background: rgba(99,102,241,0.15); color: #6366f1; }
+.ws-trigger-user { background: rgba(255,69,0,0.15); color: var(--accent); }
+.ws-trigger-colleague { background: rgba(168,85,247,0.15); color: #a855f7; }
+.ws-trigger-auto { background: rgba(20,184,166,0.15); color: #14b8a6; }
+.ws-quality { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; text-align: right; white-space: nowrap; }
+.quality-value { color: var(--green); }
+.quality-neutral { color: var(--text-muted); }
+.quality-warn { color: var(--yellow); }
+.quality-error { color: var(--red); }
+.ws-summary { font-size: 11px; color: var(--text-sec); line-height: 1.45; margin-bottom: 5px; }
+.ws-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted);
+  display: flex; gap: 5px; align-items: center; flex-wrap: wrap;
+}
+.ws-meta-dot { opacity: 0.3; }
+.ws-live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red); animation: pulse 1.5s infinite; display: inline-block; margin-right: 2px; }
+/* ── SESSION DETAIL ── */
+.session-summary-box {
+  margin: 0 14px 10px; padding: 10px 12px; flex-shrink: 0;
+  background: rgba(0,200,100,0.06); border: 1px solid rgba(0,200,100,0.15);
+  border-radius: 8px; font-size: 12px; color: var(--text-sec); line-height: 1.6;
+}
+.session-summary-box strong { color: var(--text); font-weight: 600; }
+/* ── TIMELINE ── */
+.timeline { display: flex; flex-direction: column; }
+.tl-step { display: flex; gap: 10px; padding: 9px 0; }
+.tl-step:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,0.04); }
+.tl-icon {
+  width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px;
+}
+.tl-body { flex: 1; min-width: 0; }
+.tl-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 3px; }
+.tl-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; }
+.tl-ts { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); flex-shrink: 0; }
+.tl-text { font-size: 11px; color: var(--text-sec); line-height: 1.5; word-break: break-word; }
+.tl-expand { background: none; border: none; color: var(--accent); font-size: 10px; font-family: 'JetBrains Mono', monospace; cursor: pointer; padding: 0; margin-top: 4px; display: block; transition: opacity 0.15s; }
+.tl-expand:hover { opacity: 0.7; }
+.tl-detail { display: none; margin-top: 6px; padding: 8px 10px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); white-space: pre-wrap; word-break: break-all; max-height: 160px; overflow-y: auto; line-height: 1.5; }
+.tl-detail.open { display: block; }
 /* ── MOBILE ── */
 .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99; }
 @media (max-width:767px) {
@@ -960,7 +1013,7 @@ async function selectDE(name){
   $('empty-state').style.display='none';
   $('de-view').classList.add('visible');
   backToSessionsList();
-  switchDetailTab('chat');
+  switchDetailTab('profile');
   loadSessionsPanel(name);
   try{
     const r=await apiFetch('/de/'+name);const de=await r.json();
@@ -1390,16 +1443,26 @@ async function loadSessionsPanel(de) {
       list.innerHTML = '<div style="padding:16px;font-size:11px;color:var(--text-muted)">No sessions yet.<br>Click ▶ RUN to start one.</div>';
       return;
     }
-    list.innerHTML = sessions.map(s => `
-      <div class="prog-session" onclick="showSessionSteps('${de}','${s.id}',this)">
-        <div class="prog-session-top">
-          <span>${STATUS_ICON[s.status]||'◌'}</span>
-          <span class="prog-session-trigger">${esc(s.trigger_type||'cron')}</span>
-          ${s.status==='running'?'<span class="live-badge" style="padding:1px 6px;font-size:8px;margin-left:4px">LIVE</span>':''} 
+    list.innerHTML = sessions.map(s => {
+      const qg = qualityGate(s);
+      const isLive = s.status === 'running' || s.status === 'queued';
+      const dur = s.duration_seconds ? (s.duration_seconds < 60 ? s.duration_seconds + 's' : Math.round(s.duration_seconds/60) + 'm') : '';
+      return `
+      <div class="ws-card" onclick="showSessionSteps('${esc(de)}','${esc(s.id)}',this)">
+        <div class="ws-card-top">
+          ${triggerBadge(s.trigger_type)}
+          <span class="ws-quality ${qg.cls}">${qg.label}</span>
         </div>
-        <div class="prog-session-meta">${timeAgo(s.created_at)} · ${s.step_count||0} steps</div>
-        ${s.summary?`<div class="prog-session-summary">${esc(s.summary.substring(0,60))}${s.summary.length>60?'…':''}</div>`:''}
-      </div>`).join('');
+        ${s.summary ? `<div class="ws-summary">${esc(s.summary.substring(0,90))}${s.summary.length>90?'…':''}</div>` : ''}
+        <div class="ws-meta">
+          <span>${timeAgo(s.created_at)}</span>
+          <span class="ws-meta-dot">·</span>
+          <span>${s.step_count||0} steps</span>
+          ${dur ? `<span class="ws-meta-dot">·</span><span>${dur}</span>` : ''}
+          ${isLive ? `<span class="ws-meta-dot">·</span><span style="color:var(--red);display:inline-flex;align-items:center;gap:3px"><span class="ws-live-dot"></span>live</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
   } catch(e) {
     if (e.noBackend) { list.innerHTML = '<div style="padding:12px;font-size:11px;color:var(--text-muted)">Connect backend (⚙) to view sessions.</div>'; return; }
     list.innerHTML = `<div style="padding:12px;font-size:11px;color:var(--red)">${esc(e.message)}</div>`;
@@ -1407,7 +1470,7 @@ async function loadSessionsPanel(de) {
 }
 
 async function showSessionSteps(de, sid, el) {
-  document.querySelectorAll('.prog-session').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.ws-card').forEach(e => e.classList.remove('active'));
   if (el) el.classList.add('active');
   const list = $('de-sessions-list');
   const stepsPanel = $('de-steps-panel');
@@ -1416,25 +1479,48 @@ async function showSessionSteps(de, sid, el) {
   if (list) list.style.display = 'none';
   if (stepsPanel) { stepsPanel.style.display = 'flex'; stepsPanel.style.flexDirection = 'column'; }
   if (stepsContent) stepsContent.innerHTML = '<div class="prog-empty">Loading…</div>';
-  if (stepsId) stepsId.textContent = sid;
   const liveBadge = $('de-steps-live-badge');
+
+  const renderSessionDetail = (s) => {
+    const qg = qualityGate(s);
+    const isLive = s.status === 'running' || s.status === 'queued';
+    const dur = s.duration_seconds ? (s.duration_seconds < 60 ? s.duration_seconds + 's' : Math.round(s.duration_seconds/60) + 'm') : '';
+    if (stepsId) stepsId.textContent = timeAgo(s.created_at||'');
+    if (liveBadge) liveBadge.style.display = isLive ? 'inline-flex' : 'none';
+    return `
+      ${s.summary ? `<div class="session-summary-box"><strong>What happened:</strong> ${esc(s.summary)}</div>` : ''}
+      <div style="padding:0 14px 10px;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          ${triggerBadge(s.trigger_type)}
+          <span class="ws-quality ${qg.cls}">${qg.label}</span>
+          ${isLive ? '<span class="live-badge">LIVE</span>' : ''}
+        </div>
+        <div class="ws-meta">
+          ${s.created_at ? `<span>${new Date(s.created_at).toLocaleString()}</span><span class="ws-meta-dot">·</span>` : ''}
+          <span>${(s.steps||[]).length} steps</span>
+          ${dur ? `<span class="ws-meta-dot">·</span><span>${dur}</span>` : ''}
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);flex:1;overflow-y:auto;padding:12px 14px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:10px">TIMELINE</div>
+        <div class="timeline">
+          ${(s.steps||[]).length ? (s.steps||[]).map(renderTimelineStep).join('') : '<div class="prog-empty">No steps recorded yet.</div>'}
+        </div>
+      </div>`;
+  };
+
   try {
     const r = await apiFetch(`/de/${de}/sessions/${sid}`);
     const s = await r.json();
-    const isLive = s.status === 'running' || s.status === 'queued';
-    if (liveBadge) liveBadge.style.display = isLive ? 'inline-flex' : 'none';
-    stepsContent.innerHTML = (s.steps||[]).map(renderStep).join('') || '<div class="prog-empty">No steps yet.</div>';
-    stepsContent.scrollTop = stepsContent.scrollHeight;
-    if (isLive) {
+    stepsContent.innerHTML = renderSessionDetail(s);
+    if (s.status === 'running' || s.status === 'queued') {
       const t = setInterval(async () => {
         try {
           const r2 = await apiFetch(`/de/${de}/sessions/${sid}`);
           const s2 = await r2.json();
-          stepsContent.innerHTML = (s2.steps||[]).map(renderStep).join('');
-          stepsContent.scrollTop = stepsContent.scrollHeight;
+          stepsContent.innerHTML = renderSessionDetail(s2);
           if (s2.status !== 'running' && s2.status !== 'queued') {
             clearInterval(t);
-            if (liveBadge) liveBadge.style.display = 'none';
             loadSessionsPanel(de);
           }
         } catch(e2) { clearInterval(t); }
@@ -1463,6 +1549,98 @@ function switchDetailTab(name) {
 }
 // Keep old switchTab as alias for backward compat
 function switchTab(name) { if(name==='profile') switchDetailTab('profile'); else if(name==='schedule') switchDetailTab('schedule'); }
+/* ═══ WORK SESSION HELPERS ═══ */
+function qualityGate(s) {
+  if (!s) return { label: '—', cls: 'quality-neutral' };
+  if (s.status === 'error') return { label: '❌ Error', cls: 'quality-error' };
+  const steps = s.steps || [];
+  const hasAction = steps.some(st => st.type === 'action');
+  const hasDecision = steps.some(st => st.type === 'decision_request');
+  if (s.status === 'running' || s.status === 'queued') return { label: '🔄 Running', cls: 'quality-neutral' };
+  if (hasAction || hasDecision) return { label: '💡 Value created', cls: 'quality-value' };
+  if (s.summary) return { label: '✓ Checked', cls: 'quality-neutral' };
+  return { label: '⚠ No output', cls: 'quality-warn' };
+}
+
+function triggerBadge(t) {
+  const MAP = {
+    cron:      { label: '⏰ SCHEDULED', cls: 'ws-trigger-cron' },
+    scheduled: { label: '⏰ SCHEDULED', cls: 'ws-trigger-cron' },
+    user:      { label: '🧑 USER', cls: 'ws-trigger-user' },
+    chat:      { label: '💬 CHAT', cls: 'ws-trigger-user' },
+    colleague: { label: '👥 COLLEAGUE', cls: 'ws-trigger-colleague' },
+    metric:    { label: '📊 AUTO', cls: 'ws-trigger-auto' },
+    auto:      { label: '📊 AUTO', cls: 'ws-trigger-auto' },
+  };
+  const m = MAP[t] || { label: (t || 'RUN').toUpperCase(), cls: 'ws-trigger-cron' };
+  return `<span class="ws-trigger ${m.cls}">${m.label}</span>`;
+}
+
+function renderTimelineStep(step, idx) {
+  const TL = {
+    trigger:           { icon: '▶', bg: 'rgba(99,102,241,0.2)',  color: '#6366f1',          label: 'Started' },
+    reasoning:         { icon: '💭', bg: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)',  label: 'Thinking' },
+    action:            { icon: '⚡', bg: 'rgba(255,69,0,0.15)',   color: 'var(--accent)',      label: 'Action taken' },
+    observation:       { icon: '📊', bg: 'rgba(0,200,100,0.12)', color: 'var(--green)',       label: 'Result' },
+    decision_request:  { icon: '⏳', bg: 'rgba(255,200,0,0.15)', color: 'var(--yellow)',      label: 'Decision needed' },
+    decision_response: { icon: '✓',  bg: 'rgba(0,200,100,0.1)', color: 'var(--green)',       label: 'Decided' },
+    complete:          { icon: '✅', bg: 'rgba(0,200,100,0.1)',   color: 'var(--green)',       label: 'Complete' },
+    colleague_request: { icon: '💬', bg: 'rgba(168,85,247,0.15)', color: '#a855f7',         label: 'Asked colleague' },
+  };
+  const cfg = TL[step.type] || { icon: '◦', bg: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', label: (step.type||'').replace(/_/g,' ') };
+  const ts = step.ts ? new Date(step.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+  const uid = 'tl' + idx + Math.random().toString(36).slice(2,6);
+
+  let mainText = '';
+  let detailRaw = '';
+
+  if (step.type === 'trigger') {
+    mainText = esc(step.content || 'Session triggered');
+  } else if (step.type === 'reasoning') {
+    const txt = step.content || '';
+    mainText = esc(txt.substring(0, 140)) + (txt.length > 140 ? '…' : '');
+    if (txt.length > 140) detailRaw = txt;
+  } else if (step.type === 'action') {
+    const inp = typeof step.input === 'string' ? step.input : JSON.stringify(step.input || {}, null, 2);
+    mainText = `Called <strong style="color:var(--accent)">${esc(step.tool||'')}</strong>`;
+    if (inp) mainText += ` <span style="color:var(--text-muted);font-size:10px;font-family:'JetBrains Mono',monospace">${esc(inp.substring(0,60))}${inp.length>60?'…':''}</span>`;
+    if (inp.length > 60) detailRaw = inp;
+  } else if (step.type === 'observation') {
+    const res = step.result || '';
+    const isErr = res.toLowerCase().startsWith('error') || res.includes('Error:');
+    mainText = `<span style="color:${isErr?'var(--red)':'inherit'}">${esc(res.substring(0,140))}${res.length>140?'…':''}</span>`;
+    if (res.length > 140) detailRaw = res;
+  } else if (step.type === 'decision_request') {
+    mainText = `<strong>${esc(step.title || 'Approval required')}</strong>`;
+    if (step.description) mainText += `<br><span style="color:var(--text-muted);font-size:10px">${esc(step.description.substring(0,100))}</span>`;
+    if ((step.description||'').length > 100) detailRaw = step.description;
+  } else if (step.type === 'decision_response') {
+    mainText = step.decision === 'approve'
+      ? `<span style="color:var(--green)">✓ Approved</span>${step.reason?' — '+esc(step.reason):''}` 
+      : `<span style="color:var(--red)">✗ Rejected</span>${step.reason?' — '+esc(step.reason):''}`;
+  } else if (step.type === 'complete') {
+    mainText = step.summary ? esc(step.summary.substring(0, 140)) : 'Session complete';
+    if ((step.summary||'').length > 140) detailRaw = step.summary;
+  } else if (step.type === 'colleague_request') {
+    mainText = `Asked <strong>${esc(step.colleague||'')}</strong>: ${esc((step.message||'').substring(0,80))}`;
+  } else {
+    mainText = step.content ? esc(step.content.substring(0, 120)) : '';
+  }
+
+  return `
+    <div class="tl-step">
+      <div class="tl-icon" style="background:${cfg.bg}">${cfg.icon}</div>
+      <div class="tl-body">
+        <div class="tl-row-top">
+          <div class="tl-label" style="color:${cfg.color}">${cfg.label}</div>
+          ${ts ? `<div class="tl-ts">${ts}</div>` : ''}
+        </div>
+        <div class="tl-text">${mainText}</div>
+        ${detailRaw ? `<button class="tl-expand" onclick="var d=document.getElementById('${uid}');d.classList.toggle('open');this.textContent=d.classList.contains('open')?'▲ less':'▼ more details'">▼ more details</button><div class="tl-detail" id="${uid}">${esc(detailRaw)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
 /* ═══ INIT ═══ */
 loadList();
 setInterval(loadList,60000);
