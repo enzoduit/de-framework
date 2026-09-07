@@ -1998,17 +1998,21 @@ function renderTimelineStep(step, idx) {
 
   if (step.type === 'trigger') {
     const raw = step.content || 'Session triggered';
-    // Try to extract just the Context: line for cleaner display
-    const ctxMatch = raw.match(/Context:\s*(.+?)(?:
-
-|
-(?=== )|$)/s);
-    if (ctxMatch && ctxMatch[1].trim().length > 0) {
-      const ctx = ctxMatch[1].trim();
-      mainText = `<span style="color:var(--text-muted);font-size:9px;font-family:'JetBrains Mono',monospace">PROMPT</span><br>${esc(ctx.substring(0,200))}${ctx.length>200?'…':''}`;
-      if (raw.length > 100) detailRaw = raw;
+    // Extract Context: line using simple string split (avoids regex multiline issues)
+    const ctxIdx = raw.indexOf('Context:');
+    if (ctxIdx !== -1) {
+      const afterCtx = raw.slice(ctxIdx + 8).trim();
+      const nnIdx = afterCtx.indexOf('\n\n');
+      const ctx = (nnIdx !== -1 ? afterCtx.slice(0, nnIdx) : afterCtx).trim();
+      if (ctx.length > 0) {
+        mainText = '<span style="color:var(--text-muted);font-size:9px;font-family:\'JetBrains Mono\',monospace">PROMPT</span><br>' + esc(ctx.substring(0,200)) + (ctx.length>200?'\u2026':'');
+        if (raw.length > 100) detailRaw = raw;
+      } else {
+        mainText = esc(raw.substring(0, 200)) + (raw.length > 200 ? '\u2026' : '');
+        if (raw.length > 200) detailRaw = raw;
+      }
     } else {
-      mainText = esc(raw.substring(0, 200)) + (raw.length > 200 ? '…' : '');
+      mainText = esc(raw.substring(0, 200)) + (raw.length > 200 ? '\u2026' : '');
       if (raw.length > 200) detailRaw = raw;
     }
   } else if (step.type === 'reasoning') {
