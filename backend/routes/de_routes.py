@@ -7,20 +7,7 @@ import uuid as _uuid
 from datetime import datetime, timedelta, timezone as _tz
 from pathlib import Path
 from backend.config import AGENTS_BASE, DE_NAMES, now_iso
-
-
-# ── Tool library (canonical list, hardcoded) ─────────────────────────────
-TOOL_LIBRARY = [
-    {"id": "exec_shell",             "name": "exec_shell",             "description": "Run shell commands on the server",                          "icon": "🖥"},
-    {"id": "read_file",              "name": "read_file",              "description": "Read any file on the server",                               "icon": "📄"},
-    {"id": "write_file",             "name": "write_file",             "description": "Write or create files on the server",                       "icon": "✏"},
-    {"id": "send_telegram",          "name": "send_telegram",          "description": "Send Telegram messages to the owner",                       "icon": "✉"},
-    {"id": "web_search",             "name": "web_search",             "description": "Search the web via DuckDuckGo",                            "icon": "🔍"},
-    {"id": "schedule_next_session",  "name": "schedule_next_session",  "description": "Plan a follow-up session for yourself",                     "icon": "📅"},
-    {"id": "ask_colleague",          "name": "ask_colleague",          "description": "Ask another Digital Employee for help",                     "icon": "💬"},
-    {"id": "report_to_colleague",    "name": "report_to_colleague",    "description": "Send a result/update to another Digital Employee",          "icon": "📢"},
-    {"id": "request_human_decision", "name": "request_human_decision", "description": "Escalate a decision to the human owner",                   "icon": "🙋"},
-]
+from backend.core.tool_discovery import get_tools as _get_tools
 
 
 def _compute_next_run(frequency: str, time_utc: str = '08:00') -> str:
@@ -497,8 +484,15 @@ def handle_de_get(handler, parts):
 
 
 def handle_tools_get(handler):
-    """GET /tools — return list of all available tools."""
-    return handler.send_json(200, {'tools': TOOL_LIBRARY})
+    """GET /tools — return tool list discovered from OpenClaw (or defaults)."""
+    result = _get_tools()
+    return handler.send_json(200, result)
+
+
+def handle_tools_rediscover(handler):
+    """POST /tools/rediscover — force-refresh tool list from OpenClaw."""
+    result = _get_tools(force_rediscover=True)
+    return handler.send_json(200, {**result, 'refreshed': True})
 
 
 def handle_de_tools_patch(handler, de_name: str, body: dict):
@@ -511,7 +505,7 @@ def handle_de_tools_patch(handler, de_name: str, body: dict):
         de_data = json.loads(de_json_file.read_text())
         tools = body.get('tools', [])
         # Filter to valid tool ids only
-        valid_ids = {t['id'] for t in TOOL_LIBRARY}
+        valid_ids = {t['id'] for t in _get_tools().get('tools', [])}
         tools = [t for t in tools if t in valid_ids]
         de_data['tools'] = tools
         de_data['updated_at'] = now_iso()

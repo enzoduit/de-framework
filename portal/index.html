@@ -806,11 +806,15 @@ textarea, input, select { font-family: inherit; }
   <div class="tool-library-modal">
     <div class="tool-library-hdr">
       <div class="tool-library-title">⚙ Tool Library — Available Tools</div>
-      <button class="btn-close" onclick="closeToolLibrary()">✕</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btn-rediscover" class="btn-tool-add" onclick="rediscoverTools()" title="Re-query OpenClaw for available tools">🔄 Rediscover</button>
+        <button class="btn-close" onclick="closeToolLibrary()">✕</button>
+      </div>
     </div>
     <div class="tool-library-grid" id="tool-library-grid">
       <div style="color:var(--text-muted);font-size:12px;grid-column:1/-1">Loading tools…</div>
     </div>
+    <div id="tool-library-footer" style="padding:10px 20px;border-top:1px solid var(--border);font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
   </div>
 </div>
 
@@ -1862,25 +1866,31 @@ function renderTimelineStep(step, idx) {
 })();
 
 /* ═══ TOOL LIBRARY ═══ */
-let _toolLibraryCache = null;
+let _toolLibraryCache = null;  // {tools, source, discovered_at}
 let _currentDETools = [];
 
-async function getToolLibrary() {
-  if (_toolLibraryCache) return _toolLibraryCache;
+async function getToolLibrary(force=false) {
+  if (!force && _toolLibraryCache) return _toolLibraryCache.tools || [];
   try {
-    const r = await apiFetch('/tools');
+    const url = force ? '/tools/rediscover' : '/tools';
+    const r = await apiFetch(url);
     const d = await r.json();
-    _toolLibraryCache = d.tools || [];
-    return _toolLibraryCache;
-  } catch(e) { return []; }
+    _toolLibraryCache = d;
+    return d.tools || [];
+  } catch(e) { return _toolLibraryCache?.tools || []; }
 }
 
 async function openToolLibrary() {
   $('tool-library-overlay').classList.add('open');
+  await renderToolLibrary();
+}
+
+async function renderToolLibrary(force=false) {
   const grid = $('tool-library-grid');
+  const footer = $('tool-library-footer');
   if (!grid) return;
   grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;grid-column:1/-1">Loading…</div>';
-  const tools = await getToolLibrary();
+  const tools = await getToolLibrary(force);
   if (!tools.length) {
     grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;grid-column:1/-1">Could not load tool library. Check backend connection (⚙).</div>';
     return;
@@ -1891,6 +1901,20 @@ async function openToolLibrary() {
       <div class="tool-card-name">${esc(t.id)}</div>
       <div class="tool-card-desc">${esc(t.description)}</div>
     </div>`).join('');
+  if (footer && _toolLibraryCache) {
+    const src = _toolLibraryCache.source === 'openclaw' ? '🟢 From OpenClaw installation' : '⚪ Default (OpenClaw not reached)';
+    const ts = _toolLibraryCache.discovered_at ? new Date(_toolLibraryCache.discovered_at).toLocaleString() : '';
+    footer.innerHTML = `<span>${src}${ts ? ' · ' + ts : ''}</span>`;
+  }
+}
+
+async function rediscoverTools() {
+  const btn = $('btn-rediscover');
+  if (btn) { btn.textContent = '🔄 Discovering…'; btn.disabled = true; }
+  await renderToolLibrary(true);
+  if (btn) { btn.textContent = '🔄 Rediscover'; btn.disabled = false; }
+  // Invalidate per-DE chip cache so next profile open re-fetches
+  document.querySelectorAll('.de-item').forEach(el => el._toolsLoaded = false);
 }
 
 function closeToolLibrary() { $('tool-library-overlay').classList.remove('open'); }

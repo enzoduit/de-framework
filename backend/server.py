@@ -81,6 +81,9 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/tools':
             return de_routes.handle_tools_get(self)
 
+        if path == '/tools/rediscover':
+            return de_routes.handle_tools_rediscover(self)
+
         if path == '/de-list':
             return de_routes.handle_de_list(self)
 
