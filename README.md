@@ -72,6 +72,59 @@ Click **+ NEW** in the sidebar. The AI wizard collects mission, KPIs, autonomy l
 
 ---
 
+
+## Defining a Digital Employee
+
+Each DE has two files:
+
+### de.json — Identity & Config
+
+Key fields:
+
+| Field | Description |
+|---|---|
+| `name` | Slug used as the agent directory (e.g. `ops-agent`) |
+| `display_name` | Short label shown in the portal (e.g. `OPS`) |
+| `role` | One-line role description |
+| `color` | Hex color for the portal avatar |
+| `autonomy_level` | Default: 1 (0=full auto, 1=log+notify, 2=always ask) |
+| `mission` | What this DE is responsible for achieving |
+| `kpis` | Measurable targets this DE owns |
+| `responsibilities.level_0` | Actions DE can take without asking |
+| `responsibilities.level_1` | Actions DE logs and notifies about |
+| `responsibilities.level_2` | Actions requiring human approval before execution |
+| `hard_constraints` | Things the DE must never do, regardless of reasoning |
+
+### job.md — The Brain
+
+This is the system prompt. Write it like a job description:
+- What the role is
+- What the DE owns
+- KPIs with targets
+- How to make decisions at each level
+- What tools to use for what
+
+The ReAct engine reads job.md as the primary instruction set.
+
+### Autonomy levels in practice
+
+| Level | What happens when DE wants to restart a service? |
+|---|---|
+| 0 | Does it immediately |
+| 1 | Does it, writes to log, sends Telegram alert |
+| 2 | Creates a decision request, waits for approval, then executes |
+
+### Example DEs
+
+See `examples/` for two fully configured DEs:
+
+- **ops-agent** — Operations Manager (monitors services, self-heals outages)
+- **cfo-agent** — Chief Financial Officer (monitors AI costs, finds waste)
+
+Copy either folder into your `AGENTS_DIR` to use them as starting points.
+
+---
+
 ## Deploying the backend (pick one)
 
 ### Option A — Render.com (recommended for quick demo)

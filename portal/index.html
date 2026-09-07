@@ -494,7 +494,9 @@ textarea, input, select { font-family: inherit; }
 .de-sessions-panel {
   width:420px; flex-shrink:0; border-right:1px solid var(--border);
   display:flex; flex-direction:column; overflow:hidden;
+  transition: width 0.2s ease;
 }
+.de-sessions-panel.expanded { width: min(700px, 80vw); }
 .de-sessions-panel-hdr {
   padding:10px 14px; border-bottom:1px solid var(--border);
   display:flex; align-items:center; justify-content:space-between;
@@ -1208,15 +1210,42 @@ async function loadProfile(de){
     const respGroup=(title,color,items)=>!items?.length?'':
       `<div class="resp-group"><span class="resp-group-label" style="color:${color};background:${color}1a">${title}</span>
        <ul class="resp-list">${items.map(i=>`<li style="border-color:${color}40">${esc(i)}</li>`).join('')}</ul></div>`;
+    const autonomyLevel=d.autonomy_level??1;
+    const autonomyExpl={0:'Full autonomy — acts without notification',1:'Logs actions, asks for level-2 decisions',2:'Always asks before acting'};
+    const lastSess=(d.sessions||[])[0];
+    const TOOLS=['exec_shell','read_file','write_file','send_telegram','web_search','schedule_next_session','request_human_decision','ask_colleague'];
+    const hasResp=d.responsibilities?.level_0?.length||d.responsibilities?.level_1?.length||d.responsibilities?.level_2?.length;
     inner.innerHTML=`
+      <div class="prof-section">
+        <div class="prof-label">IDENTITY</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:12px;line-height:1.8">
+          <span style="color:var(--text-muted)">Name</span><span>${esc(d.display_name||de.toUpperCase())}</span>
+          <span style="color:var(--text-muted)">Role</span><span>${esc(d.role||'—')}</span>
+          <span style="color:var(--text-muted)">Autonomy</span><span>Level ${autonomyLevel} — <span style="color:var(--text-muted);font-size:11px">${autonomyExpl[autonomyLevel]||'custom'}</span></span>
+        </div>
+      </div>
       <div class="prof-section"><div class="prof-label">MISSION</div><div class="prof-mission">${esc(d.mission||'—')}</div></div>
       ${d.kpis?.length?`<div class="prof-section"><div class="prof-label">KPIs</div><ul class="kpi-list">${d.kpis.map(k=>`<li>${esc(k)}</li>`).join('')}</ul></div>`:''}
-      <div class="prof-section"><div class="prof-label">AUTONOMY LEVELS</div>
-        ${respGroup('Level 0 — Autonomous','#22c55e',d.responsibilities?.level_0)}
-        ${respGroup('Level 1 — Document','#FFC800',d.responsibilities?.level_1)}
-        ${respGroup('Level 2 — Approval Required','#FF4500',d.responsibilities?.level_2)}
+      <div class="prof-section"><div class="prof-label">RESPONSIBILITIES</div>
+        ${hasResp?`
+          ${respGroup('✅ Level 0 — Can do autonomously','#22c55e',d.responsibilities?.level_0)}
+          ${respGroup('📝 Level 1 — Logs + notifies','#FFC800',d.responsibilities?.level_1)}
+          ${respGroup('⚠️ Level 2 — Asks before doing','#FF4500',d.responsibilities?.level_2)}`
+        :`<div style="font-size:12px;color:var(--text-muted)">Not configured — add responsibilities to de.json</div>`}
       </div>
       ${d.hard_constraints?.length?`<div class="prof-section"><div class="prof-label">HARD CONSTRAINTS</div><ul class="kpi-list">${d.hard_constraints.map(c=>`<li style="color:var(--red)">${esc(c)}</li>`).join('')}</ul></div>`:''}
+      <div class="prof-section"><div class="prof-label">TOOLS AVAILABLE</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${TOOLS.map(t=>`<span style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-sec)">${esc(t)}</span>`).join('')}
+        </div>
+      </div>
+      <div class="prof-section"><div class="prof-label">SESSION STATS</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:12px">
+          <span style="color:var(--text-muted)">Total sessions</span><span>${d.session_count||0}</span>
+          <span style="color:var(--text-muted)">Last session</span><span>${lastSess?timeAgo(lastSess.created_at):'—'}</span>
+          ${lastSess?.summary?`<span style="color:var(--text-muted)">Last summary</span><span style="color:var(--text-sec)">${esc(lastSess.summary.substring(0,80))}${lastSess.summary.length>80?'…':''}</span>`:''}
+        </div>
+      </div>
       ${d.triggers?.length?`<div class="prof-section"><div class="prof-label">TRIGGERS</div>${d.triggers.map(t=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px"><div class="mono" style="font-size:9px;color:var(--accent);margin-bottom:3px">${esc((t.type||'').toUpperCase())}</div><div style="font-size:12px;color:var(--text)">${esc(t.schedule||t.description||'')}</div></div>`).join('')}</div>`:''}
       ${d.data_sources?.length?`<div class="prof-section"><div class="prof-label">DATA SOURCES</div><div class="mono" style="font-size:11px;color:var(--text-muted);line-height:1.9">${d.data_sources.map(s=>`<div>· ${esc(s)}</div>`).join('')}</div></div>`:''}`;
   }catch(e){inner.innerHTML=`<div style="color:var(--red);font-size:12px">Error: ${esc(e.message)}</div>`;}
@@ -1519,6 +1548,8 @@ async function showSessionSteps(de, sid, el) {
   const stepsId = $('de-steps-panel-id');
   if (list) list.style.display = 'none';
   if (stepsPanel) { stepsPanel.style.display = 'flex'; stepsPanel.style.flexDirection = 'column'; }
+  const sessionsPanel = document.querySelector('.de-sessions-panel');
+  if (sessionsPanel) sessionsPanel.classList.add('expanded');
   if (stepsContent) stepsContent.innerHTML = '<div class="prog-empty">Loading…</div>';
   const liveBadge = $('de-steps-live-badge');
 
@@ -1579,6 +1610,8 @@ function backToSessionsList() {
   if (list) list.style.display = '';
   if (stepsPanel) stepsPanel.style.display = 'none';
   if (liveBadge) liveBadge.style.display = 'none';
+  const sessionsPanel = document.querySelector('.de-sessions-panel');
+  if (sessionsPanel) sessionsPanel.classList.remove('expanded');
 }
 
 function switchDetailTab(name) {
@@ -1734,4 +1767,4 @@ if(!isBackendConfigured()){setTimeout(openSettings,800);}
 </script>
 </body>
 </html>
-<!-- deploy 20260907T053436Z -->
+<!-- deploy 20260907T054200Z -->
