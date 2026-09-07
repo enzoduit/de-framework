@@ -355,16 +355,31 @@ Call `request_human_decision` with title, description, and proposed action.
 - [Hard constraints]
 
 ## Tools available
-- `read_file(path)` — read from workspace
-- `write_file(path, content)` — write to workspace
-- `http_get(url)` — fetch external data
-- `http_post(url, data)` — POST to an API
-- `exec_command(cmd)` — run shell command (Level 1+)
-- `request_human_decision(title, description, proposed_action)` — Level 2 gate
-- `ask_colleague(colleague_name, message)` — ask another DE (max 3× per session)
-- `schedule_next_activity(description, when)` — plan a future session
-- `update_metrics(data)` — write to metrics.json
-- `update_memory(content)` — append to memory.md
+
+> **Dynamic, server-defined.** The portal fetches the tool list from `GET /api/tools` on your backend. What you see in the portal settings = what your server actually exposes. No frontend changes needed when you add custom tools.
+
+### Built-in tools (all deployments)
+
+| Tool | Description | Autonomy |
+|------|-------------|----------|
+| `exec_shell` | Run shell commands on the server | L1 — logged |
+| `read_file` | Read any file on the server | L0 — silent |
+| `write_file` | Write or create files on the server | L1 — logged |
+| `send_telegram` | Send Telegram messages to the owner | L1 — logged |
+| `web_search` | Search the web via DuckDuckGo | L0 — silent |
+| `schedule_next_session` | Plan a follow-up session for this DE | L0 — silent |
+| `ask_colleague` | Ask another Digital Employee for help | L1 — logged |
+| `report_to_colleague` | Send a result/update to another DE | L1 — logged |
+| `request_human_decision` | Escalate a Level 2 decision to the human owner | L2 — blocks until resolved |
+
+### Tool source of truth
+
+```
+backend/routes/de_routes.py → TOOL_LIBRARY   ← add/edit tools here
+backend/core/react_engine.py → implementations ← implement fn= here
+```
+
+The portal reads `TOOL_LIBRARY` via API. Per-DE tool selection is stored in `de.json → tools: [...]`.
 
 ## Data sources
 Check these on every run: [list URLs or file paths]
@@ -503,8 +518,14 @@ All endpoints require `Authorization: Bearer <DE_API_TOKEN>`.
 ## Extending
 
 **Add a tool:**
+
+1. Add to `TOOL_LIBRARY` in `backend/routes/de_routes.py`:
 ```python
-# In session_runner.py, add to the tools list:
+{"id": "my_tool", "name": "my_tool", "description": "What it does", "icon": "🔧"}
+```
+
+2. Register the implementation in `backend/core/react_engine.py` (inside `_register_tools` or as a new `_register_X_tool` method):
+```python
 {
     "name": "my_tool",
     "description": "What it does",
@@ -512,6 +533,8 @@ All endpoints require `Authorization: Bearer <DE_API_TOKEN>`.
     "fn": lambda input_data: my_tool_implementation(input_data["param"])
 }
 ```
+
+3. Restart the backend → the tool appears automatically in the portal Tool Library (no frontend changes needed).
 
 **Add a trigger type:**
 - Add the trigger type string to `de.json → triggers`
