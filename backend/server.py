@@ -51,7 +51,7 @@ class DEHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
         self.end_headers()
 
@@ -77,6 +77,9 @@ class DEHandler(BaseHTTPRequestHandler):
         # ── Auth required for all remaining GET ─────────────────────────────
         if not self.check_auth():
             return self.send_json(401, {'error': 'unauthorized'})
+
+        if path == '/tools':
+            return de_routes.handle_tools_get(self)
 
         if path == '/de-list':
             return de_routes.handle_de_list(self)
@@ -177,6 +180,27 @@ class DEHandler(BaseHTTPRequestHandler):
         if (len(parts) == 3 and parts[0] == 'de'
                 and parts[2] == 'schedule'):
             return de_routes.handle_de_schedule_post(self, parts[1], body)
+
+        self.send_json(404, {'error': 'not found'})
+
+    def do_PATCH(self):
+        path = self.path_base()
+        parts = [p for p in path.split('/') if p]
+
+        length = int(self.headers.get('Content-Length', 0))
+        body = {}
+        if length:
+            try:
+                body = json.loads(self.rfile.read(length))
+            except Exception:
+                body = {}
+
+        if not self.check_auth():
+            return self.send_json(401, {'error': 'unauthorized'})
+
+        # PATCH /de/<name>/tools
+        if len(parts) == 3 and parts[0] == 'de' and parts[2] == 'tools':
+            return de_routes.handle_de_tools_patch(self, parts[1], body)
 
         self.send_json(404, {'error': 'not found'})
 

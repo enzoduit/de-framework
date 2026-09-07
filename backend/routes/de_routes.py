@@ -9,6 +9,20 @@ from pathlib import Path
 from backend.config import AGENTS_BASE, DE_NAMES, now_iso
 
 
+# ── Tool library (canonical list, hardcoded) ─────────────────────────────
+TOOL_LIBRARY = [
+    {"id": "exec_shell",             "name": "exec_shell",             "description": "Run shell commands on the server",                          "icon": "🖥"},
+    {"id": "read_file",              "name": "read_file",              "description": "Read any file on the server",                               "icon": "📄"},
+    {"id": "write_file",             "name": "write_file",             "description": "Write or create files on the server",                       "icon": "✏"},
+    {"id": "send_telegram",          "name": "send_telegram",          "description": "Send Telegram messages to the owner",                       "icon": "✉"},
+    {"id": "web_search",             "name": "web_search",             "description": "Search the web via DuckDuckGo",                            "icon": "🔍"},
+    {"id": "schedule_next_session",  "name": "schedule_next_session",  "description": "Plan a follow-up session for yourself",                     "icon": "📅"},
+    {"id": "ask_colleague",          "name": "ask_colleague",          "description": "Ask another Digital Employee for help",                     "icon": "💬"},
+    {"id": "report_to_colleague",    "name": "report_to_colleague",    "description": "Send a result/update to another Digital Employee",          "icon": "📢"},
+    {"id": "request_human_decision", "name": "request_human_decision", "description": "Escalate a decision to the human owner",                   "icon": "🙋"},
+]
+
+
 def _compute_next_run(frequency: str, time_utc: str = '08:00') -> str:
     """Compute the next ISO datetime for a given frequency and UTC time."""
     h, m = 8, 0
@@ -431,6 +445,10 @@ def handle_de_get(handler, parts):
         session_data = json.loads(session_file.read_text())
         return handler.send_json(200, session_data)
 
+    # GET /de/<name>/metrics  — KPI metrics
+    if len(parts) == 3 and parts[2] == 'metrics':
+        return handle_de_metrics_get(handler, de_name)
+
     # GET /de/<name>/schedule  — scheduled activities
     if len(parts) == 3 and parts[2] == 'schedule':
         return handle_de_schedule_get(handler, de_name)
@@ -476,3 +494,45 @@ def handle_de_get(handler, parts):
         })
 
     return handler.send_json(404, {'error': 'not found'})
+
+
+def handle_tools_get(handler):
+    """GET /tools — return list of all available tools."""
+    return handler.send_json(200, {'tools': TOOL_LIBRARY})
+
+
+def handle_de_tools_patch(handler, de_name: str, body: dict):
+    """PATCH /de/<name>/tools — update tools array in de.json."""
+    de_dir = AGENTS_BASE / de_name
+    de_json_file = de_dir / 'de.json'
+    if not de_json_file.exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    try:
+        de_data = json.loads(de_json_file.read_text())
+        tools = body.get('tools', [])
+        # Filter to valid tool ids only
+        valid_ids = {t['id'] for t in TOOL_LIBRARY}
+        tools = [t for t in tools if t in valid_ids]
+        de_data['tools'] = tools
+        de_data['updated_at'] = now_iso()
+        de_json_file.write_text(json.dumps(de_data, indent=2))
+        return handler.send_json(200, {'ok': True, 'tools': tools, 'de': de_name})
+    except Exception as e:
+        return handler.send_json(500, {'ok': False, 'error': str(e)})
+
+
+def handle_de_metrics_get(handler, de_name: str):
+    """GET /de/<name>/metrics — return metrics.json."""
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    metrics_file = de_dir / 'metrics.json'
+    if not metrics_file.exists():
+        return handler.send_json(200, {'kpis': []})
+    try:
+        data = json.loads(metrics_file.read_text())
+        if 'kpis' not in data:
+            data['kpis'] = []
+        return handler.send_json(200, data)
+    except Exception:
+        return handler.send_json(200, {'kpis': []})

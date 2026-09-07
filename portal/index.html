@@ -628,6 +628,47 @@ textarea, input, select { font-family: inherit; }
   .prog-sessions { width:100%; height:180px; border-right:none; border-bottom:1px solid var(--border); }
   .f-row { grid-template-columns:1fr; }
 }
+/* ── TOOL LIBRARY OVERLAY ── */
+#tool-library-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.82);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
+#tool-library-overlay.open{display:flex;}
+.tool-library-modal{width:min(740px,95vw);max-height:86vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;}
+.tool-library-hdr{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.tool-library-title{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--text);}
+.tool-library-grid{flex:1;overflow-y:auto;padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;align-content:start;}
+.tool-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;transition:border-color 0.15s;}
+.tool-card:hover{border-color:var(--accent);}
+.tool-card-icon{font-size:22px;margin-bottom:8px;}
+.tool-card-name{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;}
+.tool-card-desc{font-size:12px;color:var(--text-sec);line-height:1.5;}
+/* ── TOOL CHIPS (profile) ── */
+.tool-chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-sec);}
+.tool-chip-rm{background:none;border:none;color:var(--text-muted);font-size:13px;padding:0 0 0 2px;cursor:pointer;line-height:1;transition:color 0.15s;}
+.tool-chip-rm:hover{color:var(--red);}
+.btn-tool-add{background:none;border:1px dashed var(--border);border-radius:5px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);cursor:pointer;transition:all 0.15s;}
+.btn-tool-add:hover{border-color:var(--accent);color:var(--accent);}
+.tool-add-dropdown{position:absolute;top:calc(100% + 4px);left:0;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 0;min-width:230px;max-height:230px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.55);}
+.tool-add-item{padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-sec);cursor:pointer;transition:background 0.1s;white-space:nowrap;}
+.tool-add-item:hover{background:var(--surface2);color:var(--text);}
+.tool-save-flash{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green);opacity:0;transition:opacity 0.4s;margin-left:6px;}
+.tool-save-flash.show{opacity:1;}
+/* ── METRICS TAB ── */
+.metrics-scroll{flex:1;overflow-y:auto;padding:20px;}
+.metrics-updated{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:16px;}
+.kpi-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;}
+.kpi-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;}
+.kpi-name{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase;}
+.kpi-value-row{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;}
+.kpi-value{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;line-height:1;}
+.kpi-unit{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--text-muted);}
+.kpi-trend{font-size:18px;color:var(--text-muted);}
+.kpi-target-line{font-size:11px;color:var(--text-muted);margin-bottom:10px;}
+.kpi-badge{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;}
+.kpi-green{color:var(--green);background:rgba(0,200,100,0.12);border:1px solid rgba(0,200,100,0.25);}
+.kpi-yellow{color:var(--yellow);background:rgba(255,200,0,0.12);border:1px solid rgba(255,200,0,0.25);}
+.kpi-red{color:var(--red);background:rgba(255,68,68,0.12);border:1px solid rgba(255,68,68,0.25);}
+.metrics-empty{text-align:center;padding:48px 20px;color:var(--text-muted);}
+.metrics-empty-icon{font-size:36px;margin-bottom:12px;}
+.metrics-empty-title{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-sec);margin-bottom:6px;}
 </style>
 </head>
 <body>
@@ -640,7 +681,10 @@ textarea, input, select { font-family: inherit; }
 <aside id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-logo"><span class="logo-dot">⚡</span>DE FRAMEWORK</div>
-    <button class="btn-new" onclick="openCreate()">+ NEW</button>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="btn-gear" id="btn-tool-library" onclick="openToolLibrary()" title="Tool Library">&#9881;</button>
+      <button class="btn-new" onclick="openCreate()">+ NEW</button>
+    </div>
   </div>
   <div class="de-list" id="de-list"></div>
   <div class="sidebar-footer">
@@ -718,6 +762,7 @@ textarea, input, select { font-family: inherit; }
         <div class="de-detail-tabs">
           <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFIL</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
+          <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRIKEN</button>
         </div>
 
         <!-- Profile -->
@@ -739,10 +784,34 @@ textarea, input, select { font-family: inherit; }
           </div>
         </div>
 
+        <!-- Metrics -->
+        <div class="de-detail-content" id="detail-metrics">
+          <div class="metrics-scroll" id="metrics-scroll">
+            <div class="metrics-empty">
+              <div class="metrics-empty-icon">📊</div>
+              <div class="metrics-empty-title">No metrics recorded yet</div>
+              <div style="font-size:12px">Run a session to collect data</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
 </main>
+</div>
+
+<!-- ═══ TOOL LIBRARY OVERLAY ═══ -->
+<div id="tool-library-overlay" onclick="if(event.target===this)closeToolLibrary()">
+  <div class="tool-library-modal">
+    <div class="tool-library-hdr">
+      <div class="tool-library-title">⚙ Tool Library — Available Tools</div>
+      <button class="btn-close" onclick="closeToolLibrary()">✕</button>
+    </div>
+    <div class="tool-library-grid" id="tool-library-grid">
+      <div style="color:var(--text-muted);font-size:12px;grid-column:1/-1">Loading tools…</div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ SETTINGS PANEL ═══ -->
@@ -1241,7 +1310,8 @@ async function loadProfile(de){
     const autonomyLevel=d.autonomy_level??1;
     const autonomyExpl={0:'Full autonomy — acts without notification',1:'Logs actions, asks for level-2 decisions',2:'Always asks before acting'};
     const lastSess=(d.sessions||[])[0];
-    const TOOLS=['exec_shell','read_file','write_file','send_telegram','web_search','schedule_next_session','request_human_decision','ask_colleague'];
+    const allTools = await getToolLibrary();
+    _currentDETools = d.tools || [];
     const hasResp=d.responsibilities?.level_0?.length||d.responsibilities?.level_1?.length||d.responsibilities?.level_2?.length;
     inner.innerHTML=`
       <div class="prof-section">
@@ -1262,9 +1332,13 @@ async function loadProfile(de){
         :`<div style="font-size:12px;color:var(--text-muted)">Not configured — add responsibilities to de.json</div>`}
       </div>
       ${d.hard_constraints?.length?`<div class="prof-section"><div class="prof-label">HARD CONSTRAINTS</div><ul class="kpi-list">${d.hard_constraints.map(c=>`<li style="color:var(--red)">${esc(c)}</li>`).join('')}</ul></div>`:''}
-      <div class="prof-section"><div class="prof-label">TOOLS AVAILABLE</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${TOOLS.map(t=>`<span style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-sec)">${esc(t)}</span>`).join('')}
+      <div class="prof-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="prof-label" style="margin-bottom:0">TOOLS</div>
+          <span class="tool-save-flash" id="tool-save-flash">✓ Saved</span>
+        </div>
+        <div id="tools-chips" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          ${renderToolChips(allTools)}
         </div>
       </div>
       <div class="prof-section"><div class="prof-label">SESSION STATS</div>
@@ -1643,11 +1717,12 @@ function backToSessionsList() {
 }
 
 function switchDetailTab(name) {
-  const names = ['profile','schedule'];
+  const names = ['profile','schedule','metrics'];
   document.querySelectorAll('.de-detail-tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.de-detail-content').forEach((c,i) => c.classList.toggle('active', names[i]===name));
   if (name==='profile' && selectedDE) loadProfile(selectedDE);
   if (name==='schedule' && selectedDE) loadSchedule(selectedDE);
+  if (name==='metrics' && selectedDE) loadMetrics(selectedDE);
 }
 // Keep old switchTab as alias for backward compat
 function switchTab(name) { if(name==='profile') switchDetailTab('profile'); else if(name==='schedule') switchDetailTab('schedule'); }
@@ -1786,13 +1861,177 @@ function renderTimelineStep(step, idx) {
   });
 })();
 
+/* ═══ TOOL LIBRARY ═══ */
+let _toolLibraryCache = null;
+let _currentDETools = [];
+
+async function getToolLibrary() {
+  if (_toolLibraryCache) return _toolLibraryCache;
+  try {
+    const r = await apiFetch('/tools');
+    const d = await r.json();
+    _toolLibraryCache = d.tools || [];
+    return _toolLibraryCache;
+  } catch(e) { return []; }
+}
+
+async function openToolLibrary() {
+  $('tool-library-overlay').classList.add('open');
+  const grid = $('tool-library-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;grid-column:1/-1">Loading…</div>';
+  const tools = await getToolLibrary();
+  if (!tools.length) {
+    grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;grid-column:1/-1">Could not load tool library. Check backend connection (⚙).</div>';
+    return;
+  }
+  grid.innerHTML = tools.map(t => `
+    <div class="tool-card">
+      <div class="tool-card-icon">${t.icon || '🔧'}</div>
+      <div class="tool-card-name">${esc(t.id)}</div>
+      <div class="tool-card-desc">${esc(t.description)}</div>
+    </div>`).join('');
+}
+
+function closeToolLibrary() { $('tool-library-overlay').classList.remove('open'); }
+
+function renderToolChips(allTools) {
+  const enabled = _currentDETools;
+  const disabled = (allTools || []).filter(t => !enabled.includes(t.id));
+  const chips = enabled.map(toolId => {
+    const t = (allTools || []).find(x => x.id === toolId);
+    return `<span class="tool-chip">${t ? t.icon + ' ' : ''}${esc(toolId)}<button class="tool-chip-rm" onclick="removeToolFromDE('${toolId}')" title="Remove">×</button></span>`;
+  }).join('');
+  const addOpts = disabled.length
+    ? disabled.map(t => `<div class="tool-add-item" onclick="addToolToDE('${t.id}')">${t.icon} ${esc(t.id)}</div>`).join('')
+    : '<div class="tool-add-item" style="color:var(--text-muted);cursor:default">All tools enabled</div>';
+  return chips + `<div style="position:relative;display:inline-block">
+    <button class="btn-tool-add" onclick="toggleToolDropdown(event)">+ Add</button>
+    <div class="tool-add-dropdown" id="tool-add-dropdown" style="display:none">${addOpts}</div>
+  </div>` + (enabled.length === 0 ? '<span style="font-size:11px;color:var(--text-muted);padding:4px 0"> No tools enabled</span>' : '');
+}
+
+function toggleToolDropdown(e) {
+  e.stopPropagation();
+  const dd = $('tool-add-dropdown');
+  if (!dd) return;
+  const open = dd.style.display !== 'none';
+  dd.style.display = open ? 'none' : 'block';
+  if (!open) {
+    setTimeout(() => {
+      const closer = () => { if(dd) dd.style.display = 'none'; document.removeEventListener('click', closer); };
+      document.addEventListener('click', closer);
+    }, 0);
+  }
+}
+
+async function removeToolFromDE(toolId) {
+  _currentDETools = _currentDETools.filter(t => t !== toolId);
+  await saveDETools();
+  const allTools = await getToolLibrary();
+  const chips = $('tools-chips');
+  if (chips) chips.innerHTML = renderToolChips(allTools);
+}
+
+async function addToolToDE(toolId) {
+  if (!_currentDETools.includes(toolId)) _currentDETools.push(toolId);
+  await saveDETools();
+  const allTools = await getToolLibrary();
+  const chips = $('tools-chips');
+  if (chips) chips.innerHTML = renderToolChips(allTools);
+}
+
+async function saveDETools() {
+  if (!selectedDE) return;
+  try {
+    await apiFetch(`/de/${selectedDE}/tools`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tools: _currentDETools }),
+    });
+    const flash = $('tool-save-flash');
+    if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1800); }
+  } catch(e) { console.error('saveDETools:', e); }
+}
+
+/* ═══ METRICS ═══ */
+async function loadMetrics(de) {
+  const scroll = $('metrics-scroll');
+  if (!scroll) return;
+  scroll.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px">Loading…</div>';
+  try {
+    const r = await apiFetch(`/de/${de}/metrics`);
+    const d = await r.json();
+    const kpis = d.kpis || [];
+    const updatedAgo = d.updated ? timeAgo(d.updated) : null;
+    if (!kpis.length) {
+      scroll.innerHTML = `<div class="metrics-empty"><div class="metrics-empty-icon">📊</div><div class="metrics-empty-title">No metrics recorded yet</div><div style="font-size:12px">Run a session to collect data</div></div>`;
+      return;
+    }
+    scroll.innerHTML = (updatedAgo ? `<div class="metrics-updated">Last updated: ${updatedAgo}</div>` : '') + kpis.map(kpi => renderKPICard(kpi)).join('');
+  } catch(e) {
+    if (e.noBackend) { scroll.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px">Connect backend (⚙) to view metrics.</div>'; return; }
+    scroll.innerHTML = `<div style="color:var(--red);font-size:12px;padding:16px">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderKPICard(kpi) {
+  const val = kpi.value !== null && kpi.value !== undefined ? kpi.value : null;
+  const target = kpi.target !== null && kpi.target !== undefined ? kpi.target : null;
+  const dir = kpi.direction || 'up';
+  let badge = '', badgeCls = '';
+  if (val !== null && target !== null) {
+    const ratio = val / target;
+    if (dir === 'up') {
+      if (ratio >= 1) { badge = '✅ On Target'; badgeCls = 'kpi-green'; }
+      else if (ratio >= 0.9) { badge = '⚠️ Below'; badgeCls = 'kpi-yellow'; }
+      else { badge = '❌ Critical'; badgeCls = 'kpi-red'; }
+    } else {
+      if (ratio <= 1) { badge = '✅ On Target'; badgeCls = 'kpi-green'; }
+      else if (ratio <= 1.1) { badge = '⚠️ Below'; badgeCls = 'kpi-yellow'; }
+      else { badge = '❌ Critical'; badgeCls = 'kpi-red'; }
+    }
+  }
+  const trend = dir === 'up' ? '↑' : '↓';
+  const valColor = badgeCls === 'kpi-green' ? 'var(--green)' : badgeCls === 'kpi-red' ? 'var(--red)' : 'var(--text)';
+  const sparkline = renderSparkline(kpi.history || [], valColor);
+  return `<div class="kpi-card">
+    <div class="kpi-card-header">
+      <div class="kpi-name">${esc(kpi.name || kpi.id)}</div>
+      ${badge ? `<span class="kpi-badge ${badgeCls}">${badge}</span>` : ''}
+    </div>
+    <div class="kpi-value-row">
+      <span class="kpi-value" style="color:${valColor}">${val !== null ? val : '—'}</span>
+      ${kpi.unit ? `<span class="kpi-unit">${esc(kpi.unit)}</span>` : ''}
+      <span class="kpi-trend">${trend}</span>
+    </div>
+    ${target !== null ? `<div class="kpi-target-line">Target: ${target}${kpi.unit ? ' '+esc(kpi.unit) : ''}</div>` : ''}
+    ${sparkline}
+  </div>`;
+}
+
+function renderSparkline(history, color) {
+  if (!history || history.length < 2) return '';
+  const vals = history.map(h => typeof h.value === 'number' ? h.value : null).filter(v => v !== null);
+  if (vals.length < 2) return '';
+  const W = 180, H = 36;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const pts = vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * W;
+    const y = H - ((v - min) / range) * (H - 6) - 3;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg width="${W}" height="${H}" style="display:block;margin-top:10px;overflow:visible"><polyline points="${pts}" fill="none" stroke="${color||'var(--accent)'}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
 /* ═══ INIT ═══ */
 loadList();
 setInterval(loadList,60000);
+setInterval(() => { if (selectedDE && $('dtab-metrics') && $('dtab-metrics').classList.contains('active')) loadMetrics(selectedDE); }, 30000);
 updateGearIcon();
 // Open settings on first load if no backend configured
 if(!isBackendConfigured()){setTimeout(openSettings,800);}
 </script>
 </body>
 </html>
-<!-- deploy 20260907T054200Z -->
+<!-- deploy 20260907T064500Z -->

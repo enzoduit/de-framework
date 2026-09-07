@@ -559,3 +559,53 @@ class ReActEngine:
         PORTAL_INBOX.parent.mkdir(parents=True, exist_ok=True)
         with open(PORTAL_INBOX, "a") as f:
             f.write(json.dumps(entry) + "\n")
+
+        # Update metrics after run completes
+        self._update_metrics(summary or "")
+
+    def _update_metrics(self, summary: str):
+        """Update metrics.json after a session completes."""
+        import re
+        metrics_file = self.agent_dir / "metrics.json"
+
+        try:
+            data = json.loads(metrics_file.read_text()) if metrics_file.exists() else {}
+        except Exception:
+            data = {}
+
+        data["updated"] = _now_iso()
+
+        # For OPS: extract uptime % from summary text
+        if self.agent_name == "ops" and summary:
+            match = re.search(
+                r'(\d+)\s*/\s*(\d+)\s*services?\s*(?:UP|up|running|ok)?',
+                summary,
+                re.IGNORECASE,
+            )
+            if match:
+                n, m = int(match.group(1)), int(match.group(2))
+                if m > 0:
+                    uptime_pct = round((n / m) * 100, 1)
+                    kpis = data.get("kpis", [])
+                    uptime_kpi = next((k for k in kpis if k.get("id") == "uptime"), None)
+                    if not uptime_kpi:
+                        uptime_kpi = {
+                            "id": "uptime",
+                            "name": "Uptime %",
+                            "value": None,
+                            "target": 99.9,
+                            "unit": "%",
+                            "direction": "up",
+                            "history": [],
+                        }
+                        kpis.append(uptime_kpi)
+                    uptime_kpi["value"] = uptime_pct
+                    history = uptime_kpi.get("history", [])
+                    history.append({"ts": _now_iso(), "value": uptime_pct})
+                    uptime_kpi["history"] = history[-30:]
+                    data["kpis"] = kpis
+
+        try:
+            metrics_file.write_text(json.dumps(data, indent=2))
+        except Exception as e:
+            self._log({"type": "metrics_error", "message": str(e)})
