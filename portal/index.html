@@ -1613,6 +1613,8 @@ function renderTimelineStep(step, idx) {
     reasoning:         { icon: '💭', bg: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)',  label: 'Thinking' },
     action:            { icon: '⚡', bg: 'rgba(255,69,0,0.15)',   color: 'var(--accent)',      label: 'Action taken' },
     observation:       { icon: '📊', bg: 'rgba(0,200,100,0.12)', color: 'var(--green)',       label: 'Result' },
+    result:            { icon: '📋', bg: 'rgba(0,200,100,0.12)', color: 'var(--green)',       label: 'Work Log' },
+    error:             { icon: '❌', bg: 'rgba(220,38,38,0.12)', color: 'var(--red)',         label: 'Error' },
     decision_request:  { icon: '⏳', bg: 'rgba(255,200,0,0.15)', color: 'var(--yellow)',      label: 'Decision needed' },
     decision_response: { icon: '✓',  bg: 'rgba(0,200,100,0.1)', color: 'var(--green)',       label: 'Decided' },
     complete:          { icon: '✅', bg: 'rgba(0,200,100,0.1)',   color: 'var(--green)',       label: 'Complete' },
@@ -1649,6 +1651,13 @@ function renderTimelineStep(step, idx) {
     mainText = step.decision === 'approve'
       ? `<span style="color:var(--green)">✓ Approved</span>${step.reason?' — '+esc(step.reason):''}` 
       : `<span style="color:var(--red)">✗ Rejected</span>${step.reason?' — '+esc(step.reason):''}`;
+  } else if (step.type === 'result') {
+    const txt = step.content || '';
+    mainText = esc(txt.substring(0, 200)) + (txt.length > 200 ? '…' : '');
+    if (txt.length > 200) detailRaw = txt;
+  } else if (step.type === 'error') {
+    mainText = `<span style="color:var(--red)">${esc((step.content||'').substring(0,200))}</span>`;
+    if ((step.content||'').length > 200) detailRaw = step.content;
   } else if (step.type === 'complete') {
     mainText = step.summary ? esc(step.summary.substring(0, 140)) : 'Session complete';
     if ((step.summary||'').length > 140) detailRaw = step.summary;
