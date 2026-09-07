@@ -1271,7 +1271,7 @@ async function loadProfile(de){
         <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:12px">
           <span style="color:var(--text-muted)">Total sessions</span><span>${d.session_count||0}</span>
           <span style="color:var(--text-muted)">Last session</span><span>${lastSess?timeAgo(lastSess.created_at):'—'}</span>
-          ${lastSess?.summary?`<span style="color:var(--text-muted)">Last summary</span><span style="color:var(--text-sec)">${esc(lastSess.summary.substring(0,80))}${lastSess.summary.length>80?'…':''}</span>`:''}
+          ${lastSess?.summary?`<span style="color:var(--text-muted)">Last summary</span><span style="color:var(--text-sec)">${esc(stripMd(lastSess.summary,80))}${lastSess.summary.length>80?'…':''}</span>`:''}
         </div>
       </div>
       ${d.triggers?.length?`<div class="prof-section"><div class="prof-label">TRIGGERS</div>${d.triggers.map(t=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px"><div class="mono" style="font-size:9px;color:var(--accent);margin-bottom:3px">${esc((t.type||'').toUpperCase())}</div><div style="font-size:12px;color:var(--text)">${esc(t.schedule||t.description||'')}</div></div>`).join('')}</div>`:''}
@@ -1539,7 +1539,7 @@ async function loadSessionsPanel(de, autoOpenSessionId) {
           ${triggerBadge(s.trigger_type)}
           <span class="ws-quality ${qg.cls}">${qg.label}</span>
         </div>
-        ${s.summary ? `<div class="ws-summary">${esc(s.summary.substring(0,90))}${s.summary.length>90?'…':''}</div>` : ''}
+        ${s.summary ? `<div class="ws-summary">${esc(stripMd(s.summary,90))}${s.summary.length>90?'…':''}</div>` : ''}
         <div class="ws-meta">
           <span>${timeAgo(s.created_at)}</span>
           <span class="ws-meta-dot">·</span>
@@ -1588,7 +1588,7 @@ async function showSessionSteps(de, sid, el) {
     if (stepsId) stepsId.textContent = timeAgo(s.created_at||'');
     if (liveBadge) liveBadge.style.display = isLive ? 'inline-flex' : 'none';
     return `
-      ${s.summary ? `<div class="session-summary-box"><strong>What happened:</strong> ${esc(s.summary)}</div>` : ''}
+      ${s.summary ? `<div class="session-summary-box">${renderMd(s.summary)}</div>` : ''}
       <div style="padding:0 14px 10px;flex-shrink:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
           ${triggerBadge(s.trigger_type)}
