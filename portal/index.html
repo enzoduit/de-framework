@@ -1450,7 +1450,7 @@ function openAddSchedule() {
 }
 
 /* ═══ 3-PANE: SESSIONS PANEL + DETAIL TABS ═══ */
-async function loadSessionsPanel(de) {
+async function loadSessionsPanel(de, autoOpenSessionId) {
   const list = $('de-sessions-list');
   if (!list) return;
   list.innerHTML = '<div style="padding:12px;font-size:11px;color:var(--text-muted)">Loading…</div>';
@@ -1482,6 +1482,18 @@ async function loadSessionsPanel(de) {
         </div>
       </div>`;
     }).join('');
+    // Auto-open a specific session (e.g. after send)
+    if (autoOpenSessionId) {
+      const target = sessions.find(s => s.id === autoOpenSessionId);
+      if (target) {
+        // Small delay to let DOM settle, then auto-click the session
+        setTimeout(() => {
+          const cards = list.querySelectorAll('.ws-card');
+          const idx = sessions.findIndex(s => s.id === autoOpenSessionId);
+          if (idx >= 0 && cards[idx]) showSessionSteps(de, autoOpenSessionId, cards[idx]);
+        }, 150);
+      }
+    }
   } catch(e) {
     if (e.noBackend) { list.innerHTML = '<div style="padding:12px;font-size:11px;color:var(--text-muted)">Connect backend (⚙) to view sessions.</div>'; return; }
     list.innerHTML = `<div style="padding:12px;font-size:11px;color:var(--red)">${esc(e.message)}</div>`;

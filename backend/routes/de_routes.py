@@ -90,6 +90,20 @@ def _get_de_names():
     return _discover_de_names()
 
 
+def _calc_duration(d):
+    try:
+        from datetime import datetime, timezone
+        start = d.get('started_at') or d.get('created_at')
+        end = d.get('completed_at')
+        if start and end:
+            s = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            e = datetime.fromisoformat(end.replace('Z', '+00:00'))
+            return round((e - s).total_seconds())
+    except Exception:
+        pass
+    return None
+
+
 def _de_sessions_list(de_name, limit=50):
     sessions_dir = AGENTS_BASE / de_name / 'sessions'
     if not sessions_dir.exists():
@@ -107,6 +121,7 @@ def _de_sessions_list(de_name, limit=50):
                 'updated_at': d.get('updated_at'),
                 'step_count': len(d.get('steps', [])),
                 'summary': d.get('summary'),
+                'duration_seconds': _calc_duration(d),
             })
         except Exception:
             pass
