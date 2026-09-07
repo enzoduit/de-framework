@@ -26,6 +26,9 @@ OPENCLAW_GATEWAY_URL = os.environ.get('OPENCLAW_GATEWAY_URL', '')
 OPENCLAW_GATEWAY_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
 AGENTS_DIR = pathlib.Path(os.environ.get('AGENTS_DIR', '/var/de-agents'))
 
+# ── Required tool IDs — always present for every DE ─────────────────────────
+REQUIRED_TOOL_IDS = {"request_human_decision", "ask_colleague", "report_to_colleague"}
+
 # ── Prompt sent to OpenClaw to discover available tools ──────────────────────
 
 DISCOVERY_PROMPT = """DE_FRAMEWORK_TOOL_DISCOVERY
@@ -135,12 +138,31 @@ def get_tools(force_rediscover: bool = False) -> dict:
         try:
             cached = json.loads(cache.read_text())
             if isinstance(cached.get('tools'), list) and cached['tools']:
+                # Ensure required tools are present in cached result too
+                cached_ids = {t['id'] for t in cached['tools']}
+                for t in DEFAULT_TOOL_LIBRARY:
+                    if t['id'] in REQUIRED_TOOL_IDS and t['id'] not in cached_ids:
+                        cached['tools'].append(dict(t))
+                # Mark required flag
+                for t in cached['tools']:
+                    t['required'] = t['id'] in REQUIRED_TOOL_IDS
                 return cached
         except Exception:
             pass
 
     # Discover (or fallback)
     tools, source = discover_from_openclaw()
+
+    # Ensure required tools are always present (merge step)
+    discovered_ids = {t['id'] for t in tools}
+    for t in DEFAULT_TOOL_LIBRARY:
+        if t['id'] in REQUIRED_TOOL_IDS and t['id'] not in discovered_ids:
+            tools.append(dict(t))
+
+    # Mark required flag on all tools
+    for t in tools:
+        t['required'] = t['id'] in REQUIRED_TOOL_IDS
+
     result = {
         'tools': tools,
         'source': source,

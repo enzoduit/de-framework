@@ -51,7 +51,7 @@ class DEHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
         self.end_headers()
 
@@ -73,6 +73,10 @@ class DEHandler(BaseHTTPRequestHandler):
 
         if path == '/pageviews':
             return system_routes.handle_pageviews(self)
+
+        # Public: cron trigger (no auth needed for cron)
+        if path == '/trigger-scheduled':
+            return de_routes.handle_trigger_scheduled(self)
 
         # ── Auth required for all remaining GET ─────────────────────────────
         if not self.check_auth():
@@ -184,6 +188,11 @@ class DEHandler(BaseHTTPRequestHandler):
                 and parts[2] == 'schedule'):
             return de_routes.handle_de_schedule_post(self, parts[1], body)
 
+        # POST /de/<name>/sessions/<id>/reset — mark stale session as error
+        if (len(parts) == 5 and parts[0] == 'de'
+                and parts[2] == 'sessions' and parts[4] == 'reset'):
+            return de_routes.handle_session_reset(self, parts[1], parts[3])
+
         self.send_json(404, {'error': 'not found'})
 
     def do_PATCH(self):
@@ -204,6 +213,29 @@ class DEHandler(BaseHTTPRequestHandler):
         # PATCH /de/<name>/tools
         if len(parts) == 3 and parts[0] == 'de' and parts[2] == 'tools':
             return de_routes.handle_de_tools_patch(self, parts[1], body)
+
+        # PATCH /de/<name>/schedule/<sched_id>
+        if len(parts) == 4 and parts[0] == 'de' and parts[2] == 'schedule':
+            return de_routes.handle_schedule_update(self, parts[1], parts[3], body)
+
+        self.send_json(404, {'error': 'not found'})
+
+    def do_DELETE(self):
+        path = self.path_base()
+        parts = [p for p in path.split('/') if p]
+        length = int(self.headers.get('Content-Length', 0))
+        body = {}
+        if length:
+            try:
+                body = json.loads(self.rfile.read(length))
+            except Exception:
+                body = {}
+        if not self.check_auth():
+            return self.send_json(401, {'error': 'unauthorized'})
+
+        # DELETE /de/<name>/schedule/<sched_id>
+        if len(parts) == 4 and parts[0] == 'de' and parts[2] == 'schedule':
+            return de_routes.handle_schedule_delete(self, parts[1], parts[3])
 
         self.send_json(404, {'error': 'not found'})
 

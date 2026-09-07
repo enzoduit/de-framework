@@ -3,11 +3,15 @@ DE Routes — /de-list, /de/<name>, /de/<name>/sessions, /de/<name>/sessions/<id
 """
 
 import json
+import subprocess as _sp
 import uuid as _uuid
 from datetime import datetime, timedelta, timezone as _tz
 from pathlib import Path
 from backend.config import AGENTS_BASE, DE_NAMES, now_iso
-from backend.core.tool_discovery import get_tools as _get_tools
+from backend.core.tool_discovery import get_tools as _get_tools, REQUIRED_TOOL_IDS
+
+# session_runner.py lives in backend/core/
+_BACKEND_DIR = Path(__file__).parent.parent  # backend/
 
 
 def _compute_next_run(frequency: str, time_utc: str = '08:00') -> str:
@@ -23,54 +27,254 @@ def _compute_next_run(frequency: str, time_utc: str = '08:00') -> str:
     return candidate.isoformat()
 
 
+def _compute_next_run_from_schedule(s: dict) -> str:
+    """Compute next run ISO datetime from a schedule dict (with frequency, time_utc, days)."""
+    frequency = s.get('frequency', 'daily')
+    time_utc = s.get('time_utc', '08:00')
+    days = s.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
+
+    h, m = 8, 0
+    if ':' in time_utc:
+        try: h, m = map(int, time_utc.split(':'))
+        except: pass
+
+    now = datetime.now(_tz.utc)
+    DAY_MAP = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
+
+    if frequency == 'daily':
+        allowed_days = list(range(7))
+    elif frequency == 'weekdays':
+        allowed_days = [0, 1, 2, 3, 4]
+    elif frequency == 'weekly':
+        allowed_days = [DAY_MAP[d] for d in (days[:1] if days else ['mon']) if d in DAY_MAP]
+    else:  # custom
+        allowed_days = [DAY_MAP[d] for d in days if d in DAY_MAP]
+
+    if not allowed_days:
+        allowed_days = list(range(7))
+
+    candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    for i in range(8):
+        check = candidate + timedelta(days=i)
+        if check > now and check.weekday() in allowed_days:
+            return check.isoformat()
+
+    return (candidate + timedelta(days=1)).isoformat()
+
+
+def _start_session_for_schedule(de_name: str, schedule: dict) -> str:
+    """Create and spawn a session for a scheduled entry. Returns session_id."""
+    sessions_dir = AGENTS_BASE / de_name / 'sessions'
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.now(_tz.utc).strftime('%Y%m%d-%H%M%S')
+    short = _uuid.uuid4().hex[:6]
+    session_id = f'ws-{de_name}-{ts}-{short}'
+
+    prompt = schedule.get('prompt', 'Scheduled run')
+
+    session_data = {
+        'id': session_id,
+        'de': de_name,
+        'trigger_type': 'scheduled',
+        'trigger_from': 'scheduler',
+        'trigger_context': prompt,
+        'schedule_id': schedule.get('id'),
+        'schedule_name': schedule.get('name'),
+        'status': 'queued',
+        'decision_ids': [],
+        'colleague_calls': {},
+        'steps': [],
+        'paused_state': None,
+        'created_at': now_iso(),
+        'updated_at': now_iso(),
+        'summary': None,
+    }
+    (sessions_dir / f'{session_id}.json').write_text(json.dumps(session_data, indent=2))
+
+    # Write to inbox
+    inbox_file = AGENTS_BASE / de_name / 'inbox.jsonl'
+    inbox_entry = {
+        'type': 'scheduled_trigger',
+        'session_id': session_id,
+        'context': prompt,
+        'trigger_type': 'scheduled',
+        'schedule_id': schedule.get('id'),
+        'ts': now_iso(),
+    }
+    with open(inbox_file, 'a') as f:
+        f.write(json.dumps(inbox_entry) + '\n')
+
+    # Spawn session_runner
+    _SESSION_RUNNER = _BACKEND_DIR / 'core' / 'session_runner.py'
+    _log = f'/tmp/session-{de_name}-{session_id}.log'
+    _sp.Popen(
+        ['python3', str(_SESSION_RUNNER), de_name, session_id],
+        stdout=open(_log, 'w'),
+        stderr=_sp.STDOUT,
+        cwd=str(_BACKEND_DIR.parent),
+    )
+    return session_id
+
+
 def handle_de_schedule_get(handler, de_name: str):
     """GET /de/<name>/schedule"""
     schedule_file = AGENTS_BASE / de_name / 'schedule.json'
     if not schedule_file.exists():
-        return handler.send_json(200, {'activities': [], 'de': de_name})
+        return handler.send_json(200, {'activities': [], 'schedules': [], 'de': de_name})
     try:
-        return handler.send_json(200, json.loads(schedule_file.read_text()))
+        data = json.loads(schedule_file.read_text())
+        data.setdefault('activities', [])
+        data.setdefault('schedules', [])
+        return handler.send_json(200, data)
     except Exception:
-        return handler.send_json(200, {'activities': [], 'de': de_name})
+        return handler.send_json(200, {'activities': [], 'schedules': [], 'de': de_name})
 
 
 def handle_de_schedule_post(handler, de_name: str, body: dict):
-    """POST /de/<name>/schedule — add or update a schedule activity."""
+    """POST /de/<name>/schedule — create a new schedule entry.
+    If body has 'prompt' field → human-configured schedule (stored in 'schedules' array).
+    If body has 'trigger_context' field → agent activity (stored in 'activities' array).
+    """
     schedule_file = AGENTS_BASE / de_name / 'schedule.json'
     try:
-        schedule = json.loads(schedule_file.read_text()) if schedule_file.exists() else {'activities': []}
+        schedule = json.loads(schedule_file.read_text()) if schedule_file.exists() else {}
     except Exception:
-        schedule = {'activities': []}
+        schedule = {}
+    schedule.setdefault('activities', [])
+    schedule.setdefault('schedules', [])
 
-    activity = {
-        'id': _uuid.uuid4().hex[:8],
-        'title': body.get('title', 'Scheduled activity'),
-        'frequency': body.get('frequency', 'once'),
-        'time_utc': body.get('time_utc', '08:00'),
-        'trigger_context': body.get('trigger_context', ''),
-        'created_by': body.get('created_by', 'user'),
-        'last_run_at': None,
-        'next_run_at': body.get('next_run_at') or _compute_next_run(
-            body.get('frequency', 'once'), body.get('time_utc', '08:00')
-        ),
-        'run_count': 0,
-    }
-
-    existing_id = body.get('id')
-    activities = schedule.setdefault('activities', [])
-    if existing_id:
-        for i, a in enumerate(activities):
-            if a.get('id') == existing_id:
-                activities[i] = {**a, **activity, 'id': existing_id, 'run_count': a.get('run_count', 0)}
-                break
+    if 'prompt' in body:
+        # Human-configured recurring schedule
+        sched_id = 'sched-' + _uuid.uuid4().hex[:8]
+        entry = {
+            'id': sched_id,
+            'name': body.get('name', 'Scheduled Run'),
+            'active': body.get('active', True),
+            'frequency': body.get('frequency', 'daily'),
+            'time_utc': body.get('time_utc', '08:00'),
+            'days': body.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
+            'prompt': body.get('prompt', ''),
+            'next_run': _compute_next_run_from_schedule(body),
+            'last_run': None,
+            'last_session_id': None,
+            'created_at': now_iso(),
+        }
+        schedule['schedules'].append(entry)
+        schedule['updated_at'] = now_iso()
+        schedule_file.write_text(json.dumps(schedule, indent=2))
+        return handler.send_json(201, {'ok': True, 'schedule': entry})
+    else:
+        # Agent-created activity (backward compat)
+        activity = {
+            'id': _uuid.uuid4().hex[:8],
+            'title': body.get('title', 'Scheduled activity'),
+            'frequency': body.get('frequency', 'once'),
+            'time_utc': body.get('time_utc', '08:00'),
+            'trigger_context': body.get('trigger_context', ''),
+            'created_by': body.get('created_by', 'user'),
+            'last_run_at': None,
+            'next_run_at': body.get('next_run_at') or _compute_next_run(
+                body.get('frequency', 'once'), body.get('time_utc', '08:00')
+            ),
+            'run_count': 0,
+        }
+        existing_id = body.get('id')
+        activities = schedule['activities']
+        if existing_id:
+            for i, a in enumerate(activities):
+                if a.get('id') == existing_id:
+                    activities[i] = {**a, **activity, 'id': existing_id, 'run_count': a.get('run_count', 0)}
+                    break
+            else:
+                activities.append(activity)
         else:
             activities.append(activity)
-    else:
-        activities.append(activity)
+        schedule['updated_at'] = now_iso()
+        schedule_file.write_text(json.dumps(schedule, indent=2))
+        return handler.send_json(201, {'ok': True, 'activity': activity})
 
-    schedule['updated_at'] = now_iso()
-    schedule_file.write_text(json.dumps(schedule, indent=2))
-    return handler.send_json(201, {'ok': True, 'activity': activity})
+
+def handle_schedule_update(handler, de_name: str, sched_id: str, body: dict):
+    """PATCH /de/<name>/schedule/<id> — update a human-configured schedule."""
+    schedule_file = AGENTS_BASE / de_name / 'schedule.json'
+    if not schedule_file.exists():
+        return handler.send_json(404, {'error': 'No schedule file'})
+    try:
+        data = json.loads(schedule_file.read_text())
+    except Exception:
+        return handler.send_json(500, {'error': 'Could not read schedule file'})
+    schedules = data.get('schedules', [])
+    for s in schedules:
+        if s.get('id') == sched_id:
+            for field in ['name', 'active', 'frequency', 'time_utc', 'days', 'prompt']:
+                if field in body:
+                    s[field] = body[field]
+            # Recompute next_run if schedule parameters changed
+            if any(f in body for f in ['frequency', 'time_utc', 'days']):
+                s['next_run'] = _compute_next_run_from_schedule(s)
+            data['updated_at'] = now_iso()
+            schedule_file.write_text(json.dumps(data, indent=2))
+            return handler.send_json(200, {'ok': True, 'schedule': s})
+    return handler.send_json(404, {'error': f'Schedule {sched_id} not found'})
+
+
+def handle_schedule_delete(handler, de_name: str, sched_id: str):
+    """DELETE /de/<name>/schedule/<id> — remove a human-configured schedule."""
+    schedule_file = AGENTS_BASE / de_name / 'schedule.json'
+    if not schedule_file.exists():
+        return handler.send_json(404, {'error': 'No schedule file'})
+    try:
+        data = json.loads(schedule_file.read_text())
+    except Exception:
+        return handler.send_json(500, {'error': 'Could not read schedule file'})
+    schedules = data.get('schedules', [])
+    new_schedules = [s for s in schedules if s.get('id') != sched_id]
+    if len(new_schedules) == len(schedules):
+        return handler.send_json(404, {'error': f'Schedule {sched_id} not found'})
+    data['schedules'] = new_schedules
+    data['updated_at'] = now_iso()
+    schedule_file.write_text(json.dumps(data, indent=2))
+    return handler.send_json(200, {'ok': True})
+
+
+def handle_trigger_scheduled(handler):
+    """GET /trigger-scheduled — check all DEs, trigger overdue schedules (called by cron)."""
+    triggered = []
+    now = datetime.now(_tz.utc)
+    for de_name in _get_de_names():
+        sched_file = AGENTS_BASE / de_name / 'schedule.json'
+        if not sched_file.exists():
+            continue
+        try:
+            data = json.loads(sched_file.read_text())
+        except Exception:
+            continue
+        schedules = data.get('schedules', [])
+        changed = False
+        for s in schedules:
+            if not s.get('active', True):
+                continue
+            next_run = s.get('next_run')
+            if not next_run:
+                continue
+            try:
+                next_run_dt = datetime.fromisoformat(next_run.replace('Z', '+00:00'))
+            except Exception:
+                continue
+            if next_run_dt <= now:
+                try:
+                    session_id = _start_session_for_schedule(de_name, s)
+                    s['last_run'] = now.isoformat()
+                    s['last_session_id'] = session_id
+                    s['next_run'] = _compute_next_run_from_schedule(s)
+                    changed = True
+                    triggered.append({'de': de_name, 'sched_id': s['id'], 'session_id': session_id})
+                except Exception as e:
+                    triggered.append({'de': de_name, 'sched_id': s['id'], 'error': str(e)})
+        if changed:
+            sched_file.write_text(json.dumps(data, indent=2))
+    return handler.send_json(200, {'ok': True, 'triggered': triggered, 'count': len(triggered)})
 
 
 def _discover_de_names():
@@ -503,16 +707,44 @@ def handle_de_tools_patch(handler, de_name: str, body: dict):
         return handler.send_json(404, {'error': f'DE not found: {de_name}'})
     try:
         de_data = json.loads(de_json_file.read_text())
-        tools = body.get('tools', [])
+        tools = list(body.get('tools', []))
         # Filter to valid tool ids only
         valid_ids = {t['id'] for t in _get_tools().get('tools', [])}
         tools = [t for t in tools if t in valid_ids]
+        # Always include required tools regardless of what was sent
+        for req_id in REQUIRED_TOOL_IDS:
+            if req_id not in tools:
+                tools.append(req_id)
         de_data['tools'] = tools
         de_data['updated_at'] = now_iso()
         de_json_file.write_text(json.dumps(de_data, indent=2))
         return handler.send_json(200, {'ok': True, 'tools': tools, 'de': de_name})
     except Exception as e:
         return handler.send_json(500, {'ok': False, 'error': str(e)})
+
+
+def handle_session_reset(handler, de_name: str, session_id: str):
+    """POST /de/<name>/sessions/<id>/reset — mark stale running session as error."""
+    session_file = AGENTS_BASE / de_name / 'sessions' / f'{session_id}.json'
+    if not session_file.exists():
+        return handler.send_json(404, {'error': 'Session not found'})
+    try:
+        d = json.loads(session_file.read_text())
+        if d.get('status') != 'running':
+            return handler.send_json(400, {'error': f'Session is not running (status: {d.get("status")})'} )
+        d['status'] = 'error'
+        d['updated_at'] = now_iso()
+        d['completed_at'] = now_iso()
+        d.setdefault('steps', []).append({
+            'type': 'error',
+            'content': 'Session reset manually (was stale/stuck)',
+            'ts': now_iso(),
+        })
+        d['summary'] = 'Session was stuck with no progress and was reset manually.'
+        session_file.write_text(json.dumps(d, indent=2))
+        return handler.send_json(200, {'ok': True, 'session_id': session_id})
+    except Exception as e:
+        return handler.send_json(500, {'error': str(e)})
 
 
 def handle_de_metrics_get(handler, de_name: str):
