@@ -410,7 +410,7 @@ class ReActEngine:
             try:
                 response = client.messages.create(
                     model=self.model,
-                    max_tokens=1024,
+                    max_tokens=4096,
                     tools=self._tools_for_api,
                     messages=messages,
                 )
@@ -500,7 +500,7 @@ class ReActEngine:
                     break
 
             # ── Check if done ────────────────────────────────────────────
-            if stop_reason == "end_turn" and not tool_calls_made:
+            if stop_reason in ("end_turn", "max_tokens") and not tool_calls_made:
                 # No more tool calls — agent is done
                 final_status = "complete"
                 # Extract final summary text
