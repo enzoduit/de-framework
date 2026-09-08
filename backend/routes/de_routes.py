@@ -477,6 +477,47 @@ def _generate_job_md(p: dict) -> str:
     return '\n'.join(lines)
 
 
+def _generate_default_kpis(role: str, mission: str) -> list:
+    """Return a list of structured KPI dicts for metrics.json based on role + mission keywords."""
+    combined = (role + ' ' + mission).lower()
+
+    if any(k in combined for k in ['ops', 'operation', 'infra', 'devops', 'sre', 'system']):
+        return [
+            {'id': 'uptime_pct', 'name': 'Uptime %', 'value': None, 'target': 99.9, 'unit': '%', 'direction': 'up', 'history': []},
+            {'id': 'incidents_resolved', 'name': 'Incidents Resolved', 'value': None, 'target': 5, 'unit': 'count', 'direction': 'up', 'history': []},
+        ]
+    elif any(k in combined for k in ['finance', 'cfo', 'financial', 'budget', 'treasury']):
+        return [
+            {'id': 'runway_months', 'name': 'Runway', 'value': None, 'target': 18, 'unit': 'months', 'direction': 'up', 'history': []},
+            {'id': 'burn_rate', 'name': 'Monthly Burn', 'value': None, 'target': 50000, 'unit': 'USD', 'direction': 'down', 'history': []},
+        ]
+    elif any(k in combined for k in ['growth', 'marketing', 'cmo', 'acquisition', 'funnel', 'revenue', 'geo']):
+        return [
+            {'id': 'weekly_signups', 'name': 'Weekly Signups', 'value': None, 'target': 100, 'unit': 'users', 'direction': 'up', 'history': []},
+            {'id': 'conversion_rate', 'name': 'Conversion Rate', 'value': None, 'target': 3.5, 'unit': '%', 'direction': 'up', 'history': []},
+        ]
+    elif any(k in combined for k in ['security', 'shield', 'ciso', 'compliance', 'audit', 'risk']):
+        return [
+            {'id': 'backup_success_rate', 'name': 'Backup Success Rate', 'value': None, 'target': 100, 'unit': '%', 'direction': 'up', 'history': []},
+            {'id': 'open_vulnerabilities', 'name': 'Open Vulnerabilities', 'value': None, 'target': 0, 'unit': 'count', 'direction': 'down', 'history': []},
+        ]
+    elif any(k in combined for k in ['product', 'cpo', 'feature', 'roadmap', 'ux', 'design']):
+        return [
+            {'id': 'feature_velocity', 'name': 'Features Shipped', 'value': None, 'target': 4, 'unit': 'per month', 'direction': 'up', 'history': []},
+            {'id': 'bug_backlog', 'name': 'Bug Backlog', 'value': None, 'target': 10, 'unit': 'count', 'direction': 'down', 'history': []},
+        ]
+    elif any(k in combined for k in ['coach', 'hr', 'people', 'talent', 'culture', 'wellbeing']):
+        return [
+            {'id': 'team_nps', 'name': 'Team NPS', 'value': None, 'target': 50, 'unit': 'points', 'direction': 'up', 'history': []},
+            {'id': 'open_issues', 'name': 'Open HR Issues', 'value': None, 'target': 0, 'unit': 'count', 'direction': 'down', 'history': []},
+        ]
+    else:
+        return [
+            {'id': 'tasks_completed', 'name': 'Tasks Completed', 'value': None, 'target': 10, 'unit': 'per week', 'direction': 'up', 'history': []},
+            {'id': 'quality_score', 'name': 'Quality Score', 'value': None, 'target': 90, 'unit': '%', 'direction': 'up', 'history': []},
+        ]
+
+
 def _generate_default_schedules(de_name: str, de_json: dict) -> dict:
     """Generate role-appropriate default schedules for a new DE."""
     role = (de_json.get('role') or '').lower()
@@ -646,10 +687,14 @@ def handle_de_create(handler, body: dict):
         job_md = _generate_job_md(body)
         (de_dir / 'job.md').write_text(job_md)
 
-        # metrics.json — empty initial state
+        # metrics.json — initialize with role-based KPIs
+        role = body.get('role', '')
+        mission = body.get('mission', '')
+        existing_kpis = body.get('kpis', [])
+        default_kpis = [] if existing_kpis else _generate_default_kpis(role, mission)
         (de_dir / 'metrics.json').write_text(json.dumps({
-            'created_at': now_iso(),
-            'last_updated': now_iso(),
+            'updated': None,
+            'kpis': default_kpis,
         }, indent=2))
 
         # memory.md — empty
@@ -989,9 +1034,13 @@ def handle_api_des_post(handler, body: dict):
         # de.json
         (de_dir / 'de.json').write_text(json.dumps(de_json, indent=2))
 
-        # metrics.json — empty initial state
+        # metrics.json — initialize with role-based default KPIs
+        raw_kpis = body.get('kpis', [])
+        default_kpis = [] if raw_kpis else _generate_default_kpis(
+            body.get('role', ''), body.get('mission', '')
+        )
         (de_dir / 'metrics.json').write_text(json.dumps(
-            {'updated': None, 'kpis': []},
+            {'updated': None, 'kpis': default_kpis},
             indent=2
         ))
 

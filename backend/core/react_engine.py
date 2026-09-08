@@ -94,6 +94,12 @@ class ReActEngine:
         # Always add the ask-colleague tool
         self._register_ask_colleague_tool()
 
+        # Always add the write_metric tool (agent-context-aware)
+        self._register_write_metric_tool()
+
+        # Build system prompt (includes KPI list from metrics.json)
+        self._system_prompt = self._build_system_prompt()
+
         # Load Anthropic client
         self._api_key = _load_api_key()
         self._client = None  # lazy init
@@ -139,6 +145,37 @@ class ReActEngine:
         if not any(t.get('name') == 'request_human_decision' for t in self._tools_for_api):
             self._tools_for_api.append(human_tool)
 
+    def _register_write_metric_tool(self):
+        write_metric_tool = {
+            'name': 'write_metric',
+            'description': (
+                'Record a KPI metric value for this DE. '
+                'Call at end of session for each KPI you directly measured or have data for.'
+            ),
+            'input_schema': {
+                'type': 'object',
+                'properties': {
+                    'kpi_id': {
+                        'type': 'string',
+                        'description': 'KPI id (see Your KPIs section in system instructions)',
+                    },
+                    'value': {
+                        'type': 'number',
+                        'description': 'Current measured value',
+                    },
+                    'notes': {
+                        'type': 'string',
+                        'description': 'Brief note on how you measured this',
+                    },
+                },
+                'required': ['kpi_id', 'value'],
+            },
+        }
+        self._tool_fns['write_metric'] = self._handle_write_metric
+        # Only add to API list if not already registered by _register_tools
+        if not any(t.get('name') == 'write_metric' for t in self._tools_for_api):
+            self._tools_for_api.append(write_metric_tool)
+
     def _register_ask_colleague_tool(self):
         colleague_tool = {
             "name": "ask_colleague",
@@ -169,6 +206,110 @@ class ReActEngine:
         # Only add to API list if not already registered by _register_tools
         if not any(t.get('name') == 'ask_colleague' for t in self._tools_for_api):
             self._tools_for_api.append(colleague_tool)
+
+    def _handle_write_metric(self, input_data: dict) -> dict:
+        """Write a KPI metric value to this agent's metrics.json."""
+        kpi_id = (input_data.get('kpi_id') or '').strip()
+        value = input_data.get('value')
+        notes = input_data.get('notes', '')
+
+        if not kpi_id:
+            return {'error': 'kpi_id is required'}
+        if value is None:
+            return {'error': 'value is required'}
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return {'error': 'value must be a number'}
+
+        metrics_file = self.agent_dir / 'metrics.json'
+        try:
+            data = json.loads(metrics_file.read_text()) if metrics_file.exists() else {}
+        except Exception:
+            data = {}
+
+        kpis = data.get('kpis', [])
+
+        # Find existing KPI entry or create new one
+        kpi_entry = next((k for k in kpis if k.get('id') == kpi_id), None)
+        if kpi_entry is None:
+            kpi_entry = {
+                'id': kpi_id,
+                'name': kpi_id.replace('_', ' ').title(),
+                'value': None,
+                'target': None,
+                'unit': '',
+                'direction': 'up',
+                'history': [],
+            }
+            kpis.append(kpi_entry)
+
+        # Append to history, cap at 90 entries
+        hist_entry = {'ts': _now_iso(), 'value': value}
+        if notes:
+            hist_entry['notes'] = notes
+        history = kpi_entry.get('history', [])
+        history.append(hist_entry)
+        kpi_entry['history'] = history[-90:]
+        kpi_entry['value'] = value
+
+        data['kpis'] = kpis
+        data['updated'] = _now_iso()
+
+        try:
+            metrics_file.write_text(json.dumps(data, indent=2))
+        except Exception as e:
+            return {'error': f'Failed to write metrics.json: {e}'}
+
+        self._log({'type': 'metric_written', 'kpi_id': kpi_id, 'value': value})
+        print(f'  [{self.agent_name.upper()}:METRIC] {kpi_id} = {value}')
+
+        return {
+            'ok': True,
+            'kpi_id': kpi_id,
+            'value': value,
+            'history_count': len(kpi_entry['history']),
+        }
+
+    def _build_system_prompt(self) -> str:
+        """Build system prompt including KPI list for this agent from metrics.json."""
+        lines = [
+            f'You are {self.agent_name.upper()}, a Digital Employee in an autonomous AI team.',
+            'Operate as a professional ReAct agent: think step by step, use tools to gather real data, and produce concrete results.',
+            'Be thorough but efficient. Document what you find.',
+        ]
+
+        # Load structured KPIs from metrics.json
+        metrics_file = self.agent_dir / 'metrics.json'
+        kpis = []
+        try:
+            if metrics_file.exists():
+                kpis = json.loads(metrics_file.read_text()).get('kpis', [])
+        except Exception:
+            pass
+
+        if kpis:
+            lines.append('')
+            lines.append('## Your KPIs')
+            for kpi in kpis:
+                name = kpi.get('name', kpi.get('id', 'KPI'))
+                target = kpi.get('target')
+                unit = kpi.get('unit', '')
+                direction = kpi.get('direction', 'up')
+                kpi_id = kpi.get('id', '')
+                target_str = ''
+                if target is not None:
+                    target_str = f' (target: {target}{" " + unit if unit else ""}, {direction})'
+                lines.append(f'- {name}{target_str}  [id: {kpi_id}]')
+
+        lines.extend([
+            '',
+            'At the end of your session, for each KPI you directly measured or have data for, '
+            'call write_metric(kpi_id, value) to record it. '
+            "Only write metrics you actually measured in this session — don't guess.",
+        ])
+
+        return '\n'.join(lines)
 
     # ─────────────────────────────────────────────────────────────────────
     # Anthropic client (lazy)
@@ -415,6 +556,7 @@ class ReActEngine:
                 response = client.messages.create(
                     model=self.model,
                     max_tokens=4096,
+                    system=self._system_prompt,
                     tools=self._tools_for_api,
                     messages=messages,
                 )

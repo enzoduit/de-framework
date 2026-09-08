@@ -362,6 +362,20 @@ TOOL_LIBRARY = {
         },
         # fn is registered by react_engine._register_human_decision_tool
     },
+    'write_metric': {
+        'name': 'write_metric',
+        'description': 'Record a KPI metric value for this DE. Call at end of session for each KPI you measured.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'kpi_id': {'type': 'string', 'description': 'KPI id from de.json kpis array'},
+                'value': {'type': 'number', 'description': 'Current measured value'},
+                'notes': {'type': 'string', 'description': 'Brief note on how you measured this'},
+            },
+            'required': ['kpi_id', 'value'],
+        },
+        # fn is registered by react_engine._register_write_metric_tool
+    },
 }
 
 
