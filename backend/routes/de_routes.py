@@ -762,3 +762,238 @@ def handle_de_metrics_get(handler, de_name: str):
         return handler.send_json(200, data)
     except Exception:
         return handler.send_json(200, {'kpis': []})
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# REST /api/des  — programmatic DE management (for agent-to-agent handoff)
+# ────────────────────────────────────────────────────────────────────────────
+
+import re as _re
+_NAME_RE = _re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9_\-]{0,62}$')
+
+_DE_DEFAULTS = {
+    'display_name': None,          # falls back to name.upper()
+    'color': '#FF4500',
+    'autonomy': 1,
+    'autonomy_level': 1,
+    'tools': [
+        'exec_shell', 'read_file', 'write_file',
+        'send_telegram', 'web_search',
+        'schedule_next_session',
+        'ask_colleague', 'report_to_colleague',
+        'request_human_decision',
+    ],
+    'kpis': [],
+    'goals': [],
+    'responsibilities': {'l0': [], 'l1': [], 'l2': []},
+    'hard_constraints': [],
+    'data_sources': [],
+    'autoresearch': {'enabled': False, 'queries': []},
+    'self_evaluation': {'schedule': 'manual'},
+}
+
+
+def _build_de_json_from_api(body: dict) -> dict:
+    """Build a de.json dict from POST /api/des body, applying defaults."""
+    name = body['name'].strip().lower()
+    display_name = body.get('display_name') or name.upper()
+    autonomy = body.get('autonomy', body.get('autonomy_level', 1))
+
+    # KPIs: accept list of dicts (API format) or list of strings (legacy)
+    raw_kpis = body.get('kpis', [])
+    kpi_strings = []
+    for k in raw_kpis:
+        if isinstance(k, dict):
+            target = k.get('target', '')
+            unit = k.get('unit', '')
+            direction = k.get('direction', '')
+            target_str = f"{target} {unit}" if unit else str(target)
+            dir_str = f" ({direction})" if direction else ''
+            kpi_strings.append(f"{k.get('name', k.get('id', 'KPI'))}: {target_str}{dir_str}")
+        else:
+            kpi_strings.append(str(k))
+
+    # responsibilities: accept l0/l1/l2 (API) or level_0/level_1/level_2 (legacy)
+    raw_resp = body.get('responsibilities', {})
+    responsibilities = {
+        'level_0': raw_resp.get('level_0') or raw_resp.get('l0') or [],
+        'level_1': raw_resp.get('level_1') or raw_resp.get('l1') or [],
+        'level_2': raw_resp.get('level_2') or raw_resp.get('l2') or [],
+    }
+
+    # triggers — always include user trigger; add cron if schedule defined
+    schedule_val = (body.get('self_evaluation') or {}).get('schedule', 'manual')
+    triggers = [{'type': 'user', 'description': 'On-demand via portal or API'}]
+    if schedule_val and schedule_val != 'manual':
+        schedule_labels = {
+            'hourly': 'Every hour',
+            '3x_daily': '3x daily (08:00, 14:00, 20:00 UTC)',
+            'daily': 'Daily at 08:00 UTC',
+            'weekly': 'Weekly on Monday at 08:00 UTC',
+        }
+        triggers.append({
+            'type': 'cron',
+            'schedule': schedule_labels.get(schedule_val, schedule_val),
+            'description': 'Scheduled autonomous run',
+        })
+
+    return {
+        'name': name,
+        'display_name': display_name,
+        'role': body.get('role', ''),
+        'color': body.get('color', '#FF4500'),
+        'autonomy_level': autonomy,
+        'mission': body.get('mission', ''),
+        'kpis': kpi_strings,
+        'responsibilities': responsibilities,
+        'hard_constraints': body.get('hard_constraints', []),
+        'data_sources': body.get('data_sources', []),
+        'autoresearch': body.get('autoresearch', {'enabled': False, 'queries': []}),
+        'self_evaluation': body.get('self_evaluation', {'schedule': 'manual'}),
+        'tools': body.get('tools', _DE_DEFAULTS['tools']),
+        'goals': body.get('goals', []),
+        'triggers': triggers,
+        'created_at': now_iso(),
+        'updated_at': now_iso(),
+    }
+
+
+def handle_api_des_post(handler, body: dict):
+    """POST /api/des — create a new Digital Employee programmatically.
+
+    Minimal body: {"name": "aria", "role": "Head of Product", "mission": "..."}
+    Full body: see SETUP.md → Creating DEs via API.
+    Returns 201 on success, 409 if DE exists, 400 if name invalid.
+    """
+    name = (body.get('name') or '').strip().lower()
+    if not name:
+        return handler.send_json(400, {'error': 'name is required'})
+    if not _NAME_RE.match(name):
+        return handler.send_json(400, {
+            'error': 'name must start with a letter/digit and contain only '
+                     'alphanumeric, hyphen, or underscore characters'
+        })
+
+    de_dir = AGENTS_BASE / name
+    if de_dir.exists():
+        return handler.send_json(409, {
+            'error': f'DE "{name}" already exists',
+            'path': str(de_dir),
+        })
+
+    try:
+        de_dir.mkdir(parents=True)
+        (de_dir / 'sessions').mkdir()
+
+        de_json = _build_de_json_from_api(body)
+
+        # de.json
+        (de_dir / 'de.json').write_text(json.dumps(de_json, indent=2))
+
+        # metrics.json — empty initial state
+        (de_dir / 'metrics.json').write_text(json.dumps(
+            {'updated': None, 'kpis': []},
+            indent=2
+        ))
+
+        # memory.md — empty
+        (de_dir / 'memory.md').write_text(
+            f'# {de_json["display_name"]} — Memory\n\n'
+            f'Created {now_iso()}. No entries yet.\n'
+        )
+
+        # decisions.json — empty queue
+        (de_dir / 'decisions.json').write_text(
+            json.dumps({'pending': [], 'resolved': []}, indent=2)
+        )
+
+        # schedule.json — empty
+        (de_dir / 'schedule.json').write_text(
+            json.dumps({'activities': [], 'schedules': [], 'updated_at': now_iso()}, indent=2)
+        )
+
+        # job.md — generated from body (reuse existing generator)
+        job_md = _generate_job_md({
+            **body,
+            'display_name': de_json['display_name'],
+            'kpis': de_json['kpis'],
+            'responsibilities': {
+                'level_0': de_json['responsibilities']['level_0'],
+                'level_1': de_json['responsibilities']['level_1'],
+                'level_2': de_json['responsibilities']['level_2'],
+            },
+        })
+        (de_dir / 'job.md').write_text(job_md)
+
+        return handler.send_json(201, {
+            'ok': True,
+            'de': de_json,
+            'path': str(de_dir),
+        })
+
+    except Exception as exc:
+        import shutil
+        try:
+            shutil.rmtree(de_dir)
+        except Exception:
+            pass
+        return handler.send_json(500, {'ok': False, 'error': str(exc)})
+
+
+def handle_api_des_list(handler):
+    """GET /api/des — list all Digital Employees (REST variant of /de-list)."""
+    de_names = _get_de_names()
+    des = []
+    for de_name in de_names:
+        de_json_file = AGENTS_BASE / de_name / 'de.json'
+        if not de_json_file.exists():
+            continue
+        try:
+            d = json.loads(de_json_file.read_text())
+            last_sessions = _de_sessions_list(de_name, limit=1)
+            last_session = last_sessions[0] if last_sessions else None
+            des.append({
+                'name': d.get('name'),
+                'display_name': d.get('display_name'),
+                'role': d.get('role'),
+                'color': d.get('color'),
+                'mission': (d.get('mission') or '')[:200],
+                'autonomy_level': d.get('autonomy_level', 1),
+                'tools': d.get('tools', []),
+                'session_count': _de_session_count(de_name),
+                'pending_decisions': _de_pending_count(de_name),
+                'last_session': last_session,
+                'created_at': d.get('created_at'),
+                'updated_at': d.get('updated_at'),
+            })
+        except Exception as exc:
+            des.append({'name': de_name, 'error': str(exc)})
+    return handler.send_json(200, {'des': des, 'count': len(des), 'ts': now_iso()})
+
+
+def handle_api_des_get(handler, de_name: str):
+    """GET /api/des/{name} — full DE detail (REST variant of /de/<name>)."""
+    de_dir = AGENTS_BASE / de_name
+    de_json_file = de_dir / 'de.json'
+    if not de_json_file.exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    try:
+        de_data = json.loads(de_json_file.read_text())
+        sessions = _de_sessions_list(de_name, limit=20)
+        metrics_file = de_dir / 'metrics.json'
+        metrics = {}
+        if metrics_file.exists():
+            try:
+                metrics = json.loads(metrics_file.read_text())
+            except Exception:
+                pass
+        return handler.send_json(200, {
+            **de_data,
+            'session_count': _de_session_count(de_name),
+            'pending_decisions': _de_pending_count(de_name),
+            'sessions': sessions,
+            'metrics': metrics,
+            'path': str(de_dir),
+        })
+    except Exception as exc:
+        return handler.send_json(500, {'error': str(exc)})

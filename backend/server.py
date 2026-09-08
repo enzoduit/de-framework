@@ -91,6 +91,13 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/de-list':
             return de_routes.handle_de_list(self)
 
+        # ── REST /api/des ────────────────────────────────────────────────────
+        if path == '/api/des':
+            return de_routes.handle_api_des_list(self)
+
+        if len(parts) == 3 and parts[0] == 'api' and parts[1] == 'des':
+            return de_routes.handle_api_des_get(self, parts[2])
+
         if parts and parts[0] == 'de':
             return de_routes.handle_de_get(self, parts)
 
@@ -179,6 +186,10 @@ class DEHandler(BaseHTTPRequestHandler):
 
         if path == '/de/create':
             return de_routes.handle_de_create(self, body)
+
+        # ── REST /api/des ────────────────────────────────────────────────────
+        if path == '/api/des':
+            return de_routes.handle_api_des_post(self, body)
 
         if path == '/de/setup-chat':
             return setup_routes.handle_setup_chat(self, body)

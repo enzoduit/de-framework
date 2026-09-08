@@ -4,6 +4,8 @@ Run autonomous AI agents with defined missions, KPIs, and approval gates — pow
 
 Each **Digital Employee** knows what it owns, what it can do without asking, what it should document, and what it must ask you before doing. It runs on a schedule or on demand, logs every step as a **Work Session**, and pauses for human decisions when it hits something risky.
 
+> **Self-hosting on Ubuntu?** See **[SETUP.md](SETUP.md)** — one-script bootstrap, API reference for programmatic DE creation, and an org chart → DE mapping guide.
+
 ---
 
 ## What you're hosting

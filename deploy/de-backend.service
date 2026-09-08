@@ -1,0 +1,17 @@
+[Unit]
+Description=Digital Employees Framework Backend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.openclaw/workspace/de-framework
+EnvironmentFile=/etc/de-framework.env
+ExecStart=/usr/bin/python3 backend/server.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/tmp/de-backend.log
+StandardError=append:/tmp/de-backend.log
+
+[Install]
+WantedBy=multi-user.target
