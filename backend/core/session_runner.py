@@ -195,12 +195,12 @@ def main():
             _write_step(session_file, 'result', result_text)
 
             # Strip markdown for clean summary
-_s = re.sub(r'#{1,6}\s+', '', result_text)
-_s = re.sub(r'\*\*|__|_|\*|`{1,3}', '', _s)
-_s = re.sub(r'\|', ' ', _s)
-_s = re.sub(r'---+', '', _s)
-_s = re.sub(r'\s+', ' ', _s).strip()
-summary = _s[:200]
+            _s = re.sub(r'#{1,6}\s+', '', result_text)
+            _s = re.sub(r'\*\*|__|_|\*|`{1,3}', '', _s)
+            _s = re.sub(r'\|', ' ', _s)
+            _s = re.sub(r'---+', '', _s)
+            _s = re.sub(r'\s+', ' ', _s).strip()
+            summary = _s[:200]
 
             d = json.loads(session_file.read_text())
             d['status'] = 'done'
