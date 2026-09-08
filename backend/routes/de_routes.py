@@ -477,6 +477,122 @@ def _generate_job_md(p: dict) -> str:
     return '\n'.join(lines)
 
 
+def _generate_default_schedules(de_name: str, de_json: dict) -> dict:
+    """Generate role-appropriate default schedules for a new DE."""
+    role = (de_json.get('role') or '').lower()
+    mission = (de_json.get('mission') or '').lower()
+    combined = role + ' ' + mission
+
+    schedules = []
+    now = now_iso()
+
+    def _sched(name, frequency, time_utc, days, prompt):
+        return {
+            'id': f'sched-{_uuid.uuid4().hex[:8]}',
+            'name': name,
+            'active': True,
+            'frequency': frequency,
+            'time_utc': time_utc,
+            'days': days,
+            'prompt': prompt,
+            'next_run': _compute_next_run_from_schedule({
+                'frequency': frequency, 'time_utc': time_utc, 'days': days
+            }),
+            'last_run': None,
+            'last_session_id': None,
+            'created_at': now,
+        }
+
+    WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri']
+    ALL_DAYS  = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+    # ── Universal: Daily Briefing for every DE ──────────────────────────
+    schedules.append(_sched(
+        'Daily Briefing',
+        'daily', '08:00', ALL_DAYS,
+        'Start of day: review your KPIs, check your inbox for messages from colleagues, '
+        'identify the top 1-3 priorities for today, and report your plan. '
+        'If any KPI is off-track, flag it and propose a corrective action.',
+    ))
+
+    # ── Role-specific extras ─────────────────────────────────────────────
+    ops_kw    = any(k in combined for k in ['ops', 'operation', 'infra', 'devops', 'sre', 'system'])
+    finance_kw= any(k in combined for k in ['finance', 'cfo', 'financial', 'budget', 'treasury', 'max'])
+    growth_kw = any(k in combined for k in ['growth', 'marketing', 'cmo', 'acquisition', 'funnel', 'revenue'])
+    coach_kw  = any(k in combined for k in ['coach', 'hr', 'people', 'talent', 'culture', 'wellbeing'])
+    security_kw=any(k in combined for k in ['security', 'shield', 'ciso', 'compliance', 'audit', 'risk'])
+    product_kw= any(k in combined for k in ['product', 'cpo', 'feature', 'roadmap', 'ux', 'design'])
+    scribe_kw = any(k in combined for k in ['scribe', 'doc', 'knowledge', 'wiki', 'memo', 'communication'])
+
+    if ops_kw:
+        schedules.append(_sched(
+            'Health Check',
+            'daily', '06:00', ALL_DAYS,
+            'Run a full infrastructure health check: check all services, disk usage, memory, '
+            'and any failed systemd units. Restart anything that is down. '
+            'Report what was checked, what was fixed, and overall system status.',
+        ))
+
+    if finance_kw:
+        schedules.append(_sched(
+            'Weekly Financial Review',
+            'weekly', '09:00', ['mon'],
+            'Weekly financial review: summarise key financial metrics, burn rate, runway, '
+            'and any budget variances from last week. Flag anything that needs a human decision.',
+        ))
+
+    if growth_kw:
+        schedules.append(_sched(
+            'Weekly KPI Review',
+            'weekly', '09:00', ['mon'],
+            'Review all growth KPIs from the past week: traffic, conversions, CAC, LTV. '
+            'Compare against targets, identify the biggest gap, and propose one specific action to close it.',
+        ))
+
+    if coach_kw:
+        schedules.append(_sched(
+            'Team Pulse Check',
+            'weekly', '09:00', ['fri'],
+            'End-of-week people check: review open HR matters, team feedback, and any '
+            'wellbeing signals. Summarise what needs follow-up next week.',
+        ))
+
+    if security_kw:
+        schedules.append(_sched(
+            'Daily Security Audit',
+            'daily', '07:00', ALL_DAYS,
+            'Daily security audit: check auth logs for anomalies, review any new CVEs relevant '
+            'to the stack, verify backups completed. Flag any issues immediately.',
+        ))
+
+    if product_kw:
+        schedules.append(_sched(
+            'Weekly Roadmap Review',
+            'weekly', '09:00', ['mon'],
+            'Review product roadmap progress: what shipped last week, what is at risk, '
+            'and what needs a decision from the team. Identify any blockers.',
+        ))
+
+    if scribe_kw:
+        schedules.append(_sched(
+            'Documentation Review',
+            'weekly', '14:00', ['fri'],
+            'Review documentation health: identify outdated pages, missing docs for recent changes, '
+            'and any knowledge gaps flagged by the team. Propose updates.',
+        ))
+
+    # No role matched — add a generic weekly review as second schedule
+    if len(schedules) == 1:
+        schedules.append(_sched(
+            'Weekly Review',
+            'weekly', '09:00', ['mon'],
+            'Weekly self-review: assess progress on your goals and KPIs from the past week. '
+            'What was accomplished? What is behind? What one action would have the most impact next week?',
+        ))
+
+    return {'schedules': schedules, 'activities': [], 'updated_at': now}
+
+
 def handle_de_create(handler, body: dict):
     """POST /de/create — create a new Digital Employee from form payload."""
     name = (body.get('name') or '').strip().lower().replace(' ', '-')
@@ -539,25 +655,8 @@ def handle_de_create(handler, body: dict):
         # memory.md — empty
         (de_dir / 'memory.md').write_text(f'# {de_json["display_name"]} — Memory\n\nCreated {now_iso()}. No entries yet.\n')
 
-        # schedule.json — auto-generated from setup chat schedule entries
-        schedule_entries = body.get('schedule', [])
-        initial_schedule = {'activities': [], 'updated_at': now_iso()}
-        for entry in schedule_entries:
-            activity = {
-                'id': _uuid.uuid4().hex[:8],
-                'title': entry.get('title', ''),
-                'frequency': entry.get('frequency', 'daily'),
-                'time_utc': entry.get('time_utc', '08:00'),
-                'trigger_context': entry.get('trigger_context', ''),
-                'created_by': 'setup',
-                'last_run_at': None,
-                'next_run_at': _compute_next_run(
-                    entry.get('frequency', 'daily'),
-                    entry.get('time_utc', '08:00'),
-                ),
-                'run_count': 0,
-            }
-            initial_schedule['activities'].append(activity)
+        # schedule.json — auto-generated based on role/mission
+        initial_schedule = _generate_default_schedules(name, de_json)
         (de_dir / 'schedule.json').write_text(json.dumps(initial_schedule, indent=2))
 
         return handler.send_json(201, {'ok': True, 'name': name, 'dir': str(de_dir)})
@@ -907,10 +1006,9 @@ def handle_api_des_post(handler, body: dict):
             json.dumps({'pending': [], 'resolved': []}, indent=2)
         )
 
-        # schedule.json — empty
-        (de_dir / 'schedule.json').write_text(
-            json.dumps({'activities': [], 'schedules': [], 'updated_at': now_iso()}, indent=2)
-        )
+        # schedule.json — auto-generated based on role/mission
+        initial_schedule = _generate_default_schedules(name, de_json)
+        (de_dir / 'schedule.json').write_text(json.dumps(initial_schedule, indent=2))
 
         # job.md — generated from body (reuse existing generator)
         job_md = _generate_job_md({
