@@ -135,7 +135,9 @@ class ReActEngine:
             },
         }
         self._tool_fns["request_human_decision"] = self._handle_human_decision
-        self._tools_for_api.append(human_tool)
+        # Only add to API list if not already registered by _register_tools
+        if not any(t.get('name') == 'request_human_decision' for t in self._tools_for_api):
+            self._tools_for_api.append(human_tool)
 
     def _register_ask_colleague_tool(self):
         colleague_tool = {
@@ -164,7 +166,9 @@ class ReActEngine:
             },
         }
         self._tool_fns["ask_colleague"] = self._handle_ask_colleague
-        self._tools_for_api.append(colleague_tool)
+        # Only add to API list if not already registered by _register_tools
+        if not any(t.get('name') == 'ask_colleague' for t in self._tools_for_api):
+            self._tools_for_api.append(colleague_tool)
 
     # ─────────────────────────────────────────────────────────────────────
     # Anthropic client (lazy)

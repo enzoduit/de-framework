@@ -138,7 +138,9 @@ def main():
         ws = WorkSession.load(de_name, session_id)
 
         # DE-specific tool definitions from de.json (may be empty list)
-        de_tools = de_info.get('tools', [])
+        # de.json stores tool IDs as strings — convert to full dicts with implementations
+        from tool_implementations import get_tool_defs
+        de_tools = get_tool_defs(de_info.get('tools', []))
 
         engine = ReActEngine(
             agent_name=de_name,
