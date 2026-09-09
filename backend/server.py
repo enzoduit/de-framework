@@ -30,6 +30,7 @@ from backend.routes import (
     signup_routes,
     setup_routes,
     creds_routes,
+    branding_routes,
 )
 
 
@@ -98,6 +99,10 @@ class DEHandler(BaseHTTPRequestHandler):
 
         if len(parts) == 3 and parts[0] == 'api' and parts[1] == 'des':
             return de_routes.handle_api_des_get(self, parts[2])
+
+        # GET /api/branding
+        if path == '/api/branding':
+            return branding_routes.handle_branding_get(self)
 
         # GET /api/credentials
         if path == '/api/credentials':
@@ -201,6 +206,9 @@ class DEHandler(BaseHTTPRequestHandler):
 
         if path == '/api/tools/register':
             return de_routes.handle_tools_register(self, body)
+
+        if path == '/api/branding':
+            return branding_routes.handle_branding_post(self, body)
 
         if path == '/api/credentials':
             return creds_routes.handle_credentials_post(self, body)

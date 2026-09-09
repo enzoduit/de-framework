@@ -226,3 +226,7 @@ echo '         -d '"'"'{"name":"ops","role":"Operations Manager","mission":"Keep
 echo ""
 echo "  Logs: tail -f /tmp/de-backend.log"
 echo "======================================================"
+echo ""
+echo "🎨 Optional: configure branding"
+echo "   Edit /var/de-framework-branding.json or use the portal Settings → Branding"
+echo "   See SETUP.md → White-Label / Branding for details"

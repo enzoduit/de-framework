@@ -652,3 +652,42 @@ curl -X DELETE -H "Authorization: Bearer $DE_API_TOKEN" \
 /var/de-framework-tools/        ← Custom tool definitions
   meta_performance.json         ← Tool JSON (includes required_credentials)
 ```
+
+---
+
+## White-Label / Branding
+
+Customize the portal with your logo, company name, and accent color.
+
+**Via portal:** Settings ⚙ → Branding → enter logo URL + company name + color → Save Branding
+
+**Via API:**
+```bash
+curl -X POST http://your-server/api/branding \
+  -H "Authorization: Bearer $DE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"logo_url":"https://example.com/logo.png","company_name":"Acme Corp","accent_color":"#0057A8"}'
+```
+
+**Via file** (before first start):
+```bash
+cat > /var/de-framework-branding.json <<'JSON'
+{
+  "logo_url": "https://example.com/logo.png",
+  "company_name": "Acme Corp",
+  "accent_color": "#0057A8",
+  "favicon_url": ""
+}
+JSON
+```
+Then start (or restart) the backend.
+
+**Fields:**
+| Field | Description | Default |
+|-------|-------------|---------|
+| `logo_url` | URL of your logo image (displayed top-left, height 32px) | *(empty — shows company name as text)* |
+| `company_name` | Displayed in sidebar + browser tab title | `Digital Employees` |
+| `accent_color` | Hex color used for buttons, active states, accent highlights | `#FF4500` |
+| `favicon_url` | URL of your favicon | *(empty)* |
+
+The portal loads branding on startup. Changes take effect immediately after saving — no restart required.

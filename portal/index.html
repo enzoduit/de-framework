@@ -11,11 +11,39 @@
 /* ── RESET + TOKENS ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #0A0A0A; --surface: #141414; --surface2: #1C1C1C;
-  --border: rgba(255,255,255,0.08);
-  --text: #F0F0F0; --text-sec: #888; --text-muted: #555;
-  --accent: #FF4500; --green: #00C864; --yellow: #FFC800; --red: #FF4444;
-  --sidebar-w: 230px;
+  /* ── Light Theme ── */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #ebebed;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f0f2;
+  --border: #d1d1d6;
+  --border-light: #e5e5ea;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #8e8e93;
+  --accent: #FF4500;
+  --accent-hover: #e03d00;
+  --accent-dim: rgba(255,69,0,0.1);
+  --accent-dim2: rgba(255,69,0,0.05);
+  --success: #30d158;
+  --warning: #ff9f0a;
+  --danger: #ff453a;
+  --info: #0a84ff;
+  --sidebar-bg: #f5f5f7;
+  --sidebar-width: 260px;
+  --header-height: 56px;
+  --font-mono: 'JetBrains Mono', monospace;
+  /* ── Backward-compat aliases (existing CSS uses these names) ── */
+  --bg: var(--bg-primary);
+  --surface: var(--bg-secondary);
+  --surface2: var(--bg-tertiary);
+  --text: var(--text-primary);
+  --text-sec: var(--text-secondary);
+  --green: var(--success);
+  --yellow: var(--warning);
+  --red: var(--danger);
+  --sidebar-w: var(--sidebar-width);
 }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.5; overflow: hidden; }
 .mono { font-family: 'JetBrains Mono', monospace; }
@@ -39,6 +67,11 @@ textarea, input, select { font-family: inherit; }
 .sidebar-logo {
   font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
   color: var(--text); letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px;
+}
+.brand-logo {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;
+  color: var(--text-primary); letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 6px; user-select: none;
 }
 .logo-dot { color: var(--accent); font-size: 16px; }
 .btn-new {
@@ -396,7 +429,7 @@ textarea, input, select { font-family: inherit; }
   border:2px solid transparent; transition:border-color 0.15s, transform 0.1s;
 }
 .color-swatch:hover { transform:scale(1.1); }
-.color-swatch.sel { border-color:#fff; }
+.color-swatch.sel { border-color: var(--text-primary); }
 .list-builder { display:flex; flex-direction:column; gap:5px; margin-bottom:6px; }
 .list-row { display:flex; gap:8px; align-items:center; }
 .list-row input {
@@ -613,7 +646,7 @@ textarea, input, select { font-family: inherit; }
 /* ── TIMELINE ── */
 .timeline { display: flex; flex-direction: column; }
 .tl-step { display: flex; gap: 10px; padding: 10px 0; }
-.tl-step:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,0.04); }
+.tl-step:not(:last-child) { border-bottom: 1px solid var(--border-light); }
 .tl-icon {
   width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center;
   justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px;
@@ -744,7 +777,7 @@ textarea, input, select { font-family: inherit; }
 <!-- ═══ SIDEBAR ═══ -->
 <aside id="sidebar">
   <div class="sidebar-header">
-    <div class="sidebar-logo"><span class="logo-dot">⚡</span>DE FRAMEWORK</div>
+    <div id="brand-logo" class="brand-logo">⚡ Digital Employees</div>
     <div style="display:flex;align-items:center;gap:6px">
       <button class="btn-gear" id="btn-tool-library" onclick="openToolLibrary()" title="Tool Library">&#9881;</button>
       <button class="btn-new" onclick="openCreate()">+ NEW</button>
@@ -918,6 +951,25 @@ textarea, input, select { font-family: inherit; }
           <button class="cred-set-btn" onclick="addCredential()">+ Save</button>
         </div>
         <div id="cred-add-status" style="font-size:11px;font-family:'JetBrains Mono',monospace;margin-top:6px;min-height:16px"></div>
+      </div>
+
+      <!-- 🎨 Branding -->
+      <div class="branding-section" style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+        <div class="cred-manager-title">🎨 Branding</div>
+        <div class="settings-field">
+          <label>LOGO URL</label>
+          <input class="settings-input" id="b-logo" type="url" placeholder="https://example.com/logo.png" autocomplete="off">
+        </div>
+        <div class="settings-field">
+          <label>COMPANY NAME</label>
+          <input class="settings-input" id="b-company" type="text" placeholder="Digital Employees" autocomplete="off">
+        </div>
+        <div class="settings-field">
+          <label>ACCENT COLOR</label>
+          <input id="b-color" type="color" value="#FF4500" style="width:56px;height:36px;padding:3px 4px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:none">
+        </div>
+        <button class="btn-test" onclick="saveBranding()">Save Branding</button>
+        <div id="b-status" style="font-size:12px;font-family:'JetBrains Mono',monospace;margin-top:8px;min-height:20px"></div>
       </div>
     </div>
     <div class="settings-footer" style="padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px">
@@ -1129,7 +1181,7 @@ async function apiFetch(path,options={}){
   const hdrs={'Content-Type':'application/json','Authorization':'Bearer '+cfg.token,...(options.headers||{})};
   return fetch(url,{...options,headers:hdrs});
 }
-function openSettings(){const cfg=getBackendConfig();const inp=$('s-url');if(inp)inp.value=cfg.url||'';const tok=$('s-token');if(tok)tok.value=cfg.token||'';const st=$('s-test-status');if(st){st.textContent='';st.style.color='';}$('settings-panel').classList.add('open');loadCredentialManager();}
+function openSettings(){const cfg=getBackendConfig();const inp=$('s-url');if(inp)inp.value=cfg.url||'';const tok=$('s-token');if(tok)tok.value=cfg.token||'';const st=$('s-test-status');if(st){st.textContent='';st.style.color='';}$('settings-panel').classList.add('open');loadCredentialManager();loadBrandingInputs();}
 function closeSettings(){$('settings-panel').classList.remove('open');}
 
 // ── Credential Manager ──────────────────────────────────────────────────────
@@ -1453,7 +1505,7 @@ async function loadSteps(de,sid,el){
 function renderStep(step){
   const cfg={
     trigger:{l:'TRIGGER',c:'#6366f1',bg:'rgba(99,102,241,0.07)'},
-    reasoning:{l:'THINKING',c:'var(--text-muted)',bg:'rgba(255,255,255,0.02)'},
+    reasoning:{l:'THINKING',c:'var(--text-muted)',bg:'var(--bg-secondary)'},
     action:{l:'ACTION',c:'var(--accent)',bg:'rgba(255,69,0,0.07)'},
     observation:{l:'RESULT',c:'var(--green)',bg:'rgba(0,200,100,0.07)'},
     decision_request:{l:'⏳ DECISION NEEDED',c:'var(--yellow)',bg:'rgba(255,200,0,0.07)'},
@@ -2449,11 +2501,71 @@ function renderSparkline(history, color) {
   return `<svg width="${W}" height="${H}" style="display:block;margin-top:10px;overflow:visible"><polyline points="${pts}" fill="none" stroke="${color||'var(--accent)'}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
+/* ═══ BRANDING ═══ */
+async function loadBranding() {
+  try {
+    if (!isBackendConfigured()) return;
+    const r = await apiFetch('/api/branding');
+    if (!r.ok) return;
+    const cfg = await r.json();
+    // Logo top-left in sidebar
+    const logoEl = $('brand-logo');
+    if (logoEl) {
+      if (cfg.logo_url) {
+        logoEl.innerHTML = `<img src="${cfg.logo_url}" alt="${esc(cfg.company_name||'')}" style="height:32px;object-fit:contain;max-width:180px;">`;
+      } else {
+        logoEl.textContent = cfg.company_name || 'Digital Employees';
+      }
+    }
+    // Accent color override
+    if (cfg.accent_color) {
+      document.documentElement.style.setProperty('--accent', cfg.accent_color);
+      document.documentElement.style.setProperty('--accent-hover', cfg.accent_color + 'cc');
+      document.documentElement.style.setProperty('--accent-dim', cfg.accent_color + '1a');
+    }
+    // Page title
+    document.title = (cfg.company_name || 'Digital Employees') + ' — DE Portal';
+  } catch(e) { /* use defaults */ }
+}
+
+async function loadBrandingInputs() {
+  try {
+    if (!isBackendConfigured()) return;
+    const r = await apiFetch('/api/branding');
+    if (!r.ok) return;
+    const cfg = await r.json();
+    const logoInp = $('b-logo'); if (logoInp) logoInp.value = cfg.logo_url || '';
+    const companyInp = $('b-company'); if (companyInp) companyInp.value = cfg.company_name || '';
+    const colorInp = $('b-color'); if (colorInp && cfg.accent_color) colorInp.value = cfg.accent_color;
+  } catch(e) {}
+}
+
+async function saveBranding() {
+  const logo = ($('b-logo')||{}).value || '';
+  const company = ($('b-company')||{}).value || '';
+  const color = ($('b-color')||{}).value || '#FF4500';
+  const status = $('b-status');
+  if (status) { status.textContent = 'Saving…'; status.style.color = 'var(--text-muted)'; }
+  try {
+    const r = await apiFetch('/api/branding', {
+      method: 'POST',
+      body: JSON.stringify({ logo_url: logo, company_name: company, accent_color: color }),
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error');
+    await loadBranding();
+    if (status) { status.textContent = '✅ Saved'; status.style.color = 'var(--success)'; setTimeout(() => { if(status) status.textContent = ''; }, 3000); }
+  } catch(e) {
+    if (status) { status.textContent = '✖ ' + (e.message||'Error'); status.style.color = 'var(--danger)'; }
+  }
+}
+
 /* ═══ INIT ═══ */
 loadList();
 setInterval(loadList,60000);
 setInterval(() => { if (selectedDE && $('dtab-metrics') && $('dtab-metrics').classList.contains('active')) loadMetrics(selectedDE); }, 30000);
 updateGearIcon();
+loadBranding();
 // Open settings on first load if no backend configured
 if(!isBackendConfigured()){setTimeout(openSettings,800);}
 </script>
