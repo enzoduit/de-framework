@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 AGENTS_DIR = Path('/var/de-agents')
+CUSTOM_TOOLS_DIR = Path('/var/de-framework-tools')
 
 
 def _now_iso():
@@ -379,6 +380,72 @@ TOOL_LIBRARY = {
 }
 
 
+# ─── Custom tool support ─────────────────────────────────────────────────────
+
+def make_custom_tool_fn(script: str, script_args: list = None):
+    """
+    Factory: returns a callable that runs a custom script as a tool.
+
+    Execution model:
+      - Static argv: [script] + script_args (e.g. ["/usr/bin/bash", "-c", "..."])
+      - Per-call args: each key in the input dict is exported as ARG_<KEY>=<value>
+      - Output: {exit_code, output} mirroring exec_shell
+    """
+    _args = list(script_args or [])
+
+    def _fn(inp: dict) -> dict:
+        import os as _os
+        env = dict(_os.environ)
+        # Pass input dict as env vars (ARG_DATE=..., ARG_QUERY=..., etc.)
+        for k, v in (inp or {}).items():
+            env[f'ARG_{k.upper()}'] = str(v)
+        cmd = [script] + _args
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True,
+                timeout=120, cwd='/root', env=env,
+            )
+            out = (result.stdout or '') + (result.stderr or '')
+            return {'exit_code': result.returncode, 'output': out[:4000]}
+        except subprocess.TimeoutExpired:
+            return {'error': 'Custom tool timed out after 120s'}
+        except FileNotFoundError:
+            return {'error': f'Script not found: {script}'}
+        except Exception as e:
+            return {'error': str(e)}
+
+    return _fn
+
+
+def _load_and_register_custom_tools() -> None:
+    """
+    Scan CUSTOM_TOOLS_DIR for *.json definitions and inject each into TOOL_LIBRARY.
+    Called once at module init; re-importing the module (in session_runner subprocess)
+    will pick up any tools registered since the server started.
+    """
+    if not CUSTOM_TOOLS_DIR.exists():
+        return
+    for f in sorted(CUSTOM_TOOLS_DIR.glob('*.json')):
+        try:
+            data = json.loads(f.read_text())
+            tool_id = (data.get('id') or '').strip()
+            script   = (data.get('script') or '').strip()
+            if not tool_id or not script:
+                continue
+            schema = data.get('args_schema') or {}
+            if not schema.get('type'):
+                schema = {'type': 'object', 'properties': {}}
+            TOOL_LIBRARY[tool_id] = {
+                'name':         tool_id,
+                'description':  data.get('description', f'Custom tool: {tool_id}'),
+                'input_schema': schema,
+                'fn':           make_custom_tool_fn(script, data.get('script_args', [])),
+                'source':       'custom',
+            }
+        except Exception as e:
+            print(f'[tool_implementations] Could not load custom tool {f.name}: {e}')
+
+
 def get_tool_defs(tool_ids: list) -> list:
     """
     Convert a list of tool ID strings (from de.json) to full tool dicts
@@ -399,3 +466,9 @@ def get_tool_defs(tool_ids: list) -> list:
         else:
             print(f'[tool_implementations] Unexpected tool entry type: {type(tid)} — skipping')
     return result
+
+
+# ─── Register custom tools at module init ────────────────────────────────────
+# Runs when the module is first imported (server startup and each session_runner
+# subprocess). Picks up any *.json files already in CUSTOM_TOOLS_DIR.
+_load_and_register_custom_tools()

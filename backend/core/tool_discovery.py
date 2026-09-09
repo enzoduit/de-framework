@@ -25,6 +25,7 @@ from urllib.error import URLError
 OPENCLAW_GATEWAY_URL = os.environ.get('OPENCLAW_GATEWAY_URL', '')
 OPENCLAW_GATEWAY_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
 AGENTS_DIR = pathlib.Path(os.environ.get('AGENTS_DIR', '/var/de-agents'))
+CUSTOM_TOOLS_DIR = pathlib.Path('/var/de-framework-tools')
 
 # ── Required tool IDs — always present for every DE ─────────────────────────
 REQUIRED_TOOL_IDS = {"request_human_decision", "ask_colleague", "report_to_colleague"}
@@ -64,6 +65,42 @@ DEFAULT_TOOL_LIBRARY = [
     {"id": "report_to_colleague",    "name": "report_to_colleague",    "description": "Send a result/update to another Digital Employee",       "icon": "📢"},
     {"id": "request_human_decision", "name": "request_human_decision", "description": "Escalate a decision to the human owner",                 "icon": "🙋"},
 ]
+
+
+def load_custom_tools() -> list:
+    """
+    Load custom tool definitions from CUSTOM_TOOLS_DIR (*.json).
+    Required fields per file: id, name, description, script.
+    Returns list of tool dicts with source='custom'.
+    Always reads from disk (not cached) so newly registered tools appear immediately.
+    """
+    if not CUSTOM_TOOLS_DIR.exists():
+        return []
+
+    tools = []
+    for f in sorted(CUSTOM_TOOLS_DIR.glob('*.json')):
+        try:
+            data = json.loads(f.read_text())
+            # Validate required fields
+            missing = [k for k in ('id', 'name', 'description', 'script') if not data.get(k)]
+            if missing:
+                print(f'[tool_discovery] {f.name}: missing required fields {missing} — skipping')
+                continue
+            tools.append({
+                'id':          data['id'],
+                'name':        data['name'],
+                'description': data['description'],
+                'icon':        data.get('icon', '🔧'),
+                'script':      data['script'],
+                'script_args': data.get('script_args', []),
+                'args_schema': data.get('args_schema', {}),
+                'source':      'custom',
+                'required':    False,
+            })
+        except Exception as e:
+            print(f'[tool_discovery] Could not load {f.name}: {e}')
+
+    return tools
 
 
 def _now_iso() -> str:
@@ -143,9 +180,12 @@ def get_tools(force_rediscover: bool = False) -> dict:
                 for t in DEFAULT_TOOL_LIBRARY:
                     if t['id'] in REQUIRED_TOOL_IDS and t['id'] not in cached_ids:
                         cached['tools'].append(dict(t))
-                # Mark required flag
+                # Mark required flag on core tools
                 for t in cached['tools']:
                     t['required'] = t['id'] in REQUIRED_TOOL_IDS
+                # Remove any stale custom entries from cache, then add fresh ones
+                cached['tools'] = [t for t in cached['tools'] if t.get('source') != 'custom']
+                cached['tools'] += load_custom_tools()
                 return cached
         except Exception:
             pass
@@ -170,11 +210,14 @@ def get_tools(force_rediscover: bool = False) -> dict:
         'openclaw_url': OPENCLAW_GATEWAY_URL or None,
     }
 
-    # Write cache
+    # Write cache (core tools only — custom tools are always loaded fresh)
     try:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps(result, indent=2, ensure_ascii=False))
     except Exception as e:
         print(f'[tool_discovery] Could not write cache: {e}')
+
+    # Merge custom tools (always fresh, never cached)
+    result['tools'] += load_custom_tools()
 
     return result

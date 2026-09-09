@@ -10,6 +10,8 @@ from pathlib import Path
 from backend.config import AGENTS_BASE, DE_NAMES, now_iso
 from backend.core.tool_discovery import get_tools as _get_tools, REQUIRED_TOOL_IDS
 
+CUSTOM_TOOLS_DIR = Path('/var/de-framework-tools')
+
 # session_runner.py lives in backend/core/
 _BACKEND_DIR = Path(__file__).parent.parent  # backend/
 
@@ -841,6 +843,71 @@ def handle_tools_rediscover(handler):
     """POST /tools/rediscover — force-refresh tool list from OpenClaw."""
     result = _get_tools(force_rediscover=True)
     return handler.send_json(200, {**result, 'refreshed': True})
+
+
+def handle_tools_register(handler, body: dict):
+    """POST /api/tools/register — register a new custom tool from a JSON definition.
+
+    Required body fields: id, name, description, script
+    Optional: icon, script_args, args_schema
+    Creates /var/de-framework-tools/{id}.json.
+    Returns 409 if already exists, 400 if required fields missing.
+    """
+    # Validate required fields
+    required_fields = ('id', 'name', 'description', 'script')
+    missing = [f for f in required_fields if not (body.get(f) or '').strip()]
+    if missing:
+        return handler.send_json(400, {
+            'ok': False,
+            'error': f'Missing required fields: {', '.join(missing)}',
+        })
+
+    tool_id = body['id'].strip()
+    # Validate id format: alphanumeric + underscores + hyphens
+    import re as _re
+    if not _re.match(r'^[a-zA-Z][a-zA-Z0-9_-]{0,62}$', tool_id):
+        return handler.send_json(400, {
+            'ok': False,
+            'error': 'id must start with a letter and contain only alphanumeric, underscore, or hyphen chars',
+        })
+
+    CUSTOM_TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = CUSTOM_TOOLS_DIR / f'{tool_id}.json'
+
+    if out_path.exists():
+        return handler.send_json(409, {
+            'ok': False,
+            'error': f'Custom tool "{tool_id}" already exists — delete {out_path} to re-register',
+        })
+
+    tool = {
+        'id':          tool_id,
+        'name':        (body.get('name') or tool_id).strip(),
+        'description': body['description'].strip(),
+        'icon':        (body.get('icon') or '🔧').strip(),
+        'script':      body['script'].strip(),
+        'script_args': body.get('script_args', []),
+        'args_schema': body.get('args_schema', {}),
+    }
+    out_path.write_text(json.dumps(tool, indent=2, ensure_ascii=False))
+
+    # Immediately register into the running server's TOOL_LIBRARY
+    try:
+        from backend.core.tool_implementations import make_custom_tool_fn, TOOL_LIBRARY
+        schema = tool['args_schema'] or {}
+        if not schema.get('type'):
+            schema = {'type': 'object', 'properties': {}}
+        TOOL_LIBRARY[tool_id] = {
+            'name':         tool_id,
+            'description':  tool['description'],
+            'input_schema': schema,
+            'fn':           make_custom_tool_fn(tool['script'], tool['script_args']),
+            'source':       'custom',
+        }
+    except Exception as e:
+        print(f'[handle_tools_register] Live-register failed (tool saved but not hot-loaded): {e}')
+
+    return handler.send_json(201, {'ok': True, 'tool': {**tool, 'source': 'custom'}})
 
 
 def handle_de_tools_patch(handler, de_name: str, body: dict):

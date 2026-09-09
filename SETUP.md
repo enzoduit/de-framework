@@ -411,6 +411,105 @@ curl -s -X POST $BASE/api/des \
 
 ---
 
+## Adding Custom Tools
+
+Custom tools let you expose any shell script or Python script as a callable tool that appears in the Tool Library and can be enabled for any DE.
+
+Tool definitions live in `/var/de-framework-tools/` — one JSON file per tool.
+
+### Option A — Drop a JSON file directly
+
+1. Copy your script to an accessible path:
+   ```bash
+   cp /my/scripts/meta_report.sh /home/user/scripts/meta_report.sh
+   chmod +x /home/user/scripts/meta_report.sh
+   ```
+
+2. Create a definition file:
+   ```bash
+   cat > /var/de-framework-tools/meta_performance.json << 'EOF'
+   {
+     "id": "meta_performance",
+     "name": "meta_performance",
+     "description": "Run the Meta Ads performance daily report",
+     "icon": "📊",
+     "script": "/home/user/scripts/meta_report.sh",
+     "args_schema": {
+       "type": "object",
+       "properties": {
+         "date": {"type": "string", "description": "Date to run for (YYYY-MM-DD), defaults to yesterday"}
+       }
+     }
+   }
+   EOF
+   ```
+
+3. Click **🔄 Rediscover** in the portal Tool Library — your tool appears instantly.
+
+4. Open any DE profile → Tools → **+ Add** to enable it.
+
+### Option B — POST /api/tools/register
+
+```bash
+curl -s -X POST http://127.0.0.1:8769/api/tools/register \
+  -H "Authorization: Bearer $DE_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "meta_performance",
+    "name": "meta_performance",
+    "description": "Run Meta Ads performance daily report",
+    "icon": "📊",
+    "script": "/home/user/scripts/meta_report.sh",
+    "args_schema": {}
+  }'
+```
+
+Response: `{"ok": true, "tool": {..., "source": "custom"}}`
+
+Error codes: `400` missing fields, `409` tool ID already exists.
+
+### Tool definition fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | ✅ | Unique identifier (alphanumeric + `_` `-`; starts with a letter) |
+| `name` | ✅ | Display name (usually same as `id`) |
+| `description` | ✅ | Shown to DEs — describe what the tool does and when to call it |
+| `script` | ✅ | Absolute path to the executable (`/usr/bin/python3`, `/bin/bash`, etc.) |
+| `icon` | no | Emoji icon shown in Tool Library (default 🔧) |
+| `script_args` | no | Static argv appended after the script path (e.g. `["-c", "..."]`) |
+| `args_schema` | no | JSON Schema for per-call arguments; passed as `ARG_<KEY>=value` env vars |
+
+### How arguments reach your script
+
+When a DE calls a custom tool with arguments (e.g. `{"date": "2026-09-01"}`), the DE Framework:
+1. Runs `[script] + script_args` as a subprocess
+2. Exports each input field as an environment variable: `ARG_DATE=2026-09-01`
+
+Your script reads them like any env var:
+```bash
+#!/bin/bash
+DATE=${ARG_DATE:-$(date -d yesterday +%Y-%m-%d)}
+echo "Running report for $DATE"
+```
+
+or in Python:
+```python
+import os
+date = os.environ.get('ARG_DATE') or 'yesterday'
+```
+
+### Removing a custom tool
+
+```bash
+rm /var/de-framework-tools/meta_performance.json
+# Then click Rediscover in portal to clear it from the Tool Library
+```
+
+Note: removing the definition file does not remove the tool from any DE's `de.json` tools list. Edit DE profiles manually via PATCH `/de/<name>/tools` if needed.
+
+---
+
 ## Troubleshooting
 
 ### Backend not starting

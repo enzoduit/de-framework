@@ -194,6 +194,9 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/de/setup-chat':
             return setup_routes.handle_setup_chat(self, body)
 
+        if path == '/api/tools/register':
+            return de_routes.handle_tools_register(self, body)
+
         # POST /de/<name>/schedule — add/update a scheduled activity
         if (len(parts) == 3 and parts[0] == 'de'
                 and parts[2] == 'schedule'):

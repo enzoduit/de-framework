@@ -670,8 +670,12 @@ textarea, input, select { font-family: inherit; }
 .tool-library-grid{flex:1;overflow-y:auto;padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;align-content:start;}
 .tool-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;transition:border-color 0.15s;}
 .tool-card:hover{border-color:var(--accent);}
+.tool-card-custom{border-color:rgba(99,102,241,0.35);}
+.tool-card-custom:hover{border-color:#6366f1;}
 .tool-card-icon{font-size:22px;margin-bottom:8px;}
-.tool-card-name{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;}
+.tool-card-name{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.tool-card-badge-custom{font-size:8px;font-weight:700;font-family:'JetBrains Mono',monospace;background:rgba(99,102,241,0.15);color:#6366f1;border:1px solid rgba(99,102,241,0.3);border-radius:3px;padding:1px 5px;letter-spacing:0.04em;}
+.tool-card-script{font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-top:6px;word-break:break-all;}
 .tool-card-desc{font-size:12px;color:var(--text-sec);line-height:1.5;}
 /* ── TOOL CHIPS (profile) ── */
 .tool-chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-sec);}
@@ -2131,16 +2135,23 @@ async function renderToolLibrary(force=false) {
     grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;grid-column:1/-1">Could not load tool library. Check backend connection (⚙).</div>';
     return;
   }
-  grid.innerHTML = tools.map(t => `
-    <div class="tool-card">
+  const customCount = tools.filter(t => t.source === 'custom').length;
+  grid.innerHTML = tools.map(t => {
+    const isCustom = t.source === 'custom';
+    const badge = isCustom ? `<span class="tool-card-badge-custom">CUSTOM</span>` : '';
+    const scriptHint = isCustom && t.script ? `<div class="tool-card-script" title="${esc(t.script)}">📂 ${esc(t.script)}</div>` : '';
+    return `<div class="tool-card${isCustom ? ' tool-card-custom' : ''}" title="${isCustom ? 'Custom tool · ' + (t.script||'') : ''}">
       <div class="tool-card-icon">${t.icon || '🔧'}</div>
-      <div class="tool-card-name">${esc(t.id)}</div>
+      <div class="tool-card-name">${esc(t.id)}${badge}</div>
       <div class="tool-card-desc">${esc(t.description)}</div>
-    </div>`).join('');
+      ${scriptHint}
+    </div>`;
+  }).join('');
   if (footer && _toolLibraryCache) {
     const src = _toolLibraryCache.source === 'openclaw' ? '🟢 From OpenClaw installation' : '⚪ Default (OpenClaw not reached)';
     const ts = _toolLibraryCache.discovered_at ? new Date(_toolLibraryCache.discovered_at).toLocaleString() : '';
-    footer.innerHTML = `<span>${src}${ts ? ' · ' + ts : ''}</span>`;
+    const customBit = customCount > 0 ? ` · 🔧 ${customCount} custom tool${customCount > 1 ? 's' : ''}` : '';
+    footer.innerHTML = `<span>${src}${ts ? ' · ' + ts : ''}${customBit}</span>`;
   }
 }
 
@@ -2166,7 +2177,10 @@ function renderToolChips(allTools) {
     if (isRequired) {
       return `<span class="tool-chip tool-chip-required"><span class="tool-lock">🔒</span>${t ? t.icon + ' ' : ''}${esc(toolId)}</span>`;
     }
-    return `<span class="tool-chip">${t ? t.icon + ' ' : ''}${esc(toolId)}<button class="tool-chip-rm" onclick="removeToolFromDE('${toolId}')" title="Remove">×</button></span>`;
+    const isCustom = t && t.source === 'custom';
+    const customMark = isCustom ? ' 🔧' : '';
+    const customTitle = isCustom ? ` title="Custom tool · ${t.script || ''}"` : '';
+    return `<span class="tool-chip"${customTitle}>${t ? t.icon + ' ' : ''}${esc(toolId)}${customMark}<button class="tool-chip-rm" onclick="removeToolFromDE('${toolId}')" title="Remove">×</button></span>`;
   }).join('');
   const addOpts = disabled.length
     ? disabled.map(t => `<div class="tool-add-item" onclick="addToolToDE('${t.id}')">${t.icon} ${esc(t.id)}</div>`).join('')
