@@ -556,6 +556,73 @@ curl -s http://127.0.0.1:8769/trigger-scheduled
 
 ---
 
+## Credential Management
+
+Custom tool scripts can require API keys without storing them in plaintext. The framework encrypts all credentials at rest using **AES-256 (Fernet)** with a key derived from `DE_API_TOKEN` via PBKDF2 — no separate key file needed.
+
+### How it works
+
+1. **Declare credentials in your tool JSON** — add `required_credentials` to the tool definition:
+
+```json
+{
+  "id": "meta_performance",
+  "name": "Meta Performance Reporter",
+  "description": "Pulls Meta Ads performance data",
+  "script": "/var/de-framework-tools/meta_performance.sh",
+  "required_credentials": ["META_API_KEY", "META_AD_ACCOUNT_ID"]
+}
+```
+
+2. **Set credentials** — via portal (Tool Library → click ⚠ missing) or API:
+
+```bash
+# Via API
+source /etc/de-framework.env
+curl -s -X POST \
+  -H "Authorization: Bearer $DE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"META_API_KEY","value":"your-key","description":"Meta Ads API Key"}' \
+  http://127.0.0.1:8769/api/credentials
+```
+
+3. **Runtime injection** — when a DE runs the tool, credentials are decrypted and passed as environment variables to the script. They are **never logged, never stored in session files, never appear in plaintext**.
+
+```bash
+# Inside your script, use them as normal env vars:
+echo "Running with account: $META_AD_ACCOUNT_ID"
+curl -H "Authorization: Bearer $META_API_KEY" ...
+```
+
+4. **Portal credential status** — the Tool Library shows ✅ set or ⚠ missing for each credential. Click ⚠ to set inline.
+
+### API Reference
+
+```bash
+# List all credentials (metadata only — values never returned)
+curl -H "Authorization: Bearer $DE_API_TOKEN" http://127.0.0.1:8769/api/credentials
+
+# Store a credential
+curl -X POST -H "Authorization: Bearer $DE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"SOME_KEY","value":"secret123","description":"Optional description"}' \
+  http://127.0.0.1:8769/api/credentials
+
+# Delete a credential
+curl -X DELETE -H "Authorization: Bearer $DE_API_TOKEN" \
+  http://127.0.0.1:8769/api/credentials/SOME_KEY
+```
+
+### Security notes
+
+- **Encryption**: AES-256 via Python `cryptography` Fernet. Key = PBKDF2(DE_API_TOKEN, salt=`de-framework-creds`, 100,000 iterations).
+- **Storage**: `/var/de-framework-credentials/{ID}.enc` — one file per credential, binary. Metadata index (`index.json`) never stores values.
+- **Runtime**: decrypted in-memory only, passed as subprocess env vars. Not stored in session JSON, logs, or anywhere else.
+- **Rotation**: changing `DE_API_TOKEN` invalidates all existing `.enc` files (they can no longer be decrypted). Re-set credentials after token rotation.
+- **Dependency**: `pip install cryptography` — already in `requirements.txt`.
+
+---
+
 ## File layout after setup
 
 ```
@@ -576,4 +643,12 @@ curl -s http://127.0.0.1:8769/trigger-scheduled
 /etc/nginx/sites-available/de-api
 /etc/cron.d/de-framework-scheduler
 /tmp/de-backend.log             ← Backend logs
+
+/var/de-framework-credentials/  ← Encrypted credential store
+  index.json                    ← Metadata (no values)
+  META_API_KEY.enc              ← AES-256 Fernet encrypted value
+  META_AD_ACCOUNT_ID.enc
+
+/var/de-framework-tools/        ← Custom tool definitions
+  meta_performance.json         ← Tool JSON (includes required_credentials)
 ```

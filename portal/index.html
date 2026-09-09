@@ -677,6 +677,30 @@ textarea, input, select { font-family: inherit; }
 .tool-card-badge-custom{font-size:8px;font-weight:700;font-family:'JetBrains Mono',monospace;background:rgba(99,102,241,0.15);color:#6366f1;border:1px solid rgba(99,102,241,0.3);border-radius:3px;padding:1px 5px;letter-spacing:0.04em;}
 .tool-card-script{font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-top:6px;word-break:break-all;}
 .tool-card-desc{font-size:12px;color:var(--text-sec);line-height:1.5;}
+.tool-card-creds{margin-top:8px;display:flex;flex-direction:column;gap:4px;}
+.cred-status-row{display:flex;align-items:center;gap:6px;font-size:10px;font-family:'JetBrains Mono',monospace;}
+.cred-badge-set{color:#22c55e;font-weight:700;}
+.cred-badge-missing{color:#f59e0b;font-weight:700;cursor:pointer;text-decoration:underline;}
+.cred-badge-missing:hover{color:#ef4444;}
+.cred-set-form{display:flex;gap:4px;margin-top:4px;}
+.cred-set-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);}
+.cred-set-input:focus{outline:none;border-color:var(--accent);}
+.cred-set-btn{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;cursor:pointer;}
+.cred-set-btn:hover{opacity:0.85;}
+/* Credential manager in settings */
+.cred-manager-section{margin-top:18px;}
+.cred-manager-title{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:0.05em;}
+.cred-manager-list{display:flex;flex-direction:column;gap:6px;min-height:28px;}
+.cred-manager-row{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;}
+.cred-manager-id{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--accent);flex:1;}
+.cred-manager-desc{font-size:11px;color:var(--text-muted);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cred-manager-del{background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;padding:0 2px;line-height:1;transition:color 0.15s;}
+.cred-manager-del:hover{color:var(--red);}
+.cred-manager-empty{font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;padding:4px 0;}
+.cred-add-row{display:flex;gap:6px;margin-top:8px;}
+.cred-add-id{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);letter-spacing:0.04em;}
+.cred-add-val{flex:2;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);}
+.cred-add-id:focus,.cred-add-val:focus{outline:none;border-color:var(--accent);}
 /* ── TOOL CHIPS (profile) ── */
 .tool-chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-sec);}
 .tool-chip-rm{background:none;border:none;color:var(--text-muted);font-size:13px;padding:0 0 0 2px;cursor:pointer;line-height:1;transition:color 0.15s;}
@@ -880,6 +904,21 @@ textarea, input, select { font-family: inherit; }
       </div>
       <button class="btn-test" onclick="testConn()" id="btn-test">Test connection</button>
       <div id="s-test-status" style="font-size:12px;font-family:'JetBrains Mono',monospace;margin-top:8px;min-height:20px"></div>
+
+      <!-- 🔑 Credential Manager -->
+      <div class="cred-manager-section">
+        <div class="cred-manager-title">🔑 Stored Credentials</div>
+        <div class="cred-manager-list" id="cred-manager-list">
+          <div class="cred-manager-empty">Loading…</div>
+        </div>
+        <div class="cred-add-row" style="margin-top:10px">
+          <input class="cred-add-id" id="cred-new-id" placeholder="API_KEY_NAME" autocomplete="off"
+            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9_]/g,'')">
+          <input class="cred-add-val" id="cred-new-val" type="password" placeholder="value" autocomplete="new-password">
+          <button class="cred-set-btn" onclick="addCredential()">+ Save</button>
+        </div>
+        <div id="cred-add-status" style="font-size:11px;font-family:'JetBrains Mono',monospace;margin-top:6px;min-height:16px"></div>
+      </div>
     </div>
     <div class="settings-footer" style="padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px">
       <button class="btn-prev" onclick="closeSettings()">Cancel</button>
@@ -1090,8 +1129,101 @@ async function apiFetch(path,options={}){
   const hdrs={'Content-Type':'application/json','Authorization':'Bearer '+cfg.token,...(options.headers||{})};
   return fetch(url,{...options,headers:hdrs});
 }
-function openSettings(){const cfg=getBackendConfig();const inp=$('s-url');if(inp)inp.value=cfg.url||'';const tok=$('s-token');if(tok)tok.value=cfg.token||'';const st=$('s-test-status');if(st){st.textContent='';st.style.color='';}$('settings-panel').classList.add('open');}
+function openSettings(){const cfg=getBackendConfig();const inp=$('s-url');if(inp)inp.value=cfg.url||'';const tok=$('s-token');if(tok)tok.value=cfg.token||'';const st=$('s-test-status');if(st){st.textContent='';st.style.color='';}$('settings-panel').classList.add('open');loadCredentialManager();}
 function closeSettings(){$('settings-panel').classList.remove('open');}
+
+// ── Credential Manager ──────────────────────────────────────────────────────
+async function loadCredentialManager() {
+  const list = $('cred-manager-list');
+  if (!list) return;
+  list.innerHTML = '<div class="cred-manager-empty">Loading…</div>';
+  try {
+    const r = await apiFetch('/api/credentials');
+    const d = await r.json();
+    const creds = d.credentials || [];
+    if (!creds.length) {
+      list.innerHTML = '<div class="cred-manager-empty">No credentials stored yet.</div>';
+      return;
+    }
+    list.innerHTML = creds.map(c => `
+      <div class="cred-manager-row" id="cred-row-${esc(c.id)}">
+        <span class="cred-manager-id">🔑 ${esc(c.id)}</span>
+        <span class="cred-manager-desc">${esc(c.description || '')}${c.last_used ? ' • last used: ' + new Date(c.last_used).toLocaleDateString() : ''}</span>
+        <button class="cred-manager-del" onclick="deleteCredential('${esc(c.id)}')" title="Remove">×</button>
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = '<div class="cred-manager-empty" style="color:var(--red)">Could not load credentials.</div>';
+  }
+}
+
+async function addCredential() {
+  const idEl = $('cred-new-id'), valEl = $('cred-new-val'), statusEl = $('cred-add-status');
+  const id = (idEl?.value || '').trim().toUpperCase();
+  const val = valEl?.value || '';
+  if (!id || !val) { if(statusEl) { statusEl.textContent = '⚠ ID and value required'; statusEl.style.color='var(--red)'; } return; }
+  if(statusEl) { statusEl.textContent = 'Saving…'; statusEl.style.color='var(--text-muted)'; }
+  try {
+    const r = await apiFetch('/api/credentials', { method: 'POST', body: JSON.stringify({ id, value: val }) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error');
+    if(idEl) idEl.value = '';
+    if(valEl) valEl.value = '';
+    if(statusEl) { statusEl.textContent = '✅ Saved'; statusEl.style.color='var(--green)'; setTimeout(()=>{ if(statusEl)statusEl.textContent=''; }, 3000); }
+    await loadCredentialManager();
+    // Refresh tool library card statuses
+    _toolLibraryCache = null;
+    if ($('tool-library-overlay')?.classList.contains('open')) renderToolLibrary(false);
+  } catch(e) {
+    if(statusEl) { statusEl.textContent = '✖ ' + (e.message||'Error'); statusEl.style.color='var(--red)'; }
+  }
+}
+
+async function deleteCredential(credId) {
+  if (!confirm(`Delete credential ${credId}? Tools using it will stop working.`)) return;
+  try {
+    const r = await apiFetch(`/api/credentials/${encodeURIComponent(credId)}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error');
+    await loadCredentialManager();
+    _toolLibraryCache = null;
+    if ($('tool-library-overlay')?.classList.contains('open')) renderToolLibrary(false);
+  } catch(e) { alert('Delete failed: ' + (e.message||e)); }
+}
+
+// Inline set form in tool library card
+function openCredSetForm(credId, toolId, spanEl) {
+  const row = spanEl.closest('.cred-status-row');
+  if (!row) return;
+  // Don't add twice
+  if (row.querySelector('.cred-set-form')) { row.querySelector('.cred-set-input')?.focus(); return; }
+  const form = document.createElement('div');
+  form.className = 'cred-set-form';
+  form.innerHTML = `<input class="cred-set-input" type="password" placeholder="Enter value for ${esc(credId)}" autocomplete="new-password">
+    <button class="cred-set-btn" onclick="submitInlineCredForm('${esc(credId)}','${esc(toolId)}',this)">Save</button>`;
+  row.appendChild(form);
+  form.querySelector('input')?.focus();
+}
+
+async function submitInlineCredForm(credId, toolId, btn) {
+  const form = btn.closest('.cred-set-form');
+  const input = form?.querySelector('input');
+  const val = input?.value || '';
+  if (!val) { input?.focus(); return; }
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await apiFetch('/api/credentials', { method: 'POST', body: JSON.stringify({ id: credId, value: val }) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error');
+    // Update the row in place
+    const row = form.closest('.cred-status-row');
+    if (row) row.innerHTML = `🔑 <span class="cred-badge-set">✅ ${esc(credId)}</span>`;
+    // Invalidate cache so next open shows updated status
+    _toolLibraryCache = null;
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Save';
+    alert('Error saving credential: ' + (e.message||e));
+  }
+}
 async function saveSettings(){
   const url=($('s-url').value||'').trim().replace(/\/$/,'');
   const token=($('s-token').value||'').trim();
@@ -2140,11 +2272,24 @@ async function renderToolLibrary(force=false) {
     const isCustom = t.source === 'custom';
     const badge = isCustom ? `<span class="tool-card-badge-custom">CUSTOM</span>` : '';
     const scriptHint = isCustom && t.script ? `<div class="tool-card-script" title="${esc(t.script)}">📂 ${esc(t.script)}</div>` : '';
-    return `<div class="tool-card${isCustom ? ' tool-card-custom' : ''}" title="${isCustom ? 'Custom tool · ' + (t.script||'') : ''}">
+    // Credential status rows for custom tools
+    let credsHtml = '';
+    if (isCustom && t.required_credentials && t.required_credentials.length > 0) {
+      const rows = t.required_credentials.map(credId => {
+        const status = (t.credential_status || {})[credId] || 'missing';
+        if (status === 'set') {
+          return `<div class="cred-status-row">🔑 <span class="cred-badge-set">✅ ${esc(credId)}</span></div>`;
+        } else {
+          return `<div class="cred-status-row">🔑 <span class="cred-badge-missing" onclick="openCredSetForm('${esc(credId)}','${esc(t.id)}',this)" title="Click to set">⚠ ${esc(credId)} — click to set</span></div>`;
+        }
+      }).join('');
+      credsHtml = `<div class="tool-card-creds">${rows}</div>`;
+    }
+    return `<div class="tool-card${isCustom ? ' tool-card-custom' : ''}" title="${isCustom ? 'Custom tool · ' + (t.script||'') : ''}" data-tool-id="${esc(t.id)}">
       <div class="tool-card-icon">${t.icon || '🔧'}</div>
       <div class="tool-card-name">${esc(t.id)}${badge}</div>
       <div class="tool-card-desc">${esc(t.description)}</div>
-      ${scriptHint}
+      ${scriptHint}${credsHtml}
     </div>`;
   }).join('');
   if (footer && _toolLibraryCache) {

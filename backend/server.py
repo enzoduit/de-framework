@@ -29,6 +29,7 @@ from backend.routes import (
     system_routes,
     signup_routes,
     setup_routes,
+    creds_routes,
 )
 
 
@@ -97,6 +98,10 @@ class DEHandler(BaseHTTPRequestHandler):
 
         if len(parts) == 3 and parts[0] == 'api' and parts[1] == 'des':
             return de_routes.handle_api_des_get(self, parts[2])
+
+        # GET /api/credentials
+        if path == '/api/credentials':
+            return creds_routes.handle_credentials_get(self)
 
         if parts and parts[0] == 'de':
             return de_routes.handle_de_get(self, parts)
@@ -197,6 +202,9 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/api/tools/register':
             return de_routes.handle_tools_register(self, body)
 
+        if path == '/api/credentials':
+            return creds_routes.handle_credentials_post(self, body)
+
         # POST /de/<name>/schedule — add/update a scheduled activity
         if (len(parts) == 3 and parts[0] == 'de'
                 and parts[2] == 'schedule'):
@@ -250,6 +258,10 @@ class DEHandler(BaseHTTPRequestHandler):
         # DELETE /de/<name>/schedule/<sched_id>
         if len(parts) == 4 and parts[0] == 'de' and parts[2] == 'schedule':
             return de_routes.handle_schedule_delete(self, parts[1], parts[3])
+
+        # DELETE /api/credentials/<id>
+        if len(parts) == 3 and parts[0] == 'api' and parts[1] == 'credentials':
+            return creds_routes.handle_credentials_delete(self, parts[2])
 
         self.send_json(404, {'error': 'not found'})
 

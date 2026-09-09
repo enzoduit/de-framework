@@ -880,14 +880,19 @@ def handle_tools_register(handler, body: dict):
             'error': f'Custom tool "{tool_id}" already exists — delete {out_path} to re-register',
         })
 
+    required_creds = body.get('required_credentials', [])
+    if not isinstance(required_creds, list):
+        required_creds = []
+
     tool = {
-        'id':          tool_id,
-        'name':        (body.get('name') or tool_id).strip(),
-        'description': body['description'].strip(),
-        'icon':        (body.get('icon') or '🔧').strip(),
-        'script':      body['script'].strip(),
-        'script_args': body.get('script_args', []),
-        'args_schema': body.get('args_schema', {}),
+        'id':                   tool_id,
+        'name':                 (body.get('name') or tool_id).strip(),
+        'description':          body['description'].strip(),
+        'icon':                 (body.get('icon') or '🔧').strip(),
+        'script':               body['script'].strip(),
+        'script_args':          body.get('script_args', []),
+        'args_schema':          body.get('args_schema', {}),
+        'required_credentials': required_creds,
     }
     out_path.write_text(json.dumps(tool, indent=2, ensure_ascii=False))
 
@@ -898,11 +903,12 @@ def handle_tools_register(handler, body: dict):
         if not schema.get('type'):
             schema = {'type': 'object', 'properties': {}}
         TOOL_LIBRARY[tool_id] = {
-            'name':         tool_id,
-            'description':  tool['description'],
-            'input_schema': schema,
-            'fn':           make_custom_tool_fn(tool['script'], tool['script_args']),
-            'source':       'custom',
+            'name':                 tool_id,
+            'description':          tool['description'],
+            'input_schema':         schema,
+            'fn':                   make_custom_tool_fn(tool['script'], tool['script_args'], required_creds),
+            'source':               'custom',
+            'required_credentials': required_creds,
         }
     except Exception as e:
         print(f'[handle_tools_register] Live-register failed (tool saved but not hot-loaded): {e}')

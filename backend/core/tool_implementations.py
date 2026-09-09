@@ -382,20 +382,50 @@ TOOL_LIBRARY = {
 
 # ─── Custom tool support ─────────────────────────────────────────────────────
 
-def make_custom_tool_fn(script: str, script_args: list = None):
+def _decrypt_credentials(required_creds: list) -> tuple[dict, list]:
+    """
+    Decrypt required credentials and return (env_dict, missing_ids).
+    env_dict maps credential id → decrypted value (ready for subprocess env).
+    missing_ids lists any credentials that could not be decrypted.
+    """
+    from backend.routes.creds_routes import decrypt_credential, update_last_used
+    env_vals = {}
+    missing = []
+    for cred_id in required_creds:
+        value = decrypt_credential(cred_id)
+        if value is None:
+            missing.append(cred_id)
+        else:
+            env_vals[cred_id] = value
+            update_last_used(cred_id)
+    return env_vals, missing
+
+
+def make_custom_tool_fn(script: str, script_args: list = None, required_credentials: list = None):
     """
     Factory: returns a callable that runs a custom script as a tool.
 
     Execution model:
       - Static argv: [script] + script_args (e.g. ["/usr/bin/bash", "-c", "..."])
       - Per-call args: each key in the input dict is exported as ARG_<KEY>=<value>
+      - Credentials: each required credential is decrypted and injected as an env var
       - Output: {exit_code, output} mirroring exec_shell
     """
     _args = list(script_args or [])
+    _required_creds = list(required_credentials or [])
 
     def _fn(inp: dict) -> dict:
         import os as _os
         env = dict(_os.environ)
+        # Inject required credentials as env vars (decrypted — never logged)
+        if _required_creds:
+            cred_vals, missing = _decrypt_credentials(_required_creds)
+            if missing:
+                return {
+                    'error': f'Missing credential(s): {', '.join(missing)}. '
+                             f'Set them in the portal under Tool Library → 🔑 Credentials.'
+                }
+            env.update(cred_vals)
         # Pass input dict as env vars (ARG_DATE=..., ARG_QUERY=..., etc.)
         for k, v in (inp or {}).items():
             env[f'ARG_{k.upper()}'] = str(v)
@@ -435,12 +465,14 @@ def _load_and_register_custom_tools() -> None:
             schema = data.get('args_schema') or {}
             if not schema.get('type'):
                 schema = {'type': 'object', 'properties': {}}
+            required_creds = data.get('required_credentials', [])
             TOOL_LIBRARY[tool_id] = {
-                'name':         tool_id,
-                'description':  data.get('description', f'Custom tool: {tool_id}'),
-                'input_schema': schema,
-                'fn':           make_custom_tool_fn(script, data.get('script_args', [])),
-                'source':       'custom',
+                'name':                 tool_id,
+                'description':          data.get('description', f'Custom tool: {tool_id}'),
+                'input_schema':         schema,
+                'fn':                   make_custom_tool_fn(script, data.get('script_args', []), required_creds),
+                'source':               'custom',
+                'required_credentials': required_creds,
             }
         except Exception as e:
             print(f'[tool_implementations] Could not load custom tool {f.name}: {e}')

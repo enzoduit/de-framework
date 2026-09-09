@@ -67,6 +67,24 @@ DEFAULT_TOOL_LIBRARY = [
 ]
 
 
+def _compute_credential_status(required_creds: list) -> dict:
+    """
+    For each credential id in required_creds, check if the .enc file exists.
+    Returns dict like {"META_API_KEY": "set", "META_AD_ACCOUNT_ID": "missing"}.
+    """
+    try:
+        from backend.routes.creds_routes import credential_status, CREDS_DIR
+        return {cred_id: credential_status(cred_id) for cred_id in required_creds}
+    except Exception:
+        # Fallback: check file directly without importing creds_routes
+        import os as _os
+        creds_dir = pathlib.Path(_os.environ.get('DE_CREDS_DIR', '/var/de-framework-credentials'))
+        return {
+            cred_id: ('set' if (creds_dir / f'{cred_id}.enc').exists() else 'missing')
+            for cred_id in required_creds
+        }
+
+
 def load_custom_tools() -> list:
     """
     Load custom tool definitions from CUSTOM_TOOLS_DIR (*.json).
@@ -86,16 +104,19 @@ def load_custom_tools() -> list:
             if missing:
                 print(f'[tool_discovery] {f.name}: missing required fields {missing} — skipping')
                 continue
+            required_creds = data.get('required_credentials', [])
             tools.append({
-                'id':          data['id'],
-                'name':        data['name'],
-                'description': data['description'],
-                'icon':        data.get('icon', '🔧'),
-                'script':      data['script'],
-                'script_args': data.get('script_args', []),
-                'args_schema': data.get('args_schema', {}),
-                'source':      'custom',
-                'required':    False,
+                'id':                  data['id'],
+                'name':                data['name'],
+                'description':         data['description'],
+                'icon':                data.get('icon', '🔧'),
+                'script':              data['script'],
+                'script_args':         data.get('script_args', []),
+                'args_schema':         data.get('args_schema', {}),
+                'required_credentials': required_creds,
+                'credential_status':   _compute_credential_status(required_creds),
+                'source':              'custom',
+                'required':            False,
             })
         except Exception as e:
             print(f'[tool_discovery] Could not load {f.name}: {e}')
