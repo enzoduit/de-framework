@@ -51,7 +51,7 @@ button { cursor: pointer; font-family: inherit; border: none; }
 textarea, input, select { font-family: inherit; }
 
 /* ── APP SHELL ── */
-#app { display: flex; height: 100vh; overflow: hidden; }
+#app { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
 
 /* ── SIDEBAR ── */
 #sidebar {
@@ -608,7 +608,7 @@ textarea, input, select { font-family: inherit; }
 }
 .de-detail-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
 #dtab-sessions { display:none; }
-.de-detail-content { display:none; flex:1; flex-direction:column; overflow:hidden; }
+.de-detail-content { display:none; flex:1; min-height:0; flex-direction:column; overflow:hidden; }
 .de-detail-content.active { display:flex; }
 
 /* ── WORK SESSION CARDS ── */
@@ -732,6 +732,9 @@ textarea, input, select { font-family: inherit; }
   .progress-layout { flex-direction:column; }
   .prog-sessions { width:100%; height:180px; border-right:none; border-bottom:1px solid var(--border); }
   .f-row { grid-template-columns:1fr; }
+  /* workspace toolbar always visible on mobile */
+  .workspace-toolbar { position:sticky; bottom:0; left:0; right:0; z-index:10; }
+  .workspace-scroll { padding-bottom:4px; }
   .de-sessions-panel-hdr { padding:8px 12px; }
   .de-sessions-label { font-size:8px; }
 }
@@ -937,7 +940,7 @@ textarea, input, select { font-family: inherit; }
           <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFILE</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
           <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRICS</button>
-          <button class="de-detail-tab" id="dtab-workspace" onclick="switchDetailTab('workspace')">📁 WORKSPACE</button>
+          <button class="de-detail-tab" id="dtab-workspace" onclick="switchDetailTab('workspace')">📁 FILES</button>
           <button class="de-detail-tab" id="dtab-sessions" onclick="switchDetailTab('sessions')">📋 SESSIONS</button>
         </div>
 
