@@ -26,6 +26,15 @@ def init_db():
             timestamp TEXT DEFAULT (datetime('now'))
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            de_name TEXT NOT NULL,
+            session_id TEXT NOT NULL UNIQUE,
+            summary TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -79,3 +88,28 @@ def get_recent_feedback(de_name: str, limit: int = 5) -> list[dict]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+# ── Session Summary Cache ────────────────────────────────────────────────────
+
+def get_summary(de_name: str, session_id: str) -> str | None:
+    """Return cached LLM summary for a session, or None if not cached."""
+    conn = sqlite3.connect(str(_db_path()))
+    row = conn.execute(
+        'SELECT summary FROM summaries WHERE de_name = ? AND session_id = ?',
+        (de_name, session_id),
+    ).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+def store_summary(de_name: str, session_id: str, summary: str) -> None:
+    """Store an LLM-generated summary for a session (upsert by session_id)."""
+    conn = sqlite3.connect(str(_db_path()))
+    conn.execute(
+        'INSERT OR REPLACE INTO summaries (de_name, session_id, summary) '
+        'VALUES (?, ?, ?)',
+        (de_name, session_id, summary),
+    )
+    conn.commit()
+    conn.close()

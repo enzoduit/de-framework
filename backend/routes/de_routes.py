@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.request import urlopen, Request as _URLRequest
 from backend.config import AGENTS_BASE, DE_NAMES, now_iso
 from backend.core.tool_discovery import get_tools as _get_tools, REQUIRED_TOOL_IDS
-from backend.core.feedback_db import store_feedback, get_feedback, mark_applied
+from backend.core.feedback_db import store_feedback, get_feedback, mark_applied, get_summary, store_summary
 
 _OPENCLAW_GATEWAY_URL = os.environ.get('OPENCLAW_GATEWAY_URL', 'http://127.0.0.1:18789')
 _OPENCLAW_GATEWAY_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
@@ -771,6 +771,69 @@ def handle_de_list(handler):
     return handler.send_json(200, {'des': des, 'ts': now_iso()})
 
 
+def handle_session_summary(handler, de_name: str, session_id: str):
+    """GET /de/<name>/sessions/<session_id>/summary
+    Return an LLM-generated 1-2 sentence plain-English summary of the session.
+    Result is cached in SQLite — never re-generated once stored.
+    """
+    # Fast path: already cached
+    cached = get_summary(de_name, session_id)
+    if cached:
+        return handler.send_json(200, {'summary': cached, 'cached': True})
+
+    # Load session file
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    session_file = de_dir / 'sessions' / f'{session_id}.json'
+    if not session_file.exists():
+        return handler.send_json(404, {'error': f'Session not found: {session_id}'})
+
+    try:
+        s = json.loads(session_file.read_text())
+    except Exception as exc:
+        return handler.send_json(500, {'error': str(exc)})
+
+    steps = s.get('steps', [])
+    status = s.get('status', 'unknown')
+
+    # Build steps_text from observation/result/complete/error fields only
+    obs_lines = []
+    for step in steps:
+        t = step.get('type', '')
+        if t == 'observation' and step.get('result'):
+            obs_lines.append(step['result'][:300])
+        elif t in ('complete', 'result') and step.get('summary'):
+            obs_lines.append(step['summary'][:300])
+        elif t == 'error' and step.get('content'):
+            obs_lines.append('ERROR: ' + step['content'][:200])
+        elif t == 'complete' and step.get('content'):
+            obs_lines.append(step['content'][:300])
+    steps_text = '\n'.join(obs_lines[:20]) or '(no detailed step results recorded)'
+
+    prompt = (
+        'You are summarizing what a Digital Employee did in one session.\n'
+        'Write exactly 1-2 sentences in plain English that a non-technical person can understand.\n'
+        'Focus on what was accomplished or what went wrong — not HOW it was done technically.\n'
+        'Do NOT mention file paths, tool names, commands, or JSON.\n'
+        'Start with "I " (first person, the DE speaking).\n\n'
+        f'Session steps (tool calls and results):\n{steps_text}\n\n'
+        f'Status: {status}'
+    )
+
+    try:
+        summary = _llm_call(
+            messages=[{'role': 'user', 'content': prompt}],
+            timeout=30,
+        ).strip()
+        if not summary:
+            summary = 'I completed this session but no detailed summary is available.'
+        store_summary(de_name, session_id, summary)
+        return handler.send_json(200, {'summary': summary, 'cached': False})
+    except Exception as exc:
+        return handler.send_json(500, {'error': f'LLM call failed: {exc}'})
+
+
 def handle_de_get(handler, parts):
     """Handle GET /de/<name>[/sessions[/<session_id>][/workspace[/<filename>]]]"""
     # parts = ['de', ...]
@@ -801,6 +864,10 @@ def handle_de_get(handler, parts):
     if len(parts) == 3 and parts[2] == 'sessions':
         sessions = _de_sessions_list(de_name, limit=50)
         return handler.send_json(200, {'sessions': sessions, 'count': len(sessions)})
+
+    # GET /de/<name>/sessions/<session_id>/summary  — LLM summary (cached)
+    if len(parts) == 5 and parts[2] == 'sessions' and parts[4] == 'summary':
+        return handle_session_summary(handler, de_name, parts[3])
 
     # GET /de/<name>/sessions/<session_id>  — full session detail
     if len(parts) == 4 and parts[2] == 'sessions':

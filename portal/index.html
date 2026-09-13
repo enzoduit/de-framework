@@ -667,6 +667,15 @@ textarea, input, select { font-family: inherit; }
   border-radius: 8px; font-size: 12px; color: var(--text-sec); line-height: 1.6;
 }
 .session-summary-box strong { color: var(--text); font-weight: 600; }
+/* ── VIEW TOGGLE ── */
+.view-toggle{display:flex;gap:2px;margin-left:4px;}
+.ai-summary-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin:10px 14px 0;flex-shrink:0;}
+.ai-summary-text{font-size:12px;color:var(--text-sec);line-height:1.65;}
+.vt-btn{background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:14px;padding:2px 6px;opacity:0.5;transition:all 0.15s;}
+.vt-btn.active{opacity:1;border-color:var(--accent);}
+/* ── STORY MODE SUMMARY CARD ── */
+.session-summary-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
+.summary-text{font-size:13px;color:var(--text-sec);line-height:1.6;}
 /* ── TIMELINE ── */
 .timeline { display: flex; flex-direction: column; }
 .tl-step { display: flex; gap: 10px; padding: 10px 0; }
@@ -984,8 +993,13 @@ textarea, input, select { font-family: inherit; }
             <button class="btn-back-sessions" onclick="backToSessionsList()">← Sessions</button>
             <div class="mono" id="de-steps-panel-id" style="font-size:9px;color:var(--text-muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px"></div>
             <span class="live-badge" id="de-steps-live-badge" style="display:none">LIVE</span>
+            <div class="view-toggle" id="steps-view-toggle">
+              <button class="vt-btn active" id="vt-story" title="Story view" onclick="setStepsView('story')">📖</button>
+              <button class="vt-btn" id="vt-trace" title="Trace view" onclick="setStepsView('trace')">⚙️</button>
+            </div>
             <button class="btn-run btn-run-in-steps" onclick="deRun()" style="display:none">▶ RUN</button>
           </div>
+          <div id="ai-summary-card" class="ai-summary-card" style="display:none"><span class="ai-summary-text" id="ai-summary-text">Loading summary…</span></div>
           <div class="prog-steps" id="de-steps-panel-content" style="padding:12px 14px"></div>
         </div>
         <!-- Message input: type to start a session -->
@@ -1715,6 +1729,19 @@ async function loadProgress(de){
 }
 
 let _stepsPoller=null;
+let _stepsViewMode="story";
+let _currentStepsDE=null,_currentStepsSid=null;
+function setStepsView(mode){
+  _stepsViewMode=mode;
+  const vs=$("vt-story"),vt=$("vt-trace");
+  if(vs)vs.classList.toggle("active",mode==="story");
+  if(vt)vt.classList.toggle("active",mode==="trace");
+  // show/hide summary card
+  const sc=$("ai-summary-card");if(sc)sc.style.display=(mode==="story")?"":"none";
+  // re-render current session if available
+  if(_currentStepsDE&&_currentStepsSid)showSessionSteps(_currentStepsDE,_currentStepsSid,null);
+}
+
 async function loadSteps(de,sid,el){
   if(_stepsPoller){clearInterval(_stepsPoller);_stepsPoller=null;}
   document.querySelectorAll('.prog-session').forEach(e=>e.classList.remove('active'));
@@ -2343,10 +2370,22 @@ async function showSessionSteps(de, sid, el) {
     return html;
   };
 
+  _currentStepsDE=de;_currentStepsSid=sid;
+  const sc=$("ai-summary-card"),st=$("ai-summary-text");
+  if(sc){sc.style.display="none";}
   try {
     const r = await apiFetch(`/de/${de}/sessions/${sid}`);
     const s = await r.json();
     stepsContent.innerHTML = renderSessionDetail(s);
+    // Async fetch AI summary for story mode on completed sessions
+    const isDone=s.status!=="running"&&s.status!=="queued";
+    if(_stepsViewMode==="story"&&isDone&&sc&&st){
+      sc.style.display="";st.textContent="Loading summary…";
+      apiFetch(`/de/${de}/sessions/${sid}/summary`)
+        .then(r2=>r2.json()).then(d=>{
+          if(d.summary&&sc&&_stepsViewMode==="story"){st.textContent=d.summary;}
+        }).catch(()=>{if(sc)sc.style.display="none";});
+    }
     if (s.status === 'running' || s.status === 'queued') {
       const t = setInterval(async () => {
         try {
@@ -2356,6 +2395,13 @@ async function showSessionSteps(de, sid, el) {
           if (s2.status !== 'running' && s2.status !== 'queued') {
             clearInterval(t);
             loadSessionsPanel(de);
+            // Fetch summary now that it completed
+            if(_stepsViewMode==="story"&&sc&&st){
+              sc.style.display="";st.textContent="Loading summary…";
+              apiFetch(`/de/${de}/sessions/${sid}/summary`)
+                .then(r3=>r3.json()).then(d=>{if(d.summary&&sc&&_stepsViewMode==="story")st.textContent=d.summary;})
+                .catch(()=>{if(sc)sc.style.display="none";});
+            }
           }
         } catch(e2) { clearInterval(t); }
       }, 2500);
@@ -2719,14 +2765,21 @@ function renderTimelineStep(step, idx) {
       if (raw.length > 200) detailRaw = raw;
     }
   } else if (step.type === 'reasoning') {
+    if(_stepsViewMode==='story') return ''; // hide thinking in story mode
     const txt = step.content || '';
     mainText = esc(stripMd(txt, 140)) + (txt.length > 140 ? '…' : '');
     if (txt.length > 140) detailRaw = txt;
   } else if (step.type === 'action') {
     const inp = typeof step.input === 'string' ? step.input : JSON.stringify(step.input || {}, null, 2);
-    mainText = `Called <strong style="color:var(--accent)">${esc(step.tool||'')}</strong>`;
-    if (inp) mainText += ` <span style="color:var(--text-muted);font-size:10px;font-family:'JetBrains Mono',monospace">${esc(inp.substring(0,60))}${inp.length>60?'…':''}</span>`;
-    if (inp.length > 60) detailRaw = inp;
+    if(_stepsViewMode==='story'){
+      const STORY_TOOLS={'read_file':'📖 Read file','write_file':'📝 Updated file','exec_shell':'⚙️ Ran script','exec_python':'🐍 Ran script','python':'🐍 Ran script','bash':'⚙️ Ran command','send_message':'✉️ Sent message','send_telegram':'✉️ Sent message','web_search':'🔍 Searched','browse':'🌐 Opened page','screenshot':'📸 Took screenshot','http_request':'🌐 Called API','request_human_decision':'⏳ Requested approval','ask_colleague':'💬 Asked colleague','write_metric':'📊 Recorded metric'};
+      mainText=STORY_TOOLS[step.tool]||('⚡ '+esc(step.tool||'unknown'));
+      // no detail in story mode
+    } else {
+      mainText = `Called <strong style="color:var(--accent)">${esc(step.tool||'')}</strong>`;
+      if (inp) mainText += ` <span style="color:var(--text-muted);font-size:10px;font-family:'JetBrains Mono',monospace">${esc(inp.substring(0,60))}${inp.length>60?'…':''}</span>`;
+      if (inp.length > 60) detailRaw = inp;
+    }
   } else if (step.type === 'observation') {
     const res = step.result || '';
     const isErr = res.toLowerCase().startsWith('error') || res.includes('Error:');
