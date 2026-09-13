@@ -819,6 +819,22 @@ def handle_de_get(handler, parts):
             return handler.send_json(404, {'error': 'File not found'})
         if not str(fp.resolve()).startswith(str(ws_dir.resolve())):
             return handler.send_json(403, {'error': 'Access denied'})
+        # ?raw=1 — serve raw bytes (for download or binary preview)
+        if 'raw=1' in getattr(handler, 'path', ''):
+            import mimetypes as _mt
+            mime, _ = _mt.guess_type(filename)
+            if not mime:
+                mime = 'application/octet-stream'
+            data = fp.read_bytes()
+            handler.send_response(200)
+            handler.send_header('Content-Type', mime)
+            handler.send_header('Content-Length', str(len(data)))
+            handler.send_header('Content-Disposition', f'inline; filename="{filename}"')
+            handler.send_header('Access-Control-Allow-Origin', '*')
+            handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+            handler.end_headers()
+            handler.wfile.write(data)
+            return
         try:
             content = fp.read_text(encoding='utf-8', errors='replace')
             binary = False

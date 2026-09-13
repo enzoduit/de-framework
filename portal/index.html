@@ -836,7 +836,9 @@ textarea, input, select { font-family: inherit; }
 .ws-preview-modal{background:var(--surface);border-radius:10px;width:min(700px,94vw);max-height:80vh;display:flex;flex-direction:column;border:1px solid var(--border);overflow:hidden;}
 .ws-preview-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .ws-preview-title{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text);}
-.ws-preview-body{flex:1;overflow-y:auto;padding:16px 18px;}
+.ws-preview-body{flex:1;overflow-y:auto;padding:0;}
+.workspace-file-dl{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px;line-height:1;flex-shrink:0;transition:color .15s,background .15s;margin-left:auto;}
+.workspace-file-dl:hover{color:var(--accent);background:rgba(255,69,0,.08);}
 .ws-preview-body textarea{width:100%;min-height:320px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:12px;resize:vertical;box-sizing:border-box;}
 .ws-preview-footer{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
 .ws-preview-footer .btn-save{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;}
@@ -991,13 +993,14 @@ textarea, input, select { font-family: inherit; }
   <div class="ws-preview-modal">
     <div class="ws-preview-hdr">
       <div class="ws-preview-title" id="ws-preview-title">file.md</div>
-      <button class="btn-close" onclick="closeWsPreview()">&#10005;</button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="btn-cancel" onclick="downloadCurrentWsFile()" style="font-size:12px;padding:5px 10px;">&#11015; Download</button>
+        <button class="btn-close" onclick="closeWsPreview()">&#10005;</button>
+      </div>
     </div>
-    <div class="ws-preview-body">
-      <textarea id="ws-preview-textarea" spellcheck="false"></textarea>
-    </div>
-    <div class="ws-preview-footer">
-      <button class="btn-save" onclick="saveWsPreview()">&#128190; Save</button>
+    <div class="ws-preview-body" id="ws-preview-body"></div>
+    <div class="ws-preview-footer" id="ws-preview-footer">
+      <button class="btn-save" id="ws-preview-save" onclick="saveWsPreview()">&#128190; Save</button>
       <button class="btn-cancel" onclick="closeWsPreview()">Cancel</button>
     </div>
   </div>
@@ -2268,14 +2271,24 @@ let _wsPreviewFile = null;
 
 function fileIcon(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
-  if (ext === 'md') return '\ud83d\udcdd';
-  if (ext === 'json') return '\ud83d\udccb';
-  if (ext === 'py') return '\ud83d\udc0d';
-  if (ext === 'sh') return '\u2699';
-  if (ext === 'txt') return '\ud83d\udcc4';
-  if (ext === 'csv') return '\ud83d\udcca';
-  return '\ud83d\udcc4';
+  const m = {
+    md:'\uD83D\uDCDD', txt:'\uD83D\uDCC4', json:'\uD83D\uDCCB',
+    py:'\uD83D\uDC0D', js:'\uD83D\uDCC4', ts:'\uD83D\uDCC4', sh:'\u2699\uFE0F',
+    csv:'\uD83D\uDCCA', tsv:'\uD83D\uDCCA',
+    pdf:'\uD83D\uDCD5',
+    doc:'\uD83D\uDCD8', docx:'\uD83D\uDCD8',
+    xls:'\uD83D\uDCD7', xlsx:'\uD83D\uDCD7',
+    ppt:'\uD83D\uDCD9', pptx:'\uD83D\uDCD9',
+    png:'\uD83D\uDDBC\uFE0F', jpg:'\uD83D\uDDBC\uFE0F', jpeg:'\uD83D\uDDBC\uFE0F',
+    gif:'\uD83D\uDDBC\uFE0F', webp:'\uD83D\uDDBC\uFE0F', svg:'\uD83D\uDDBC\uFE0F', bmp:'\uD83D\uDDBC\uFE0F',
+    mp4:'\uD83C\uDFA5', mov:'\uD83C\uDFA5', mp3:'\uD83C\uDFA7', wav:'\uD83C\uDFA7',
+    zip:'\uD83D\uDCE6', gz:'\uD83D\uDCE6', tar:'\uD83D\uDCE6',
+  };
+  return m[ext] || '\uD83D\uDCC4';
 }
+const TEXT_EXTS = new Set(['md','txt','json','js','ts','py','sh','bash','csv','tsv','yaml','yml','toml','ini','conf','env','xml','html','htm','css','sql','log','rst','tex']);
+const IMAGE_EXTS = new Set(['png','jpg','jpeg','gif','webp','svg','bmp','ico']);
+const OFFICE_EXTS = new Set(['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp']);
 
 function formatBytes(n) {
   if (!n && n !== 0) return '';
@@ -2302,6 +2315,7 @@ async function loadWorkspaceTab(de) {
         <span class="workspace-file-icon">${fileIcon(f.name)}</span>
         <span class="workspace-file-name">${esc(f.name)}</span>
         <span class="workspace-file-size">${f.size_kb !== undefined ? f.size_kb + ' KB' : ''}</span>
+        <button class="workspace-file-dl" onclick="downloadWorkspaceFile(event,'${esc(de)}','${esc(f.name)}')" title="Download">&#11015;</button>
         <button class="workspace-file-del" onclick="deleteWorkspaceFile(event,'${esc(de)}','${esc(f.name)}')">\u00d7</button>
       </div>`).join('');
   } catch(e) {
@@ -2371,25 +2385,103 @@ async function uploadWorkspaceFile(input) {
 async function previewWorkspaceFile(de, name) {
   _wsPreviewFile = name;
   const overlay = $('ws-preview-overlay');
-  const title = $('ws-preview-title');
-  const ta = $('ws-preview-textarea');
-  if (!overlay) return;
-  if (title) title.textContent = name;
-  if (ta) ta.value = 'Loading…';
+  const titleEl = $('ws-preview-title');
+  const body = $('ws-preview-body');
+  const saveBtn = $('ws-preview-save');
+  if (!overlay || !body) return;
+  if (titleEl) titleEl.textContent = name;
+  body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);font-family:monospace;font-size:12px;">Loading\u2026</div>';
+  if (saveBtn) saveBtn.style.display = 'none';
   overlay.classList.add('open');
+  if (overlay._blobUrl) { URL.revokeObjectURL(overlay._blobUrl); overlay._blobUrl = null; }
+
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const cfg = getBackendConfig();
+  const rawUrl = cfg.url.replace(/\/$/, '') + `/de/${encodeURIComponent(de)}/workspace/${encodeURIComponent(name)}?raw=1`;
+  const authHdr = { 'Authorization': 'Bearer ' + cfg.token };
+
+  // Image preview
+  if (IMAGE_EXTS.has(ext)) {
+    try {
+      const r = await fetch(rawUrl, { headers: authHdr });
+      const blob = await r.blob();
+      const objUrl = URL.createObjectURL(blob);
+      overlay._blobUrl = objUrl;
+      body.innerHTML = `<div style="padding:16px;text-align:center;"><img src="${objUrl}" style="max-width:100%;max-height:55vh;object-fit:contain;border-radius:4px;"></div>`;
+    } catch(e) { body.innerHTML = `<div style="padding:20px;color:#e55;font-family:monospace;font-size:12px;">Error: ${esc(e.message)}</div>`; }
+    return;
+  }
+
+  // PDF preview
+  if (ext === 'pdf') {
+    try {
+      const r = await fetch(rawUrl, { headers: authHdr });
+      const blob = await r.blob();
+      const objUrl = URL.createObjectURL(blob);
+      overlay._blobUrl = objUrl;
+      body.innerHTML = `<iframe src="${objUrl}" style="width:100%;height:58vh;border:none;display:block;"></iframe>`;
+    } catch(e) { body.innerHTML = `<div style="padding:20px;color:#e55;font-family:monospace;font-size:12px;">Error: ${esc(e.message)}</div>`; }
+    return;
+  }
+
+  // Office files — download only
+  if (OFFICE_EXTS.has(ext)) {
+    body.innerHTML = `<div style="padding:48px;text-align:center;">
+      <div style="font-size:52px;margin-bottom:14px;">${fileIcon(name)}</div>
+      <div style="color:var(--text);font-family:monospace;font-size:13px;font-weight:700;margin-bottom:6px;">${esc(name)}</div>
+      <div style="color:var(--text-muted);font-size:12px;margin-bottom:24px;line-height:1.7;">Office files can't be previewed in the browser.<br>Download to open in your local app.</div>
+      <button onclick="downloadWorkspaceFile(event,'${esc(de)}','${esc(name)}')" style="background:var(--accent);color:#fff;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-size:13px;font-family:monospace;">&#11015; Download ${esc(name)}</button>
+    </div>`;
+    return;
+  }
+
+  // Text / editable textarea
   try {
     const r = await apiFetch(`/de/${encodeURIComponent(de)}/workspace/${encodeURIComponent(name)}`);
     const d = await r.json();
-    if (ta) ta.value = d.content || d.error || '';
+    if (d.binary) {
+      body.innerHTML = `<div style="padding:48px;text-align:center;">
+        <div style="font-size:52px;margin-bottom:14px;">${fileIcon(name)}</div>
+        <div style="color:var(--text-muted);font-size:12px;margin-bottom:24px;">Binary file \u2014 preview not available.</div>
+        <button onclick="downloadWorkspaceFile(event,'${esc(de)}','${esc(name)}')" style="background:var(--accent);color:#fff;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-size:13px;font-family:monospace;">&#11015; Download ${esc(name)}</button>
+      </div>`;
+      return;
+    }
+    body.innerHTML = `<div style="padding:16px 18px;height:100%;box-sizing:border-box;"><textarea id="ws-preview-textarea" spellcheck="false" style="width:100%;min-height:300px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea></div>`;
+    const ta = $('ws-preview-textarea');
+    if (ta) ta.value = d.content || '';
+    if (saveBtn) saveBtn.style.display = '';
   } catch(e) {
-    if (ta) ta.value = 'Error: ' + e.message;
+    body.innerHTML = `<div style="padding:20px;color:#e55;font-family:monospace;font-size:12px;">Error: ${esc(e.message)}</div>`;
   }
 }
 
 function closeWsPreview() {
   const overlay = $('ws-preview-overlay');
-  if (overlay) overlay.classList.remove('open');
+  if (overlay) {
+    if (overlay._blobUrl) { URL.revokeObjectURL(overlay._blobUrl); overlay._blobUrl = null; }
+    overlay.classList.remove('open');
+  }
   _wsPreviewFile = null;
+}
+
+async function downloadWorkspaceFile(event, de, name) {
+  if (event) event.stopPropagation();
+  const cfg = getBackendConfig();
+  const url = cfg.url.replace(/\/$/, '') + `/de/${encodeURIComponent(de)}/workspace/${encodeURIComponent(name)}?raw=1`;
+  try {
+    const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + cfg.token } });
+    const blob = await r.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 5000);
+  } catch(e) { alert('Download failed: ' + e.message); }
+}
+
+function downloadCurrentWsFile() {
+  const de = _wsCurrentDE; const name = _wsPreviewFile;
+  if (de && name) downloadWorkspaceFile(null, de, name);
 }
 
 async function saveWsPreview() {
@@ -2397,6 +2489,7 @@ async function saveWsPreview() {
   const name = _wsPreviewFile;
   if (!de || !name) return;
   const ta = $('ws-preview-textarea');
+  if (!ta) return;
   const content = ta ? ta.value : '';
   try {
     const r = await apiFetch(`/de/${encodeURIComponent(de)}/workspace/${encodeURIComponent(name)}`, {
