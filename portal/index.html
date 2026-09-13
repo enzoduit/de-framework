@@ -737,6 +737,8 @@ textarea, input, select { font-family: inherit; }
   .workspace-toolbar { position:sticky; bottom:0; left:0; right:0; z-index:10; }
   .workspace-scroll { padding-bottom:4px; }
   .de-sessions-panel-hdr { padding:8px 12px; }
+  /* Override expanded width on mobile — must not shrink to 80vw */
+  .de-sessions-panel, .de-sessions-panel.expanded { width:100% !important; }
   /* When session detail open: merge into single bar */
   .de-sessions-panel.steps-open .de-sessions-panel-hdr { display:none !important; }
   .btn-run-in-steps { display:inline-flex !important; }
@@ -1647,6 +1649,7 @@ async function loadSteps(de,sid,el){
   document.querySelectorAll('.prog-session').forEach(e=>e.classList.remove('active'));
   if(el)el.classList.add('active');
   document.querySelector('.de-sessions-panel')?.classList.add('steps-open');
+  if(window.innerWidth<=767){const _sh=document.querySelector('.de-sessions-panel-hdr');if(_sh)_sh.style.display='none';}
   const pane=$('prog-steps');pane.innerHTML='<div class="prog-empty">Loading…</div>';
   try{
     const r=await apiFetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
@@ -2241,7 +2244,8 @@ async function showSessionSteps(de, sid, el) {
   if (list) list.style.display = 'none';
   if (stepsPanel) { stepsPanel.style.display = 'flex'; stepsPanel.style.flexDirection = 'column'; }
   const sessionsPanel = document.querySelector('.de-sessions-panel');
-  if (sessionsPanel) sessionsPanel.classList.add('expanded');
+  if (sessionsPanel) sessionsPanel.classList.add('expanded','steps-open');
+  if(window.innerWidth<=767){const _sh2=document.querySelector('.de-sessions-panel-hdr');if(_sh2)_sh2.style.display='none';}
   if (stepsContent) stepsContent.innerHTML = '<div class="prog-empty">Loading…</div>';
   const liveBadge = $('de-steps-live-badge');
 
@@ -2286,6 +2290,7 @@ function backToSessionsList() {
   if(liveBadge)liveBadge.style.display='none';
   const sessionsPanel=document.querySelector('.de-sessions-panel');
   if(sessionsPanel)sessionsPanel.classList.remove('expanded','steps-open');
+  const _sh=document.querySelector('.de-sessions-panel-hdr');if(_sh)_sh.style.display='';
 }
 
 function switchDetailTab(name) {
