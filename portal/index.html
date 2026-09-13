@@ -1563,6 +1563,7 @@ function closeSidebar(){$('sidebar').classList.remove('open');$('sidebar-overlay
 
 /* ═══ DE LIST ═══ */
 function renderHomeDash(des){
+  if(selectedDE) return; // DE is open — never show home over it
   const hd=$("home-dash");if(!hd)return;
   // attention: pending decisions
   const pending=des.filter(d=>(d.pending_decisions||0)>0);
