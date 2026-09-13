@@ -108,6 +108,26 @@ textarea, input, select { font-family: inherit; }
 #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .mobile-topbar { display: none; }
 
+/* ── HOME DASHBOARD ── */
+#home-dash{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:24px 28px;gap:24px;}
+#home-dash.visible{display:flex;}
+.home-greeting{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--text);}
+.home-sub{font-size:12px;color:var(--text-sec);margin-top:6px;line-height:1.5;}
+.home-sec-label{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:10px;}
+.home-attn-card{background:rgba(255,69,0,0.06);border:1px solid rgba(255,69,0,0.25);border-radius:10px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color 0.15s;}
+.home-attn-card:hover{border-color:var(--accent);}
+.home-attn-icon{font-size:20px;flex-shrink:0;}
+.home-attn-title{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--text);}
+.home-attn-desc{font-size:11px;color:var(--text-sec);margin-top:2px;}
+.home-de-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+.home-de-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:border-color 0.15s;position:relative;}
+.home-de-card:hover{border-color:var(--accent);}
+.home-de-dot{width:8px;height:8px;border-radius:50%;margin-bottom:8px;}
+.home-de-name{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--text);}
+.home-de-role{font-size:10px;color:var(--text-muted);margin-top:3px;line-height:1.3;}
+.home-de-badge{position:absolute;top:10px;right:10px;background:var(--accent);color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:2px 6px;}
+@media(max-width:767px){#home-dash{padding:16px;gap:18px;}.home-greeting{font-size:16px;}.home-de-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}}
+
 /* empty state */
 #empty-state {
   flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -916,6 +936,22 @@ textarea, input, select { font-family: inherit; }
     <button class="btn-create-first" onclick="openCreate()">+ Create your first Digital Employee</button>
   </div>
 
+  <!-- Home dashboard: shown when DEs exist but none selected -->
+  <div id="home-dash">
+    <div>
+      <div class="home-greeting">Where your team needs you</div>
+      <div class="home-sub" id="home-sub"></div>
+    </div>
+    <div id="home-attn-section" style="display:none">
+      <div class="home-sec-label">NEEDS ATTENTION</div>
+      <div id="home-attn-cards" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+    <div>
+      <div class="home-sec-label">YOUR DIGITAL EMPLOYEES</div>
+      <div class="home-de-grid" id="home-de-grid"></div>
+    </div>
+  </div>
+
   <!-- DE view -->
   <div id="de-view">
     <div class="de-header">
@@ -1484,13 +1520,47 @@ function openSidebar(){$('sidebar').classList.add('open');$('sidebar-overlay').c
 function closeSidebar(){$('sidebar').classList.remove('open');$('sidebar-overlay').classList.remove('visible');}
 
 /* ═══ DE LIST ═══ */
+function renderHomeDash(des){
+  const hd=$("home-dash");if(!hd)return;
+  // attention: pending decisions
+  const pending=des.filter(d=>(d.pending_decisions||0)>0);
+  const attnSec=$("home-attn-section"),attnCards=$("home-attn-cards");
+  if(pending.length&&attnSec&&attnCards){
+    attnSec.style.display="";
+    attnCards.innerHTML=pending.map(d=>
+      `<div class="home-attn-card" onclick="selectDE('${d.name}')">`+
+      `<div class="home-attn-icon">⏳</div>`+
+      `<div><div class="home-attn-title">${esc(d.display_name||d.name.toUpperCase())}</div>`+
+      `<div class="home-attn-desc">${d.pending_decisions} decision${d.pending_decisions!==1?"s":""} waiting for you</div></div>`+
+      `</div>`).join("");
+  } else if(attnSec){attnSec.style.display="none";}
+  // subtitle
+  const total=des.reduce((s,d)=>s+(d.pending_decisions||0),0);
+  const sub=$("home-sub");
+  if(sub)sub.textContent=total>0
+    ?`${total} decision${total!==1?"s":""} pending — your employees are waiting`
+    :`${des.length} employee${des.length!==1?"s":""} running autonomously`;
+  // DE grid
+  const grid=$("home-de-grid");
+  if(grid)grid.innerHTML=des.map(d=>
+    `<div class="home-de-card" onclick="selectDE('${d.name}')">`+
+    `<div class="home-de-dot" style="background:${d.color||"#FF4500"}"></div>`+
+    `<div class="home-de-name">${esc(d.display_name||d.name.toUpperCase())}</div>`+
+    `<div class="home-de-role">${esc((d.role||"").substring(0,36))}</div>`+
+    ((d.pending_decisions||0)>0?`<div class="home-de-badge">${d.pending_decisions}</div>`:"")+
+    `</div>`).join("");
+  hd.classList.add("visible");
+}
+
 async function loadList(){
   try{
     if(!isBackendConfigured()){const c=$('de-list');c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No backend connected.<br><br>Click <strong>⚙</strong> (sidebar footer) to configure.</div>';return;}
     const r=await apiFetch('/de-list');if(!r.ok&&r.status===401){const c=$('de-list');c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">Invalid token.<br><br>Click <strong>⚙</strong> to update.</div>';return;}const d=await r.json();
     const des=d.des||[];
     const c=$('de-list');
-    if(!des.length){c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No employees yet.<br>Click + NEW to create one.</div>';return;}
+    if(!des.length){c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No employees yet.<br>Click + NEW to create one.</div>';$("empty-state").style.display="";const hd=$("home-dash");if(hd)hd.classList.remove("visible");return;}
+    $("empty-state").style.display="none";
+    renderHomeDash(des);
     c.innerHTML=des.map(de=>`
       <div class="de-item ${selectedDE===de.name?'active':''}" id="di-${de.name}" onclick="selectDE('${de.name}')">
         <div class="de-dot" style="background:${de.color||'#FF4500'}"></div>
@@ -1512,6 +1582,7 @@ async function selectDE(name){
   document.querySelectorAll('.de-item').forEach(el=>el.classList.remove('active'));
   const item=$('di-'+name);if(item)item.classList.add('active');
   $('empty-state').style.display='none';
+  const _hd=$('home-dash');if(_hd)_hd.classList.remove('visible');
   $('de-view').classList.add('visible');
   backToSessionsList();
   switchDetailTab('profile');
