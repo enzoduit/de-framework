@@ -555,6 +555,8 @@ textarea, input, select { font-family: inherit; }
 .sched-add-bar { padding:12px 20px; border-top:1px solid var(--border); background:var(--surface); flex-shrink:0; }
 .btn-add-sched { width:100%; background:none; border:1px dashed var(--border); border-radius:8px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-muted); cursor:pointer; transition:all 0.15s; }
 .btn-add-sched:hover { border-color:var(--accent); color:var(--accent); }
+.btn-add-sched-inline { display:inline-block; margin-top:14px; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:10px 20px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; cursor:pointer; transition:opacity 0.15s; }
+.btn-add-sched-inline:hover { opacity:0.85; }
 
 /* ── 3-PANE SESSIONS VIEW ── */
 .de-view-body { display:flex; flex:1; overflow:hidden; }
@@ -1984,7 +1986,7 @@ async function loadSchedule(de) {
     }
 
     if (!schedules.length && !acts.length) {
-      html = '<div class="sched-empty">No scheduled runs yet.<br><br>Click <strong>＋ Add Schedule</strong> to set up a recurring run with a custom prompt.</div>';
+      html = '<div class="sched-empty">No scheduled runs yet.<br><br><button class="btn-add-sched-inline" onclick="openAddSchedule()">＋ Add Schedule</button></div>';
     }
     scroll.innerHTML = html;
   } catch(e) {
