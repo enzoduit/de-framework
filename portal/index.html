@@ -1647,7 +1647,7 @@ async function loadSteps(de,sid,el){
   document.querySelectorAll('.prog-session').forEach(e=>e.classList.remove('active'));
   if(el)el.classList.add('active');
   document.querySelector('.de-sessions-panel')?.classList.add('steps-open');
-  const pane=$(('prog-steps');pane.innerHTML='<div class="prog-empty">Loading…</div>';
+  const pane=$('prog-steps');pane.innerHTML='<div class="prog-empty">Loading…</div>';
   try{
     const r=await apiFetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
     const isLive=s.status==='running'||s.status==='queued';
