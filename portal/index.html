@@ -709,7 +709,7 @@ textarea, input, select { font-family: inherit; }
   .de-view-body { flex-direction:column; }
   .de-sessions-panel {
     width:100% !important; flex-shrink:0;
-    max-height:42vh; border-right:none;
+    max-height:200px; border-right:none;
     border-bottom:1px solid var(--border);
     overflow-y:auto;
   }
@@ -885,7 +885,7 @@ textarea, input, select { font-family: inherit; }
         </div>
         <!-- Message input: type to start a session -->
         <div class="de-msg-bar" id="de-msg-bar" style="display:none">
-          <textarea id="de-msg-input" rows="1" placeholder="Nachricht senden…" onkeydown="deMsgKey(event)" oninput="autoResize(this)"></textarea>
+          <textarea id="de-msg-input" rows="1" placeholder="Send a message…" onkeydown="deMsgKey(event)" oninput="autoResize(this)"></textarea>
           <button class="btn-send" id="de-msg-send" onclick="deSendMsg()">↑</button>
         </div>
       </div>
@@ -896,9 +896,9 @@ textarea, input, select { font-family: inherit; }
       <!-- RIGHT: Chat / Profile / Schedule -->
       <div class="de-detail-panel">
         <div class="de-detail-tabs">
-          <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFIL</button>
+          <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFILE</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
-          <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRIKEN</button>
+          <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRICS</button>
         </div>
 
         <!-- Profile -->
