@@ -223,6 +223,11 @@ class DEHandler(BaseHTTPRequestHandler):
                 and parts[2] == 'sessions' and parts[4] == 'reset'):
             return de_routes.handle_session_reset(self, parts[1], parts[3])
 
+        # POST /de/<name>/workspace/<filename> — create or overwrite text file
+        if (len(parts) == 4 and parts[0] == 'de'
+                and parts[2] == 'workspace'):
+            return de_routes.handle_workspace_write(self, parts[1], parts[3], body)
+
         self.send_json(404, {'error': 'not found'})
 
     def do_PATCH(self):
@@ -270,6 +275,11 @@ class DEHandler(BaseHTTPRequestHandler):
         # DELETE /api/credentials/<id>
         if len(parts) == 3 and parts[0] == 'api' and parts[1] == 'credentials':
             return creds_routes.handle_credentials_delete(self, parts[2])
+
+        # DELETE /de/<name>/workspace/<filename>
+        if (len(parts) == 4 and parts[0] == 'de'
+                and parts[2] == 'workspace'):
+            return de_routes.handle_workspace_delete(self, parts[1], parts[3])
 
         self.send_json(404, {'error': 'not found'})
 

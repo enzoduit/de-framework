@@ -807,6 +807,40 @@ textarea, input, select { font-family: inherit; }
 .metrics-empty{text-align:center;padding:48px 20px;color:var(--text-muted);}
 .metrics-empty-icon{font-size:36px;margin-bottom:12px;}
 .metrics-empty-title{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-sec);margin-bottom:6px;}
+/* ─── Workspace Tab ─────────────────────────────────────────────────────── */
+.workspace-scroll{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:4px;}
+.workspace-file{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;transition:background .15s;font-family:'JetBrains Mono',monospace;font-size:12px;}
+.workspace-file:hover{background:var(--surface);}
+.workspace-file-icon{font-size:16px;flex-shrink:0;}
+.workspace-file-name{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.workspace-file-size{color:var(--text-muted);font-size:10px;flex-shrink:0;}
+.workspace-file-del{margin-left:4px;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:14px;line-height:1;flex-shrink:0;transition:color .15s,background .15s;}
+.workspace-file-del:hover{color:#e55;background:rgba(220,50,50,.08);}
+.workspace-empty{color:var(--text-muted);font-size:12px;text-align:center;margin-top:40px;line-height:1.8;}
+.workspace-empty.error{color:#e55;}
+.workspace-toolbar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+.btn-new-file{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:opacity .15s;}
+.btn-new-file:hover{opacity:.85;}
+.btn-upload-file{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:background .15s;}
+.btn-upload-file:hover{background:var(--bg);}
+/* Workspace new-file inline form */
+.ws-new-file-form{background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
+.ws-new-file-form input,.ws-new-file-form textarea{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;width:100%;box-sizing:border-box;}
+.ws-new-file-form textarea{resize:vertical;min-height:120px;}
+.ws-form-actions{display:flex;gap:8px;}
+.ws-form-actions .btn-save{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;}
+.ws-form-actions .btn-cancel{background:none;border:1px solid var(--border);border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--text-muted);font-family:'JetBrains Mono',monospace;}
+/* Workspace preview modal */
+#ws-preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;display:none;align-items:center;justify-content:center;}
+#ws-preview-overlay.open{display:flex;}
+.ws-preview-modal{background:var(--surface);border-radius:10px;width:min(700px,94vw);max-height:80vh;display:flex;flex-direction:column;border:1px solid var(--border);overflow:hidden;}
+.ws-preview-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ws-preview-title{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text);}
+.ws-preview-body{flex:1;overflow-y:auto;padding:16px 18px;}
+.ws-preview-body textarea{width:100%;min-height:320px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:12px;resize:vertical;box-sizing:border-box;}
+.ws-preview-footer{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+.ws-preview-footer .btn-save{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;}
+.ws-preview-footer .btn-cancel{background:none;border:1px solid var(--border);border-radius:5px;padding:7px 14px;font-size:12px;cursor:pointer;color:var(--text-muted);font-family:'JetBrains Mono',monospace;}
 </style>
 </head>
 <body>
@@ -901,6 +935,7 @@ textarea, input, select { font-family: inherit; }
           <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFILE</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
           <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRICS</button>
+          <button class="de-detail-tab" id="dtab-workspace" onclick="switchDetailTab('workspace')">📁 WORKSPACE</button>
           <button class="de-detail-tab" id="dtab-sessions" onclick="switchDetailTab('sessions')">📋 SESSIONS</button>
         </div>
 
@@ -934,10 +969,38 @@ textarea, input, select { font-family: inherit; }
           </div>
         </div>
 
+        <!-- Workspace -->
+        <div class="de-detail-content" id="detail-workspace">
+          <div class="workspace-scroll" id="workspace-scroll">
+            <div class="workspace-empty">Select a Digital Employee to view their workspace.</div>
+          </div>
+          <div class="workspace-toolbar">
+            <button class="btn-new-file" onclick="openNewFileDialog()">&#xFF0B; New file</button>
+            <label class="btn-upload-file">&#128206; Upload <input type="file" id="workspace-upload-input" style="display:none" onchange="uploadWorkspaceFile(this)" multiple></label>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
 </main>
+</div>
+
+<!-- ═══ WORKSPACE PREVIEW MODAL ═══ -->
+<div id="ws-preview-overlay" onclick="if(event.target===this)closeWsPreview()">
+  <div class="ws-preview-modal">
+    <div class="ws-preview-hdr">
+      <div class="ws-preview-title" id="ws-preview-title">file.md</div>
+      <button class="btn-close" onclick="closeWsPreview()">&#10005;</button>
+    </div>
+    <div class="ws-preview-body">
+      <textarea id="ws-preview-textarea" spellcheck="false"></textarea>
+    </div>
+    <div class="ws-preview-footer">
+      <button class="btn-save" onclick="saveWsPreview()">&#128190; Save</button>
+      <button class="btn-cancel" onclick="closeWsPreview()">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ TOOL LIBRARY OVERLAY ═══ -->
@@ -2188,15 +2251,173 @@ function switchDetailTab(name) {
   }
   const sessBtn = $('dtab-sessions');
   if (sessBtn) sessBtn.classList.remove('active');
-  const names = ['profile','schedule','metrics'];
+  const names = ['profile','schedule','metrics','workspace'];
   document.querySelectorAll('.de-detail-tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.de-detail-content').forEach((c,i) => c.classList.toggle('active', names[i]===name));
   if (name==='profile' && selectedDE) loadProfile(selectedDE);
   if (name==='schedule' && selectedDE) loadSchedule(selectedDE);
   if (name==='metrics' && selectedDE) loadMetrics(selectedDE);
+  if (name==='workspace' && selectedDE) loadWorkspaceTab(selectedDE);
 }
 // Keep old switchTab as alias for backward compat
 function switchTab(name) { if(name==='profile') switchDetailTab('profile'); else if(name==='schedule') switchDetailTab('schedule'); }
+
+/* ═══ WORKSPACE TAB ══════════════════════════════════════════════════════ */
+let _wsCurrentDE = null;
+let _wsPreviewFile = null;
+
+function fileIcon(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (ext === 'md') return '\ud83d\udcdd';
+  if (ext === 'json') return '\ud83d\udccb';
+  if (ext === 'py') return '\ud83d\udc0d';
+  if (ext === 'sh') return '\u2699';
+  if (ext === 'txt') return '\ud83d\udcc4';
+  if (ext === 'csv') return '\ud83d\udcca';
+  return '\ud83d\udcc4';
+}
+
+function formatBytes(n) {
+  if (!n && n !== 0) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
+
+async function loadWorkspaceTab(de) {
+  _wsCurrentDE = de;
+  const scroll = $('workspace-scroll');
+  if (!scroll) return;
+  scroll.innerHTML = '<div class="workspace-empty">Loading…</div>';
+  try {
+    const r = await apiFetch(`/de/${encodeURIComponent(de)}/workspace`);
+    const d = await r.json();
+    const files = d.files || [];
+    if (!files.length) {
+      scroll.innerHTML = '<div class="workspace-empty">No files yet.<br>Create a text file or upload one.</div>';
+      return;
+    }
+    scroll.innerHTML = files.map(f => `
+      <div class="workspace-file" onclick="previewWorkspaceFile('${esc(de)}','${esc(f.name)}')">
+        <span class="workspace-file-icon">${fileIcon(f.name)}</span>
+        <span class="workspace-file-name">${esc(f.name)}</span>
+        <span class="workspace-file-size">${f.size_kb !== undefined ? f.size_kb + ' KB' : ''}</span>
+        <button class="workspace-file-del" onclick="deleteWorkspaceFile(event,'${esc(de)}','${esc(f.name)}')">\u00d7</button>
+      </div>`).join('');
+  } catch(e) {
+    if (e.noBackend) { scroll.innerHTML = '<div class="workspace-empty error">Backend not configured.</div>'; return; }
+    scroll.innerHTML = `<div class="workspace-empty error">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+let _wsNewFileOpen = false;
+function openNewFileDialog() {
+  if (!_wsCurrentDE) return;
+  const scroll = $('workspace-scroll');
+  if (_wsNewFileOpen) return;
+  _wsNewFileOpen = true;
+  const formHtml = `<div class="ws-new-file-form" id="ws-new-file-form">
+    <input type="text" id="ws-new-filename" placeholder="filename.md" />
+    <textarea id="ws-new-content" placeholder="File content…"></textarea>
+    <div class="ws-form-actions">
+      <button class="btn-save" onclick="submitNewFile()">Save</button>
+      <button class="btn-cancel" onclick="cancelNewFile()">Cancel</button>
+    </div>
+  </div>`;
+  scroll.insertAdjacentHTML('afterbegin', formHtml);
+  const inp = $('ws-new-filename');
+  if (inp) inp.focus();
+}
+
+function cancelNewFile() {
+  _wsNewFileOpen = false;
+  const f = $('ws-new-file-form');
+  if (f) f.remove();
+}
+
+async function submitNewFile() {
+  const de = _wsCurrentDE;
+  if (!de) return;
+  const filename = ($('ws-new-filename') || {}).value || '';
+  const content = ($('ws-new-content') || {}).value || '';
+  if (!filename.trim()) { alert('Filename required'); return; }
+  try {
+    const r = await apiFetch(`/de/${encodeURIComponent(de)}/workspace/${encodeURIComponent(filename.trim())}`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+    if (!r.ok) { const d = await r.json(); alert('Error: ' + (d.error || r.status)); return; }
+    _wsNewFileOpen = false;
+    loadWorkspaceTab(de);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function uploadWorkspaceFile(input) {
+  const de = _wsCurrentDE;
+  if (!de || !input.files || !input.files.length) return;
+  for (const file of input.files) {
+    try {
+      const fd = new FormData();
+      fd.append('file', file, file.name);
+      const cfg = getBackendConfig();
+      const url = cfg.url.replace(/\/$/, '') + `/de/${encodeURIComponent(de)}/workspace/upload`;
+      await fetch(url, { method: 'POST', headers: { 'Authorization': 'Bearer ' + cfg.token }, body: fd });
+    } catch(e) { console.error('Upload error:', e); }
+  }
+  input.value = '';
+  loadWorkspaceTab(de);
+}
+
+async function previewWorkspaceFile(de, name) {
+  _wsPreviewFile = name;
+  const overlay = $('ws-preview-overlay');
+  const title = $('ws-preview-title');
+  const ta = $('ws-preview-textarea');
+  if (!overlay) return;
+  if (title) title.textContent = name;
+  if (ta) ta.value = 'Loading…';
+  overlay.classList.add('open');
+  try {
+    const r = await apiFetch(`/de/${encodeURIComponent(de)}/workspace/${encodeURIComponent(name)}`);
+    const d = await r.json();
+    if (ta) ta.value = d.content || d.error || '';
+  } catch(e) {
+    if (ta) ta.value = 'Error: ' + e.message;
+  }
+}
+
+function closeWsPreview() {
+  const overlay = $('ws-preview-overlay');
+  if (overlay) overlay.classList.remove('open');
+  _wsPreviewFile = null;
+}
+
+async function saveWsPreview() {
+  const de = _wsCurrentDE;
+  const name = _wsPreviewFile;
+  if (!de || !name) return;
+  const ta = $('ws-preview-textarea');
+  const content = ta ? ta.value : '';
+  try {
+    const r = await apiFetch(`/de/${encodeURIComponent(de)}/workspace/${encodeURIComponent(name)}`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+    if (!r.ok) { const d = await r.json(); alert('Save failed: ' + (d.error || r.status)); return; }
+    closeWsPreview();
+    loadWorkspaceTab(de);
+  } catch(e) { alert('Save error: ' + e.message); }
+}
+
+async function deleteWorkspaceFile(event, de, name) {
+  event.stopPropagation();
+  if (!confirm(`Delete ${name}?`)) return;
+  try {
+    const r = await apiFetch(`/de/${encodeURIComponent(de)}/workspace/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    if (!r.ok) { const d = await r.json(); alert('Delete failed: ' + (d.error || r.status)); return; }
+    loadWorkspaceTab(de);
+  } catch(e) { alert('Delete error: ' + e.message); }
+}
 /* ═══ WORK SESSION HELPERS ═══ */
 function qualityGate(s) {
   if (!s) return { label: '—', cls: 'quality-neutral' };

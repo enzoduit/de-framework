@@ -271,8 +271,39 @@ class ReActEngine:
             'history_count': len(kpi_entry['history']),
         }
 
+    def _load_workspace_context(self) -> str:
+        """Load relevant workspace files to inject into session context."""
+        workspace = self.agent_dir / 'workspace'
+        if not workspace.exists():
+            return ''
+
+        lines = []
+        # Priority order: MEMORY.md first, then README.md, TODO.md, other .md files
+        priority = ['MEMORY.md', 'README.md', 'TODO.md']
+        found = set()
+
+        for fname in priority:
+            fpath = workspace / fname
+            if fpath.exists():
+                content = fpath.read_text(errors='replace')[:3000]  # cap at 3000 chars
+                lines.append(f'### {fname}\n{content}')
+                found.add(fname)
+
+        # Add other .md files (up to 2 more, capped at 1500 chars each)
+        count = 0
+        for fpath in sorted(workspace.glob('*.md')):
+            if fpath.name not in found and count < 2:
+                content = fpath.read_text(errors='replace')[:1500]
+                lines.append(f'### {fpath.name}\n{content}')
+                count += 1
+
+        if not lines:
+            return ''
+
+        return '\n\n## Your Workspace\n' + '\n\n'.join(lines)
+
     def _build_system_prompt(self) -> str:
-        """Build system prompt including KPI list for this agent from metrics.json."""
+        """Build system prompt including KPI list and workspace context for this agent."""
         lines = [
             f'You are {self.agent_name.upper()}, a Digital Employee in an autonomous AI team.',
             'Operate as a professional ReAct agent: think step by step, use tools to gather real data, and produce concrete results.',
@@ -308,6 +339,42 @@ class ReActEngine:
             'call write_metric(kpi_id, value) to record it. '
             "Only write metrics you actually measured in this session — don't guess.",
         ])
+
+        # Workspace context (MEMORY.md and other .md files)
+        workspace_context = self._load_workspace_context()
+        if workspace_context:
+            lines.append(workspace_context)
+
+        # Workspace path + memory guidance (only when workspace exists)
+        workspace_dir = self.agent_dir / 'workspace'
+        if workspace_dir.exists():
+            workspace_abs = str(workspace_dir.resolve())
+            lines.append('')
+            lines.append(f'Your workspace directory: {workspace_abs}/')
+            lines.append('')
+            lines.append('## Your Memory File')
+            lines.append('')
+            lines.append('You have a MEMORY.md in your workspace. Write important facts, decisions, and progress there:')
+            lines.append('- Key facts about ongoing projects')
+            lines.append('- Decisions made and why')
+            lines.append('- What you learned in this session')
+            lines.append('- What you plan to do next session')
+            lines.append('')
+            lines.append(f'Write to it using: write_file(path=\'{workspace_abs}/MEMORY.md\', content=\'...\')')
+            lines.append('Read it at session start (it will be in the Your Workspace section above).')
+
+        # QA step — mandatory last step for every DE
+        lines.append('')
+        lines.append('## Quality Assurance — Mandatory Last Step')
+        lines.append('')
+        lines.append('Before ending this session, always run a self-QA check:')
+        lines.append('1. Did I complete the task I was given? (yes/no — if no, say what\'s missing)')
+        lines.append('2. Is my output correct and verifiable? (check key facts, numbers, conclusions)')
+        lines.append('3. Are there any errors or warnings I should flag to the human?')
+        lines.append('4. Is there anything I should write to my MEMORY.md for next time?')
+        lines.append('')
+        lines.append('Only after completing QA: use report_to_colleague or write your session summary.')
+        lines.append('Human time is the most valuable resource — only escalate if output is verified.')
 
         return '\n'.join(lines)
 

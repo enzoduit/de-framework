@@ -652,6 +652,7 @@ def handle_de_create(handler, body: dict):
     try:
         de_dir.mkdir(parents=True)
         (de_dir / 'sessions').mkdir()
+        (de_dir / 'workspace').mkdir(exist_ok=True)
 
         # de.json — agent profile
         de_json = {
@@ -965,6 +966,59 @@ def handle_session_reset(handler, de_name: str, session_id: str):
         return handler.send_json(500, {'error': str(e)})
 
 
+def _safe_workspace_path(de_name: str, filename: str):
+    """Return (ws_dir, safe_path) or raise ValueError on path traversal."""
+    import os.path as _osp
+    # Strip path separators and .. components
+    safe = _osp.basename(filename.replace('..', ''))
+    if not safe:
+        raise ValueError('invalid filename')
+    ws_dir = AGENTS_BASE / de_name / 'workspace'
+    ws_dir.mkdir(parents=True, exist_ok=True)
+    fp = ws_dir / safe
+    # Confirm no traversal
+    if not str(fp.resolve()).startswith(str(ws_dir.resolve())):
+        raise ValueError('path traversal denied')
+    return ws_dir, fp
+
+
+def handle_workspace_write(handler, de_name: str, filename: str, body: dict):
+    """POST /de/<name>/workspace/<filename> — create or overwrite a text file."""
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    try:
+        _, fp = _safe_workspace_path(de_name, filename)
+    except ValueError as e:
+        return handler.send_json(400, {'error': str(e)})
+    content = body.get('content', '')
+    if not isinstance(content, str):
+        return handler.send_json(400, {'error': 'content must be a string'})
+    try:
+        fp.write_text(content, encoding='utf-8')
+        return handler.send_json(200, {'ok': True, 'name': fp.name, 'size': fp.stat().st_size})
+    except Exception as e:
+        return handler.send_json(500, {'error': str(e)})
+
+
+def handle_workspace_delete(handler, de_name: str, filename: str):
+    """DELETE /de/<name>/workspace/<filename> — delete a workspace file."""
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    try:
+        _, fp = _safe_workspace_path(de_name, filename)
+    except ValueError as e:
+        return handler.send_json(400, {'error': str(e)})
+    if not fp.exists():
+        return handler.send_json(404, {'error': 'File not found'})
+    try:
+        fp.unlink()
+        return handler.send_json(200, {'ok': True})
+    except Exception as e:
+        return handler.send_json(500, {'error': str(e)})
+
+
 def handle_de_metrics_get(handler, de_name: str):
     """GET /de/<name>/metrics — return metrics.json."""
     de_dir = AGENTS_BASE / de_name
@@ -1128,6 +1182,9 @@ def handle_api_des_post(handler, body: dict):
         (de_dir / 'decisions.json').write_text(
             json.dumps({'pending': [], 'resolved': []}, indent=2)
         )
+
+        # workspace dir
+        (de_dir / 'workspace').mkdir(exist_ok=True)
 
         # schedule.json — auto-generated based on role/mission
         initial_schedule = _generate_default_schedules(name, de_json)
