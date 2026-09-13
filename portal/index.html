@@ -709,10 +709,15 @@ textarea, input, select { font-family: inherit; }
   /* ── SESSIONS as first tab on mobile ── */
   #dtab-sessions { display:inline-flex !important; order:-1; }
   .de-view-body { flex-direction:column; overflow:hidden; }
+  /* Sessions panel: hidden by default, fills space when active */
   .de-sessions-panel { display:none; width:100%; flex:1; max-height:none; border-right:none; border-bottom:none; overflow:hidden; }
   .de-sessions-panel.mobile-tab-active { display:flex; }
-  .de-detail-panel { min-width:0; width:100%; flex:1; }
-  .de-detail-panel.mobile-sessions-tab { display:none; }
+  /* Detail panel: ALWAYS visible (tab bar must remain accessible) */
+  /* When sessions tab active: collapse to just the tab bar, hide content */
+  .de-detail-panel { min-width:0; width:100%; flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .de-detail-panel.mobile-sessions-tab { flex:0 0 auto; }
+  .de-detail-panel.mobile-sessions-tab .de-detail-content { display:none !important; }
+  .de-detail-panel.mobile-sessions-tab .de-msg-bar { display:none !important; }
   .de-sessions-resize-handle { display:none; }
 
   /* ── Session cards: quality badge truncation ── */
