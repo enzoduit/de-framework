@@ -1494,12 +1494,21 @@ Only include changes that are clearly implied by the feedback. If only a schedul
             timeout=60,
         )
 
-        # Extract JSON — strip markdown code fences if present
+        # Extract JSON — robust: handle ```json fences, prose preambles, trailing text
+        import re as _re
         text = raw_response.strip()
-        if text.startswith('```'):
-            text = text.split('\n', 1)[-1]
-            if text.endswith('```'):
-                text = text[:-3]
+        # Try to extract JSON from code fence first
+        _m = _re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', text)
+        if _m:
+            text = _m.group(1).strip()
+        elif text.startswith('```'):
+            text = _re.sub(r'^```\w*\s*', '', text)
+            text = _re.sub(r'\s*```$', '', text).strip()
+        # If still no JSON object at start, find the first {...} block
+        if not text.startswith('{'):
+            _m2 = _re.search(r'\{[\s\S]*\}', text)
+            if _m2:
+                text = _m2.group(0)
         text = text.strip()
 
         proposal = json.loads(text)
