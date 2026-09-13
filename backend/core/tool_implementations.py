@@ -394,7 +394,15 @@ def _decrypt_credentials(required_creds: list) -> tuple[dict, list]:
     for cred_id in required_creds:
         value = decrypt_credential(cred_id)
         if value is None:
-            missing.append(cred_id)
+            # Fallback: use existing system environment variable if available.
+            # This means scripts that already work on the server (credentials in
+            # /etc/de-framework.env or the system env) work transparently as DE
+            # tools without requiring re-entry in the portal.
+            env_fallback = os.environ.get(cred_id)
+            if env_fallback:
+                env_vals[cred_id] = env_fallback
+            else:
+                missing.append(cred_id)
         else:
             env_vals[cred_id] = value
             update_last_used(cred_id)
