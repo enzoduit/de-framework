@@ -31,6 +31,7 @@ from backend.routes import (
     setup_routes,
     creds_routes,
     branding_routes,
+    discovery_routes,
 )
 
 
@@ -209,6 +210,9 @@ class DEHandler(BaseHTTPRequestHandler):
 
         if path == '/api/branding':
             return branding_routes.handle_branding_post(self, body)
+
+        if path == '/api/tools/discover-from-agent':
+            return discovery_routes.handle_discover(self)
 
         if path == '/api/credentials':
             return creds_routes.handle_credentials_post(self, body)

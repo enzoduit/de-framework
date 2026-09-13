@@ -846,6 +846,27 @@ textarea, input, select { font-family: inherit; }
 .ws-preview-footer{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
 .ws-preview-footer .btn-save{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;}
 .ws-preview-footer .btn-cancel{background:none;border:1px solid var(--border);border-radius:5px;padding:7px 14px;font-size:12px;cursor:pointer;color:var(--text-muted);font-family:'JetBrains Mono',monospace;}
+#discover-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;display:none;align-items:center;justify-content:center;}
+#discover-overlay.open{display:flex;}
+.discover-modal{background:var(--surface);border-radius:10px;width:min(720px,96vw);max-height:82vh;display:flex;flex-direction:column;border:1px solid var(--border);}
+.discover-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.discover-title{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text);}
+.discover-body{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:6px;}
+.discover-footer{display:flex;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;}
+.discover-count{color:var(--text-muted);font-size:11px;font-family:monospace;margin-left:auto;}
+.discover-loading{color:var(--text-muted);font-family:monospace;font-size:12px;text-align:center;padding:40px;}
+.discover-section{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.1em;margin:8px 0 4px;}
+.discover-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;}
+.discover-item:hover{background:var(--surface);}
+.discover-item.registered{opacity:.5;}
+.discover-item input[type=checkbox]{margin-top:2px;flex-shrink:0;accent-color:var(--accent);}
+.discover-item-info{flex:1;min-width:0;}
+.discover-item-name{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--text);}
+.discover-item-desc{font-size:11px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.discover-item-badge{font-size:9px;padding:2px 6px;border-radius:10px;font-weight:700;font-family:monospace;flex-shrink:0;}
+.badge-registered{background:rgba(0,180,0,.12);color:#0a0;}
+.badge-new{background:rgba(255,69,0,.12);color:var(--accent);}
+.discover-creds{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:var(--text-muted);line-height:1.8;}
 </style>
 </head>
 <body>
@@ -1010,12 +1031,30 @@ textarea, input, select { font-family: inherit; }
 </div>
 
 <!-- ═══ TOOL LIBRARY OVERLAY ═══ -->
+<div id="discover-overlay" onclick="if(event.target===this)closeDiscover()">
+  <div class="discover-modal">
+    <div class="discover-hdr">
+      <div class="discover-title">⚡ Discover from Agent</div>
+      <button class="btn-close" onclick="closeDiscover()">&#10005;</button>
+    </div>
+    <div class="discover-body" id="discover-body">
+      <div class="discover-loading">Scanning agent workspace...</div>
+    </div>
+    <div class="discover-footer">
+      <button class="btn-save" id="discover-register-btn" onclick="registerSelectedTools()" style="display:none;background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;">&#10003; Register Selected</button>
+      <button onclick="closeDiscover()" style="background:none;border:1px solid var(--border);border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">Close</button>
+      <span class="discover-count" id="discover-count"></span>
+    </div>
+  </div>
+</div>
+
 <div id="tool-library-overlay" onclick="if(event.target===this)closeToolLibrary()">
   <div class="tool-library-modal">
     <div class="tool-library-hdr">
       <div class="tool-library-title">⚙ Tool Library — Available Tools</div>
       <div style="display:flex;gap:8px;align-items:center">
         <button id="btn-rediscover" class="btn-tool-add" onclick="rediscoverTools()" title="Re-query OpenClaw for available tools">🔄 Rediscover</button>
+        <button class="btn-tool-add" onclick="openDiscover()" title="Scan agent workspace for tool candidates">⚡ Discover from Agent</button>
         <button class="btn-close" onclick="closeToolLibrary()">✕</button>
       </div>
     </div>
@@ -2739,6 +2778,131 @@ async function rediscoverTools() {
 }
 
 function closeToolLibrary() { $('tool-library-overlay').classList.remove('open'); }
+
+// ── Discover from Agent ─────────────────────────────────────────────────────
+let _discoverData = null;
+
+async function openDiscover() {
+  const overlay = $('discover-overlay');
+  const body = $('discover-body');
+  const registerBtn = $('discover-register-btn');
+  const countEl = $('discover-count');
+  overlay.classList.add('open');
+  body.innerHTML = '<div class="discover-loading">Scanning agent workspace…</div>';
+  if (registerBtn) registerBtn.style.display = 'none';
+  if (countEl) countEl.textContent = '';
+  _discoverData = null;
+
+  try {
+    const r = await apiFetch('/api/tools/discover-from-agent', { method: 'POST' });
+    const d = await r.json();
+    _discoverData = d;
+    renderDiscoverResults(d, body);
+    const newCount = (d.candidates || []).filter(c => !c.already_registered).length;
+    if (registerBtn) registerBtn.style.display = newCount ? '' : 'none';
+    if (countEl) countEl.textContent = `${d.counts?.total || 0} found · ${d.counts?.credential_names || 0} credential keys`;
+  } catch(e) {
+    body.innerHTML = `<div class="discover-loading" style="color:#e55;">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderDiscoverResults(d, body) {
+  const candidates = d.candidates || [];
+  const creds = d.credential_names || [];
+  let html = '';
+
+  const scripts = candidates.filter(c => c.source_type === 'workspace_script');
+  const native = candidates.filter(c => c.source_type === 'openclaw_native');
+
+  if (scripts.length) {
+    html += `<div class="discover-section">📁 WORKSPACE SCRIPTS (${scripts.length})</div>`;
+    html += scripts.map(c => `
+      <label class="discover-item ${c.already_registered ? 'registered' : ''}" style="cursor:pointer;">
+        <input type="checkbox" class="discover-cb" data-id="${esc(c.id)}" ${c.already_registered ? 'disabled' : ''} ${!c.already_registered ? 'checked' : ''}>
+        <span style="font-size:18px;flex-shrink:0;">${esc(c.icon)}</span>
+        <div class="discover-item-info">
+          <div class="discover-item-name">${esc(c.name)}</div>
+          <div class="discover-item-desc" title="${esc(c.description)}">${esc(c.description)}</div>
+        </div>
+        <span class="discover-item-badge ${c.already_registered ? 'badge-registered' : 'badge-new'}">${c.already_registered ? '✓ registered' : 'NEW'}</span>
+      </label>`).join('');
+  }
+
+  if (native.length) {
+    html += `<div class="discover-section">⚡ OPENCLAW NATIVE TOOLS (${native.length})</div>`;
+    html += native.map(c => `
+      <label class="discover-item ${c.already_registered ? 'registered' : ''}" style="cursor:pointer;">
+        <input type="checkbox" class="discover-cb" data-id="${esc(c.id)}" ${c.already_registered ? 'disabled' : ''}>
+        <span style="font-size:18px;flex-shrink:0;">${esc(c.icon)}</span>
+        <div class="discover-item-info">
+          <div class="discover-item-name">${esc(c.name)}</div>
+          <div class="discover-item-desc">${esc(c.description)}</div>
+        </div>
+        <span class="discover-item-badge ${c.already_registered ? 'badge-registered' : 'badge-new'}">${c.already_registered ? '✓ registered' : 'NEW'}</span>
+      </label>`).join('');
+  }
+
+  if (creds.length) {
+    html += `<div class="discover-section">🔑 DETECTED CREDENTIAL KEYS (${creds.length})</div>`;
+    html += `<div class="discover-creds">Found in .env files (keys only — values never exposed):<br>${creds.map(k => `· ${esc(k)}`).join('<br>')}</div>`;
+  }
+
+  if (!candidates.length && !creds.length) {
+    html = '<div class="discover-loading">No scripts or integrations found. Make sure AGENT_WORKSPACE is set correctly.</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function closeDiscover() {
+  const overlay = $('discover-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+async function registerSelectedTools() {
+  if (!_discoverData) return;
+  const checkboxes = document.querySelectorAll('.discover-cb:checked:not(:disabled)');
+  if (!checkboxes.length) { alert('Select at least one tool to register.'); return; }
+
+  const candidates = _discoverData.candidates || [];
+  const selectedIds = new Set([...checkboxes].map(cb => cb.dataset.id));
+  const toRegister = candidates.filter(c => selectedIds.has(c.id));
+
+  const btn = $('discover-register-btn');
+  if (btn) { btn.textContent = '⏳ Registering…'; btn.disabled = true; }
+
+  let registered = 0;
+  const errors = [];
+  for (const c of toRegister) {
+    try {
+      const r = await apiFetch('/api/tools/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          icon: c.icon,
+          script: c.script || c.id,
+        }),
+      });
+      const d = await r.json();
+      if (d.ok) registered++;
+      else errors.push(`${c.id}: ${d.error || 'failed'}`);
+    } catch(e) { errors.push(`${c.id}: ${e.message}`); }
+  }
+
+  if (btn) { btn.textContent = '✓ Register Selected'; btn.disabled = false; }
+
+  if (errors.length) {
+    alert(`Registered ${registered}. Errors:\n${errors.join('\n')}`);
+  } else {
+    closeDiscover();
+    await renderToolLibrary(true); // refresh tool library
+    if (!$('tool-library-overlay').classList.contains('open')) {
+      openToolLibrary();
+    }
+  }
+}
 
 function renderToolChips(allTools) {
   const REQUIRED_IDS = ['request_human_decision', 'ask_colleague', 'report_to_colleague'];
