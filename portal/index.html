@@ -2209,6 +2209,19 @@ function renderSessionDetail_inner(de, s) {
   const stale = isSessionStale(s);
   const dur = s.duration_seconds ? (s.duration_seconds < 60 ? s.duration_seconds + 's' : Math.round(s.duration_seconds/60) + 'm') : '';
   const schedInfo = s.schedule_name ? `<span style="font-size:10px;color:var(--text-muted)">📅 ${esc(s.schedule_name)}</span>` : '';
+  const feedbackSection = !isLive ? `
+    <div style="border-top:1px solid var(--border);padding:12px 14px 16px;flex-shrink:0">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:8px">IMPROVE</div>
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <textarea id="fb-input" rows="2"
+          placeholder="What would you change about ${esc(de)}?"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:8px 10px;resize:vertical;font-family:inherit;outline:none;line-height:1.5"
+          onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){submitFeedback('${esc(de)}','${esc(s.id)}');event.preventDefault()}"></textarea>
+        <button onclick="submitFeedback('${esc(de)}','${esc(s.id)}')"
+          style="background:var(--accent);border:none;color:#fff;font-size:12px;font-weight:600;padding:8px 14px;border-radius:6px;cursor:pointer;white-space:nowrap;font-family:'JetBrains Mono',monospace">→ Improve</button>
+      </div>
+      <div id="fb-result" style="display:none;margin-top:10px"></div>
+    </div>` : '';
   return `
     ${s.summary ? `<div class="session-summary-box">${renderMd(s.summary)}</div>` : ''}
     <div style="padding:0 14px 10px;flex-shrink:0">
@@ -2231,7 +2244,8 @@ function renderSessionDetail_inner(de, s) {
       <div class="timeline">
         ${(s.steps||[]).length ? (s.steps||[]).map(renderTimelineStep).join('') : '<div class="prog-empty">No steps recorded yet.</div>'}
       </div>
-    </div>`;
+    </div>
+    ${feedbackSection}`;
 }
 
 async function showSessionSteps(de, sid, el) {
@@ -3123,6 +3137,87 @@ updateGearIcon();
 loadBranding();
 // Open settings on first load if no backend configured
 if(!isBackendConfigured()){setTimeout(openSettings,800);}
+
+/* ═══ HUMAN FEEDBACK LOOP ════════════════════════════════════════════════ */
+let _pendingFeedback = null; // { de, fbId, changes }
+
+async function submitFeedback(de, sid) {
+  const textarea = document.getElementById('fb-input');
+  const resultDiv = document.getElementById('fb-result');
+  if (!textarea || !resultDiv) return;
+  const feedback = textarea.value.trim();
+  if (!feedback) { textarea.focus(); return; }
+
+  const btn = textarea.parentNode ? textarea.parentNode.querySelector('button') : null;
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<div style="color:var(--text-muted);font-size:11px;padding:8px 0">Analyzing feedback…</div>';
+
+  try {
+    const r = await apiFetch(`/de/${encodeURIComponent(de)}/sessions/${encodeURIComponent(sid)}/improve`, {
+      method: 'POST',
+      body: JSON.stringify({ feedback }),
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'Request failed');
+
+    _pendingFeedback = { de, fbId: d.feedback_id, changes: d.changes || [] };
+
+    const changesHtml = (d.changes || []).map(c => {
+      if (c.type === 'instructions') return `<div style="color:var(--text-sec);font-size:11px;padding:2px 0">📝 Update instructions</div>`;
+      if (c.type === 'schedule') return `<div style="color:var(--text-sec);font-size:11px;padding:2px 0">⏰ Schedule "${esc(c.schedule_name||'')}" · ${esc(c.field||'')} → <strong>${esc(String(c.new_value||''))}</strong></div>`;
+      if (c.type === 'feedback_log') return `<div style="color:var(--text-sec);font-size:11px;padding:2px 0">📌 Log feedback note</div>`;
+      return '';
+    }).join('');
+
+    resultDiv.innerHTML = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="font-size:12px;color:var(--text);margin-bottom:${changesHtml ? '8px' : '10px'}">
+          <span style="color:var(--text-muted);font-size:10px;font-family:'JetBrains Mono',monospace">I UNDERSTOOD</span><br>
+          ${esc(d.summary || '')}
+        </div>
+        ${changesHtml ? `<div style="margin-bottom:10px">${changesHtml}</div>` : ''}
+        <div style="display:flex;gap:8px">
+          <button onclick="applyFeedback()"
+            style="background:#16a34a;border:none;color:#fff;font-size:12px;font-weight:600;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace">Apply</button>
+          <button onclick="dismissFeedback()"
+            style="background:transparent;border:1px solid var(--border);color:var(--text-sec);font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer">Dismiss</button>
+        </div>
+      </div>`;
+  } catch(e) {
+    resultDiv.innerHTML = `<div style="color:var(--red);font-size:11px;padding:8px 0">Error: ${esc(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText || '→ Improve'; }
+  }
+}
+
+async function applyFeedback() {
+  if (!_pendingFeedback) return;
+  const { de, fbId, changes } = _pendingFeedback;
+  const resultDiv = document.getElementById('fb-result');
+  if (resultDiv) resultDiv.innerHTML = '<div style="color:var(--text-muted);font-size:11px;padding:8px 0">Applying changes…</div>';
+  try {
+    const r = await apiFetch(`/de/${encodeURIComponent(de)}/improve/apply`, {
+      method: 'POST',
+      body: JSON.stringify({ feedback_id: fbId, changes }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Apply failed');
+    _pendingFeedback = null;
+    if (resultDiv) resultDiv.innerHTML = '<div style="color:#16a34a;font-size:13px;font-weight:600;padding:6px 0">✅ Applied</div>';
+  } catch(e) {
+    if (resultDiv) resultDiv.innerHTML = `<div style="color:var(--red);font-size:11px;padding:8px 0">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function dismissFeedback() {
+  _pendingFeedback = null;
+  const resultDiv = document.getElementById('fb-result');
+  if (resultDiv) { resultDiv.style.display = 'none'; resultDiv.innerHTML = ''; }
+  const textarea = document.getElementById('fb-input');
+  if (textarea) textarea.value = '';
+}
 </script>
 </body>
 </html>

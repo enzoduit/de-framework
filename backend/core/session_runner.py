@@ -122,6 +122,18 @@ def main():
         f'Be specific and action-oriented. This log will be reviewed by your manager.'
     )
 
+    # Inject recent human feedback so the session learns from past corrections
+    try:
+        from feedback_db import get_recent_feedback
+        recent_fb = get_recent_feedback(de_name, limit=5)
+        if recent_fb:
+            feedback_section = '\n\n## Recent Human Feedback (apply these learnings)\n'
+            for f in recent_fb:
+                feedback_section += f"- [{f['timestamp'][:10]}] {f['raw_text']}\n"
+            task_prompt += feedback_section
+    except Exception as _fb_err:
+        print(f'[session_runner] feedback injection skipped: {_fb_err}')
+
     # ── Engine Selection ────────────────────────────────────────────────────────
     # ANTHROPIC_API_KEY is injected via /etc/de-framework.env (EnvironmentFile in service)
     ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '')

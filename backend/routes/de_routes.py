@@ -8,8 +8,35 @@ import subprocess as _sp
 import uuid as _uuid
 from datetime import datetime, timedelta, timezone as _tz
 from pathlib import Path
+from urllib.request import urlopen, Request as _URLRequest
 from backend.config import AGENTS_BASE, DE_NAMES, now_iso
 from backend.core.tool_discovery import get_tools as _get_tools, REQUIRED_TOOL_IDS
+from backend.core.feedback_db import store_feedback, get_feedback, mark_applied
+
+_OPENCLAW_GATEWAY_URL = os.environ.get('OPENCLAW_GATEWAY_URL', 'http://127.0.0.1:18789')
+_OPENCLAW_GATEWAY_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
+_DE_MODEL = os.environ.get('DE_MODEL', 'claude-sonnet-4-6')
+
+
+def _llm_call(messages: list, timeout: int = 60) -> str:
+    """Single chat-completion call via OpenClaw gateway. Returns assistant text."""
+    payload = json.dumps({
+        'model': 'openclaw',
+        'messages': messages,
+        'max_tokens': 2048,
+    }).encode()
+    req = _URLRequest(
+        f'{_OPENCLAW_GATEWAY_URL}/v1/chat/completions',
+        data=payload,
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {_OPENCLAW_GATEWAY_TOKEN}',
+        },
+        method='POST',
+    )
+    resp = urlopen(req, timeout=timeout)
+    result = json.loads(resp.read())
+    return result['choices'][0]['message']['content'] or ''
 
 CUSTOM_TOOLS_DIR = Path(os.environ.get('CUSTOM_TOOLS_DIR', '/var/de-framework-tools'))
 
@@ -1291,3 +1318,218 @@ def handle_api_des_get(handler, de_name: str):
         })
     except Exception as exc:
         return handler.send_json(500, {'error': str(exc)})
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Human Feedback Loop — POST /de/<name>/sessions/<id>/improve
+#                       POST /de/<name>/improve/apply
+# ──────────────────────────────────────────────────────────────────────────
+
+def _session_steps_summary(steps: list, max_chars: int = 1500) -> str:
+    """Compact string summary of session steps for the LLM prompt."""
+    lines = []
+    for step in steps:
+        t = step.get('type', '')
+        c = (step.get('content') or step.get('summary') or '').strip()[:300]
+        if c:
+            lines.append(f'[{t}] {c}')
+    return '\n'.join(lines)[:max_chars]
+
+
+def handle_session_improve(handler, de_name: str, session_id: str, body: dict):
+    """POST /de/<de>/sessions/<sid>/improve
+    Accept human feedback, store it, then call the LLM to propose changes.
+    Returns {feedback_id, summary, changes}.
+    """
+    raw_feedback = (body.get('feedback') or '').strip()
+    if not raw_feedback:
+        return handler.send_json(400, {'error': 'feedback is required'})
+
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+
+    # Load session for summary/steps context
+    session_file = de_dir / 'sessions' / f'{session_id}.json'
+    session_summary = ''
+    steps_summary = ''
+    if session_file.exists():
+        try:
+            sd = json.loads(session_file.read_text())
+            session_summary = sd.get('summary') or ''
+            steps_summary = _session_steps_summary(sd.get('steps', []))
+        except Exception:
+            pass
+
+    # Store feedback immediately — never lose it
+    combined_summary = (session_summary or steps_summary)[:500]
+    feedback_id = store_feedback(
+        de_name=de_name,
+        session_id=session_id,
+        session_summary=combined_summary,
+        raw_text=raw_feedback,
+    )
+
+    # Load current DE profile and schedules
+    try:
+        de_info = json.loads((de_dir / 'de.json').read_text())
+    except Exception:
+        de_info = {}
+
+    current_instructions = ''
+    job_md_file = de_dir / 'job.md'
+    if job_md_file.exists():
+        try:
+            current_instructions = job_md_file.read_text()[:3000]
+        except Exception:
+            pass
+
+    schedules_json = '[]'
+    schedule_file = de_dir / 'schedule.json'
+    if schedule_file.exists():
+        try:
+            sched_data = json.loads(schedule_file.read_text())
+            schedules_json = json.dumps(sched_data.get('schedules', []), indent=2)[:2000]
+        except Exception:
+            pass
+
+    # Build LLM prompt
+    prompt = f"""You are analyzing human feedback about a Digital Employee session.
+
+## Digital Employee: {de_name}
+## Current Instructions:
+{current_instructions}
+
+## Current Schedules:
+{schedules_json}
+
+## Session that was reviewed:
+{steps_summary or session_summary or '(no session content available)'}
+
+## Human feedback:
+{raw_feedback}
+
+Analyze the feedback and return ONLY a JSON object (no prose) with:
+{{
+  "summary": "one-line human-readable summary of what you understood",
+  "changes": [
+    {{"type": "instructions", "new_value": "full updated instructions text"}},
+    {{"type": "schedule", "schedule_name": "Daily Check", "field": "time", "new_value": "09:00"}},
+    {{"type": "feedback_log", "note": "general feedback stored for context"}}
+  ]
+}}
+
+Only include changes that are clearly implied by the feedback. If only a schedule change is needed, only include that. If it's just a general observation, include only feedback_log."""
+
+    try:
+        raw_response = _llm_call(
+            messages=[{'role': 'user', 'content': prompt}],
+            timeout=60,
+        )
+
+        # Extract JSON — strip markdown code fences if present
+        text = raw_response.strip()
+        if text.startswith('```'):
+            text = text.split('\n', 1)[-1]
+            if text.endswith('```'):
+                text = text[:-3]
+        text = text.strip()
+
+        proposal = json.loads(text)
+        summary = proposal.get('summary', '')
+        changes = proposal.get('changes', [])
+
+    except json.JSONDecodeError:
+        # LLM didn't return valid JSON — treat as feedback_log
+        summary = 'Could not parse AI proposal; feedback logged.'
+        changes = [{'type': 'feedback_log', 'note': raw_feedback}]
+    except Exception as exc:
+        return handler.send_json(500, {'error': f'LLM call failed: {exc}', 'feedback_id': feedback_id})
+
+    return handler.send_json(200, {
+        'ok': True,
+        'feedback_id': feedback_id,
+        'summary': summary,
+        'changes': changes,
+    })
+
+
+def handle_improve_apply(handler, de_name: str, body: dict):
+    """POST /de/<de>/improve/apply
+    Accept confirmed changes and apply them to the DE's profile.
+    Returns {ok, applied}.
+    """
+    feedback_id = body.get('feedback_id')
+    changes = body.get('changes', [])
+
+    if feedback_id is None:
+        return handler.send_json(400, {'error': 'feedback_id is required'})
+
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+
+    applied = []
+    errors = []
+
+    for change in changes:
+        ctype = change.get('type')
+        try:
+            if ctype == 'instructions':
+                # Update job.md (the primary instructions file)
+                new_instructions = change.get('new_value', '')
+                if new_instructions:
+                    job_md_file = de_dir / 'job.md'
+                    job_md_file.write_text(new_instructions)
+                    applied.append({'type': 'instructions', 'ok': True})
+
+            elif ctype == 'schedule':
+                # Update the matching schedule entry in schedule.json
+                schedule_file = de_dir / 'schedule.json'
+                if schedule_file.exists():
+                    sched_data = json.loads(schedule_file.read_text())
+                    schedules = sched_data.get('schedules', [])
+                    sched_name = (change.get('schedule_name') or '').lower()
+                    field = change.get('field', '')
+                    new_val = change.get('new_value', '')
+                    matched = False
+                    for s in schedules:
+                        if (s.get('name') or '').lower() == sched_name:
+                            if field and new_val:
+                                s[field] = new_val
+                                matched = True
+                    if matched:
+                        sched_data['updated_at'] = now_iso()
+                        schedule_file.write_text(json.dumps(sched_data, indent=2))
+                        applied.append({'type': 'schedule', 'schedule_name': change.get('schedule_name'), 'ok': True})
+                    else:
+                        errors.append({'type': 'schedule', 'error': f'Schedule "{sched_name}" not found'})
+
+            elif ctype == 'feedback_log':
+                # Append note to LEARNING_LOG.md in the DE's workspace
+                ws_dir = de_dir / 'workspace'
+                ws_dir.mkdir(parents=True, exist_ok=True)
+                log_file = ws_dir / 'LEARNING_LOG.md'
+                note = change.get('note', '')
+                ts = now_iso()[:10]
+                with open(log_file, 'a') as f:
+                    f.write(f'\n## [{ts}] Human Feedback\n{note}\n')
+                applied.append({'type': 'feedback_log', 'ok': True})
+
+            else:
+                errors.append({'type': ctype, 'error': 'Unknown change type'})
+
+        except Exception as exc:
+            errors.append({'type': ctype, 'error': str(exc)})
+
+    # Mark as applied in SQLite
+    try:
+        mark_applied(int(feedback_id), json.dumps(changes))
+    except Exception:
+        pass
+
+    return handler.send_json(200, {
+        'ok': True,
+        'applied': applied,
+        'errors': errors,
+    })

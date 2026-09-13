@@ -227,6 +227,16 @@ class DEHandler(BaseHTTPRequestHandler):
                 and parts[2] == 'sessions' and parts[4] == 'reset'):
             return de_routes.handle_session_reset(self, parts[1], parts[3])
 
+        # POST /de/<name>/sessions/<id>/improve — human feedback → AI proposal
+        if (len(parts) == 5 and parts[0] == 'de'
+                and parts[2] == 'sessions' and parts[4] == 'improve'):
+            return de_routes.handle_session_improve(self, parts[1], parts[3], body)
+
+        # POST /de/<name>/improve/apply — apply confirmed changes
+        if (len(parts) == 4 and parts[0] == 'de'
+                and parts[2] == 'improve' and parts[3] == 'apply'):
+            return de_routes.handle_improve_apply(self, parts[1], body)
+
         # POST /de/<name>/workspace/<filename> — create or overwrite text file
         if (len(parts) == 4 and parts[0] == 'de'
                 and parts[2] == 'workspace'):
@@ -290,6 +300,14 @@ class DEHandler(BaseHTTPRequestHandler):
 
 def run():
     import socketserver
+    from backend.core.feedback_db import init_db as _init_feedback_db
+
+    # Initialise feedback SQLite DB on startup
+    try:
+        _init_feedback_db()
+        print('[DE Framework API] feedback.db ready')
+    except Exception as e:
+        print(f'[DE Framework API] WARNING: feedback DB init failed: {e}')
 
     class ReusableHTTPServer(HTTPServer):
         allow_reuse_address = True
