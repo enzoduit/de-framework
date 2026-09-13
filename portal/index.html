@@ -607,6 +607,7 @@ textarea, input, select { font-family: inherit; }
   color:var(--text-muted); border-bottom:2px solid transparent; cursor:pointer; transition:all 0.15s;
 }
 .de-detail-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+#dtab-sessions { display:none; }
 .de-detail-content { display:none; flex:1; flex-direction:column; overflow:hidden; }
 .de-detail-content.active { display:flex; }
 
@@ -705,16 +706,14 @@ textarea, input, select { font-family: inherit; }
   .btn-run { padding:6px 12px; font-size:9px; white-space:nowrap; }
   .live-badge { font-size:8px; padding:2px 6px; }
 
-  /* ── 3-pane layout: stack vertically on mobile ── */
-  .de-view-body { flex-direction:column; }
-  .de-sessions-panel {
-    width:100% !important; flex-shrink:0;
-    max-height:200px; border-right:none;
-    border-bottom:1px solid var(--border);
-    overflow-y:auto;
-  }
-  .de-sessions-resize-handle { display:none; }
+  /* ── SESSIONS as first tab on mobile ── */
+  #dtab-sessions { display:inline-flex !important; order:-1; }
+  .de-view-body { flex-direction:column; overflow:hidden; }
+  .de-sessions-panel { display:none; width:100%; flex:1; max-height:none; border-right:none; border-bottom:none; overflow:hidden; }
+  .de-sessions-panel.mobile-tab-active { display:flex; }
   .de-detail-panel { min-width:0; width:100%; flex:1; }
+  .de-detail-panel.mobile-sessions-tab { display:none; }
+  .de-sessions-resize-handle { display:none; }
 
   /* ── Session cards: quality badge truncation ── */
   .ws-card-top { flex-wrap:wrap; gap:4px; }
@@ -899,6 +898,7 @@ textarea, input, select { font-family: inherit; }
           <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFILE</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
           <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRICS</button>
+          <button class="de-detail-tab" id="dtab-sessions" onclick="switchDetailTab('sessions')">📋 SESSIONS</button>
         </div>
 
         <!-- Profile -->
@@ -2167,6 +2167,22 @@ function backToSessionsList() {
 }
 
 function switchDetailTab(name) {
+  const isMobile = window.innerWidth <= 767;
+  const sp = document.querySelector('.de-sessions-panel');
+  const dp = document.querySelector('.de-detail-panel');
+  if (isMobile && sp && dp) {
+    if (name === 'sessions') {
+      sp.classList.add('mobile-tab-active');
+      dp.classList.add('mobile-sessions-tab');
+      document.querySelectorAll('.de-detail-tab').forEach(t => t.classList.toggle('active', t.id === 'dtab-sessions'));
+      if (selectedDE) loadSessionsPanel(selectedDE);
+      return;
+    }
+    sp.classList.remove('mobile-tab-active');
+    dp.classList.remove('mobile-sessions-tab');
+  }
+  const sessBtn = $('dtab-sessions');
+  if (sessBtn) sessBtn.classList.remove('active');
   const names = ['profile','schedule','metrics'];
   document.querySelectorAll('.de-detail-tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.de-detail-content').forEach((c,i) => c.classList.toggle('active', names[i]===name));
