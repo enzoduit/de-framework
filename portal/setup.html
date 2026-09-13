@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Integration Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f7;--surface:#ffffff;--border:#d1d1d6;
+  --text:#1d1d1f;--text-sec:#6e6e73;--text-muted:#8e8e93;
+  --accent:#FF4500;--success:#30d158;--danger:#ff453a;--warn:#ff9f0a;
+  --font-mono:'JetBrains Mono',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
+
+/* HEADER */
+#hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
+#hdr-logo{height:26px;border-radius:4px;display:none}
+#hdr-name{font-family:var(--font-mono);font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px}
+.logo-dot{color:var(--accent)}
+#hdr-sep{color:#d1d1d6;font-size:16px}
+#hdr-sub{font-size:12px;color:var(--text-sec)}
+
+/* LAYOUT */
+#main{max-width:700px;margin:0 auto;padding:32px 20px 56px}
+
+/* CONFIG FORM */
+#cfg-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px;max-width:440px;margin:40px auto;box-shadow:0 1px 4px rgba(0,0,0,.05);display:none}
+#cfg-wrap h2{font-family:var(--font-mono);font-size:13px;font-weight:700;margin-bottom:4px}
+#cfg-wrap p{font-size:12px;color:var(--text-sec);margin-bottom:20px;line-height:1.6}
+.lbl{font-size:10px;font-family:var(--font-mono);font-weight:700;letter-spacing:.05em;color:var(--text-sec);display:block;margin-bottom:5px}
+.cfg-inp{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--text);outline:none;transition:border-color .15s;margin-bottom:14px}
+.cfg-inp:focus{border-color:var(--accent)}
+#cfg-btn{width:100%;background:var(--accent);color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:10px;border-radius:7px;border:none;cursor:pointer;transition:opacity .15s}
+#cfg-btn:hover{opacity:.85}
+#cfg-err{font-size:11px;color:var(--danger);margin-top:10px;font-family:var(--font-mono);display:none}
+
+/* TOOL SECTION */
+#tools-wrap{display:none}
+#recfg-row{font-size:11px;color:var(--text-muted);font-family:var(--font-mono);text-align:right;margin-bottom:8px}
+#recfg-row a{color:var(--text-muted);text-decoration:underline;cursor:pointer}
+#recfg-row a:hover{color:var(--accent)}
+#banner{border-radius:8px;padding:12px 16px;margin-bottom:24px;font-family:var(--font-mono);font-size:12px;font-weight:600;display:none}
+#banner.ok{background:rgba(48,209,88,.1);border:1px solid rgba(48,209,88,.3);color:var(--success)}
+#banner.warn{background:rgba(255,159,10,.1);border:1px solid rgba(255,159,10,.35);color:var(--warn)}
+#err-box{background:rgba(255,69,58,.07);border:1px solid rgba(255,69,58,.3);border-radius:8px;padding:13px 16px;font-size:12px;color:var(--danger);display:none;margin-bottom:20px}
+#err-box a{color:var(--danger);font-family:var(--font-mono);font-size:11px}
+#loading{text-align:center;padding:60px 20px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted)}
+
+/* TOOL CARDS */
+.tc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .15s}
+.tc.missing{border-color:rgba(255,159,10,.45)}
+.tc.done{border-color:rgba(48,209,88,.35)}
+.tc-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.tc-icon{font-size:20px;flex-shrink:0}
+.tc-meta{flex:1;min-width:0}
+.tc-name{font-family:var(--font-mono);font-size:12px;font-weight:700}
+.tc-desc{font-size:11px;color:var(--text-muted);margin-top:2px}
+.tc-badge{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.b-ok{background:rgba(48,209,88,.12);color:var(--success)}
+.b-warn{background:rgba(255,159,10,.12);color:var(--warn)}
+
+/* CRED ROWS */
+.cred-list{display:flex;flex-direction:column;gap:8px}
+.cr{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cr-key{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--text-sec);min-width:180px;flex-shrink:0}
+.cr-set{font-family:var(--font-mono);font-size:11px;color:var(--success);font-weight:600;display:flex;align-items:center;gap:6px}
+.cr-change{font-size:10px;color:var(--text-muted);cursor:pointer;text-decoration:underline;font-family:var(--font-mono);background:none;border:none;padding:0}
+.cr-change:hover{color:var(--accent)}
+.cr-field{display:flex;align-items:center;gap:6px;flex:1;min-width:200px}
+.cr-inp{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:var(--text);outline:none;transition:border-color .15s;min-width:0}
+.cr-inp:focus{border-color:var(--accent)}
+.cr-inp.err{border-color:var(--danger)}
+.cr-btn{background:var(--accent);color:#fff;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:7px 12px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:opacity .15s,background .15s}
+.cr-btn:hover:not(:disabled){opacity:.85}
+.cr-btn:disabled{opacity:.5;cursor:default}
+.cr-btn.saving{background:#8a8a8e}
+.cr-btn.saved{background:var(--success)}
+
+/* FOOTER */
+#footer{text-align:center;margin-top:40px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+
+@media(max-width:600px){
+  #main{padding:20px 12px 40px}
+  #hdr{padding:12px 16px}
+  .cr-key{min-width:140px}
+  .cr-field{min-width:100%}
+  .tc{padding:14px}
+}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <img id="hdr-logo" alt="">
+  <div id="hdr-name"><span class="logo-dot">●</span> DE Framework</div>
+  <span id="hdr-sep">│</span>
+  <div id="hdr-sub">Credential Setup</div>
+</div>
+
+<div id="main">
+  <div id="cfg-wrap">
+    <h2>Connect to your backend</h2>
+    <p>Enter your backend URL and access token.<br>Your admin will provide these.</p>
+    <label class="lbl" for="cfg-url">BACKEND_URL</label>
+    <input class="cfg-inp" type="url" id="cfg-url" placeholder="https://your-backend.railway.app" autocomplete="off" spellcheck="false">
+    <label class="lbl" for="cfg-tok">ACCESS_TOKEN</label>
+    <input class="cfg-inp" type="password" id="cfg-tok" placeholder="sk-…">
+    <button id="cfg-btn">Connect →</button>
+    <div id="cfg-err"></div>
+  </div>
+
+  <div id="tools-wrap">
+    <div id="recfg-row"><a onclick="reconfigure()">⚙ Reconfigure backend</a></div>
+    <div id="banner"></div>
+    <div id="err-box"></div>
+    <div id="loading">Loading integrations…</div>
+    <div id="tool-list"></div>
+  </div>
+</div>
+
+<div id="footer">Powered by DE Framework</div>
+
+<script>
+function getCfg(){try{const s=localStorage.getItem('de_backend');if(s){const c=JSON.parse(s);if(c.url&&c.token)return c;}}catch{}return null;}
+function setCfg(url,tok){const u=url.replace(/\/+$/,'');localStorage.setItem('de_backend',JSON.stringify({url:u,token:tok}));return{url:u,token:tok};}
+async function apiFetch(cfg,path,opts={}){
+  return fetch(cfg.url+path,{...opts,headers:{'Authorization':'Bearer '+cfg.token,'Content-Type':'application/json',...(opts.headers||{})}});
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Boot
+(async()=>{
+  const p=new URLSearchParams(location.search);
+  if(p.get('url')&&p.get('token')){setCfg(p.get('url'),p.get('token'));history.replaceState({},'',location.pathname);}
+  const cfg=getCfg();
+  if(!cfg){show('cfg-wrap');document.getElementById('cfg-url').focus();return;}
+  show('tools-wrap');await loadPage(cfg);
+})();
+
+function show(id){['cfg-wrap','tools-wrap'].forEach(i=>document.getElementById(i).style.display=i===id?'block':'none');}
+
+// Config form
+['cfg-url','cfg-tok'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('cfg-btn').click();}));
+document.getElementById('cfg-btn').addEventListener('click',async()=>{
+  const url=document.getElementById('cfg-url').value.trim();
+  const tok=document.getElementById('cfg-tok').value.trim();
+  const errEl=document.getElementById('cfg-err');
+  errEl.style.display='none';
+  if(!url||!tok){errEl.textContent='Both fields are required.';errEl.style.display='';return;}
+  show('tools-wrap');await loadPage(setCfg(url,tok));
+});
+function reconfigure(){
+  document.getElementById('tool-list').innerHTML='';
+  document.getElementById('loading').style.display='';
+  document.getElementById('err-box').style.display='none';
+  document.getElementById('banner').style.display='none';
+  const c=getCfg();document.getElementById('cfg-url').value=c?.url||'';document.getElementById('cfg-tok').value='';
+  show('cfg-wrap');document.getElementById('cfg-url').focus();
+}
+
+// Page load
+async function loadPage(cfg){
+  // Branding
+  try{const br=await apiFetch(cfg,'/api/branding');if(br.ok){const b=await br.json();
+    if(b.accent_color)document.documentElement.style.setProperty('--accent',b.accent_color);
+    if(b.logo_url){const li=document.getElementById('hdr-logo');li.src=b.logo_url;li.style.display='';}
+    if(b.company_name){document.getElementById('hdr-name').innerHTML='<span class="logo-dot">●</span> '+esc(b.company_name);
+      document.title=b.company_name+' — Integration Setup';document.getElementById('footer').textContent='Powered by '+b.company_name;}
+  }}catch{}
+  // Tools
+  let r;try{r=await apiFetch(cfg,'/tools');}catch{return showErr('Cannot connect to backend. Check your URL.');}
+  if(r.status===401)return showErr('Invalid token. Please check your access token.');
+  if(!r.ok)return showErr('Cannot connect to backend. Check your URL.');
+  document.getElementById('loading').style.display='none';
+  renderTools(cfg,await r.json());
+}
+function showErr(msg){
+  document.getElementById('loading').style.display='none';
+  const el=document.getElementById('err-box');el.style.display='';
+  el.innerHTML=msg+' <a onclick="reconfigure()">Reconfigure</a>';
+}
+
+// Render
+function renderTools(cfg,raw){
+  const tools=(Array.isArray(raw)?raw:raw.tools||[]).filter(t=>t.required_credentials&&t.required_credentials.length>0);
+  const banner=document.getElementById('banner');banner.style.display='';
+  if(!tools.length){banner.className='ok';banner.textContent='✅ No integrations require credentials.';return;}
+
+  let missing=0;
+  tools.forEach(t=>{const st=t.credential_status||{};t.required_credentials.forEach(k=>{if(st[k]!=='set')missing++;});});
+  updateBanner(banner,missing,tools.length);
+
+  const list=document.getElementById('tool-list');list.innerHTML='';
+  let firstInp=null;
+  tools.forEach(tool=>{
+    const st=tool.credential_status||{};const id=tool.id||tool.name||'tool';
+    const mKeys=tool.required_credentials.filter(k=>st[k]!=='set');const allSet=!mKeys.length;
+    const card=document.createElement('div');card.className='tc '+(allSet?'done':'missing');card.dataset.id=id;
+    card.innerHTML=`<div class="tc-hdr">
+      <div class="tc-icon">${esc(tool.icon||'🔧')}</div>
+      <div class="tc-meta"><div class="tc-name">${esc(tool.name||id)}</div>${tool.description?`<div class="tc-desc">${esc(tool.description)}</div>`:''}</div>
+      <span class="tc-badge ${allSet?'b-ok':'b-warn'}">${allSet?'✅ All set':'⚠ '+mKeys.length+' missing'}</span>
+    </div><div class="cred-list"></div>`;
+    list.appendChild(card);
+    const cl=card.querySelector('.cred-list');
+    tool.required_credentials.forEach(key=>{
+      const isSet=st[key]==='set';const row=makeRow(cfg,key,isSet);cl.appendChild(row);
+      if(!isSet&&!firstInp){firstInp=row.querySelector('.cr-inp');}
+    });
+  });
+  if(firstInp)firstInp.focus();
+}
+
+function makeRow(cfg,key,isSet){
+  const row=document.createElement('div');row.className='cr';row.dataset.key=key;row.dataset.set=isSet?'1':'0';
+  if(isSet){
+    row.innerHTML=`<span class="cr-key">${esc(key)}</span>
+      <span class="cr-set">✅ Already set <button class="cr-change" onclick="showField(this)">Change</button></span>
+      <div class="cr-field" style="display:none">
+        <input class="cr-inp" type="password" placeholder="Enter new value…">
+        <button class="cr-btn" onclick="doSave(this,'${esc(key)}')">Save ▶</button>
+        <button class="cr-change" onclick="cancelField(this)">Cancel</button></div>`;
+  }else{
+    row.innerHTML=`<span class="cr-key">${esc(key)}</span>
+      <div class="cr-field">
+        <input class="cr-inp" type="password" placeholder="Enter value…">
+        <button class="cr-btn" onclick="doSave(this,'${esc(key)}')">Save ▶</button></div>`;
+  }
+  row.querySelectorAll('.cr-inp').forEach(inp=>inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){const b=inp.closest('.cr-field').querySelector('.cr-btn');if(b)b.click();}
+  }));
+  return row;
+}
+
+async function doSave(btn,key){
+  const field=btn.closest('.cr-field');const inp=field.querySelector('.cr-inp');const val=inp.value.trim();
+  if(!val){inp.classList.add('err');inp.focus();setTimeout(()=>inp.classList.remove('err'),2000);return;}
+  btn.disabled=true;btn.textContent='…';btn.classList.add('saving');
+  const cfg=getCfg();
+  try{
+    const r=await apiFetch(cfg,`/api/credentials/${encodeURIComponent(key)}`,{method:'POST',body:JSON.stringify({value:val})});
+    if(r.ok){
+      btn.classList.replace('saving','saved');btn.textContent='✅';
+      setTimeout(()=>{markSet(btn.closest('.cr'),key);refreshState();},500);
+    }else{inp.classList.add('err');setTimeout(()=>inp.classList.remove('err'),2000);btn.disabled=false;btn.textContent='Save ▶';btn.classList.remove('saving');}
+  }catch{btn.disabled=false;btn.textContent='Save ▶';btn.classList.remove('saving');}
+}
+
+function markSet(row,key){
+  row.dataset.set='1';
+  row.innerHTML=`<span class="cr-key">${esc(key)}</span>
+    <span class="cr-set">✅ Already set <button class="cr-change" onclick="showField(this)">Change</button></span>
+    <div class="cr-field" style="display:none">
+      <input class="cr-inp" type="password" placeholder="Enter new value…">
+      <button class="cr-btn" onclick="doSave(this,'${esc(key)}')">Save ▶</button>
+      <button class="cr-change" onclick="cancelField(this)">Cancel</button></div>`;
+  row.querySelectorAll('.cr-inp').forEach(inp=>inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){const b=inp.closest('.cr-field').querySelector('.cr-btn');if(b)b.click();}
+  }));
+}
+
+function refreshState(){
+  document.querySelectorAll('.tc').forEach(card=>{
+    const missing=[...card.querySelectorAll('.cr')].filter(r=>r.dataset.set!=='1');
+    const allSet=!missing.length;card.className='tc '+(allSet?'done':'missing');
+    const badge=card.querySelector('.tc-badge');if(badge){
+      badge.className='tc-badge '+(allSet?'b-ok':'b-warn');
+      badge.textContent=allSet?'✅ All set':'⚠ '+missing.length+' missing';
+    }
+  });
+  let rem=0;document.querySelectorAll('.cr').forEach(r=>{if(r.dataset.set!=='1')rem++;});
+  const banner=document.getElementById('banner');
+  updateBanner(banner,rem,document.querySelectorAll('.tc').length);
+}
+function updateBanner(el,missing,total){
+  if(missing===0){el.className='ok';el.textContent=`✅ Setup complete — all ${total} integration${total!==1?'s are':' is'} configured.`;}
+  else{el.className='warn';el.textContent=`⚠ ${missing} credential${missing!==1?'s':''} still missing`;}
+}
+function showField(btn){const d=btn.closest('.cr-set'),f=d.nextElementSibling;d.style.display='none';f.style.display='flex';f.querySelector('.cr-inp').focus();}
+function cancelField(btn){const f=btn.closest('.cr-field'),d=f.previousElementSibling;f.style.display='none';d.style.display='';}
+</script>
+</body>
+</html>
