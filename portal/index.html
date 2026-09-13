@@ -680,6 +680,11 @@ textarea, input, select { font-family: inherit; }
 /* ── MOBILE ── */
 .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99; }
 @media (max-width:767px) {
+  /* ── General overflow guard ── */
+  body, #app { overflow-x:hidden; max-width:100vw; }
+  .main-area { overflow-x:hidden; min-width:0; }
+
+  /* ── Sidebar ── */
   .sidebar-overlay { display:block; opacity:0; pointer-events:none; transition:opacity 0.25s; }
   .sidebar-overlay.visible { opacity:1; pointer-events:auto; }
   #sidebar { position:fixed; top:0; left:0; bottom:0; z-index:100; transform:translateX(-100%); }
@@ -690,9 +695,41 @@ textarea, input, select { font-family: inherit; }
   }
   .mobile-topbar-title { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--text); }
   .btn-ham { background:none; color:var(--text-sec); font-size:20px; padding:0; line-height:1; }
+
+  /* ── DE header: prevent RUN button overflow ── */
+  .de-header { flex-wrap:wrap; padding:10px 14px; gap:8px; }
+  .de-header-info { min-width:0; flex:1; }
+  .de-header-actions { flex-shrink:1; gap:6px; }
+  .btn-run { padding:6px 12px; font-size:9px; white-space:nowrap; }
+  .live-badge { font-size:8px; padding:2px 6px; }
+
+  /* ── 3-pane layout: stack vertically on mobile ── */
+  .de-view-body { flex-direction:column; }
+  .de-sessions-panel {
+    width:100% !important; flex-shrink:0;
+    max-height:42vh; border-right:none;
+    border-bottom:1px solid var(--border);
+    overflow-y:auto;
+  }
+  .de-sessions-resize-handle { display:none; }
+  .de-detail-panel { min-width:0; width:100%; flex:1; }
+
+  /* ── Session cards: quality badge truncation ── */
+  .ws-card-top { flex-wrap:wrap; gap:4px; }
+  .ws-quality { max-width:110px; overflow:hidden; text-overflow:ellipsis; font-size:9px; }
+
+  /* ── Tabs: horizontal scroll if needed ── */
+  .de-detail-tabs { overflow-x:auto; -webkit-overflow-scrolling:touch; flex-wrap:nowrap; }
+  .de-detail-tab { padding:10px 14px; flex-shrink:0; }
+  .de-tabs { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .de-tab { padding:10px 16px; flex-shrink:0; }
+
+  /* ── Other layout fixes ── */
   .progress-layout { flex-direction:column; }
   .prog-sessions { width:100%; height:180px; border-right:none; border-bottom:1px solid var(--border); }
   .f-row { grid-template-columns:1fr; }
+  .de-sessions-panel-hdr { padding:8px 12px; }
+  .de-sessions-label { font-size:8px; }
 }
 /* ── TOOL LIBRARY OVERLAY ── */
 #tool-library-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.82);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
