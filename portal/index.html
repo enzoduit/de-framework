@@ -114,6 +114,18 @@ textarea, input, select { font-family: inherit; }
 .home-greeting{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--text);}
 .home-sub{font-size:12px;color:var(--text-sec);margin-top:6px;line-height:1.5;}
 .home-sec-label{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:10px;}
+.pulse-strip{display:flex;gap:10px;}
+.pulse-card{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center;}
+.pulse-card.has-errors{border-color:rgba(220,38,38,0.4);background:rgba(220,38,38,0.06);}
+.pulse-num{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--text);line-height:1;}
+.pulse-num.red{color:var(--red);}
+.pulse-lbl{font-size:10px;color:var(--text-muted);margin-top:4px;}
+.home-next{font-size:11px;color:var(--text-muted);margin-top:10px;}
+.home-7day{display:flex;align-items:flex-end;gap:4px;height:56px;}
+.h7b{flex:1;border-radius:3px 3px 0 0;background:#22c55e;min-height:2px;position:relative;overflow:hidden;}
+.h7b-err{position:absolute;bottom:0;left:0;right:0;background:var(--red);opacity:0.55;}
+.home-7day-lbls{display:flex;gap:4px;margin-top:3px;}
+.h7l{flex:1;font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);text-align:center;}
 .home-attn-card{background:rgba(255,69,0,0.06);border:1px solid rgba(255,69,0,0.25);border-radius:10px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color 0.15s;}
 .home-attn-card:hover{border-color:var(--accent);}
 .home-attn-icon{font-size:20px;flex-shrink:0;}
@@ -956,6 +968,22 @@ textarea, input, select { font-family: inherit; }
       <div class="home-sec-label">NEEDS ATTENTION</div>
       <div id="home-attn-cards" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
+    <!-- Pulse strip: TODAY stats -->
+    <div id="home-pulse" style="display:none">
+      <div class="home-sec-label">TODAY</div>
+      <div class="pulse-strip">
+        <div class="pulse-card" id="pc-sess"><div class="pulse-num" id="pc-sess-n">—</div><div class="pulse-lbl">sessions</div></div>
+        <div class="pulse-card" id="pc-err"><div class="pulse-num" id="pc-err-n">—</div><div class="pulse-lbl">errors</div></div>
+        <div class="pulse-card" id="pc-run"><div class="pulse-num" id="pc-run-n">—</div><div class="pulse-lbl">running</div></div>
+      </div>
+      <div class="home-next" id="home-next" style="display:none"></div>
+    </div>
+    <!-- 7-day activity chart -->
+    <div id="home-7day-sec" style="display:none">
+      <div class="home-sec-label">7-DAY ACTIVITY</div>
+      <div class="home-7day" id="home-7day-bars"></div>
+      <div class="home-7day-lbls" id="home-7day-lbls"></div>
+    </div>
     <div>
       <div class="home-sec-label">YOUR DIGITAL EMPLOYEES</div>
       <div class="home-de-grid" id="home-de-grid"></div>
@@ -1564,6 +1592,43 @@ function renderHomeDash(des){
     ((d.pending_decisions||0)>0?`<div class="home-de-badge">${d.pending_decisions}</div>`:"")+
     `</div>`).join("");
   hd.classList.add("visible");
+  // Async load dashboard stats
+  if(isBackendConfigured()){
+    apiFetch("/dashboard-stats").then(r=>r.json()).then(st=>{
+      const pulse=$("home-pulse");if(pulse)pulse.style.display="";
+      const sn=$("pc-sess-n"),en=$("pc-err-n"),rn=$("pc-run-n");
+      if(sn)sn.textContent=st.sessions_today??0;
+      if(en){
+        en.textContent=st.errors_today??0;
+        en.className="pulse-num"+(st.errors_today>0?" red":"");
+        const ec=$("pc-err");if(ec)ec.classList.toggle("has-errors",st.errors_today>0);
+      }
+      if(rn){
+        const rl=st.running_now||[];
+        rn.textContent=rl.length||0;
+        rn.className="pulse-num"+(rl.length>0?" red":"");
+      }
+      const nx=$("home-next");
+      if(nx&&st.next_scheduled){
+        nx.style.display="";
+        nx.innerHTML=`🕐 Next: <strong>${esc(st.next_scheduled.de)}</strong> — ${esc(st.next_scheduled.schedule)} in ${esc(st.next_scheduled.eta)}`;
+      }
+      const sec7=$("home-7day-sec"),bars=$("home-7day-bars"),lbls=$("home-7day-lbls");
+      if(sec7&&bars&&lbls&&(st.week||[]).length){
+        sec7.style.display="";
+        const maxT=Math.max(...st.week.map(d=>d.total),1);
+        bars.innerHTML=st.week.map(w=>{
+          const pct=Math.max(Math.round((w.total/maxT)*100),3);
+          const ePct=w.total?Math.round((w.errors/w.total)*100):0;
+          return `<div class="h7b" style="height:${pct}%"><div class="h7b-err" style="height:${ePct}%"></div></div>`;
+        }).join("");
+        lbls.innerHTML=st.week.map(w=>{
+          const d=new Date(w.date+"T12:00:00Z");
+          return `<div class="h7l">${["Su","Mo","Tu","We","Th","Fr","Sa"][d.getUTCDay()]}</div>`;
+        }).join("");
+      }
+    }).catch(()=>{});
+  }
 }
 
 async function loadList(){

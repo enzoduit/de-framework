@@ -1600,3 +1600,89 @@ def handle_improve_apply(handler, de_name: str, body: dict):
         'applied': applied,
         'errors': errors,
     })
+
+
+def handle_dashboard_stats(handler):
+    """GET /dashboard-stats — aggregate stats across all DEs for homepage."""
+    import datetime, re
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    today_str = now.date().isoformat()
+
+    # Build 7-day buckets
+    days = [(now.date() - datetime.timedelta(days=i)).isoformat() for i in range(6, -1, -1)]
+    day_stats = {d: {'total': 0, 'errors': 0} for d in days}
+
+    sessions_today = 0
+    errors_today = 0
+    running_now = []
+    next_scheduled = None  # (minutes_from_now, de_name, sched_name)
+
+    ERROR_STATUSES = {'error', 'max_iterations_reached', 'failed'}
+    RUNNING_STATUSES = {'running', 'queued'}
+
+    for de_dir in sorted(AGENTS_BASE.iterdir()):
+        if not (de_dir / 'de.json').exists():
+            continue
+        de_name = de_dir.name
+
+        # Check running sessions
+        sess_dir = de_dir / 'sessions'
+        if sess_dir.exists():
+            for sf in sess_dir.glob('*.json'):
+                try:
+                    s = json.loads(sf.read_text())
+                    status = s.get('status', '')
+                    ca = (s.get('created_at') or '')[:10]
+                    if ca == today_str:
+                        sessions_today += 1
+                        if status in ERROR_STATUSES:
+                            errors_today += 1
+                    if ca in day_stats:
+                        day_stats[ca]['total'] += 1
+                        if status in ERROR_STATUSES:
+                            day_stats[ca]['errors'] += 1
+                    if status in RUNNING_STATUSES and de_name not in running_now:
+                        running_now.append(de_name)
+                except Exception:
+                    pass
+
+        # Next scheduled
+        try:
+            de_data = json.loads((de_dir / 'de.json').read_text())
+            for sched in de_data.get('schedules', []):
+                t = sched.get('time', '')  # HH:MM
+                m = re.match(r'^(\d{1,2}):(\d{2})$', t)
+                if not m:
+                    continue
+                h, mi = int(m.group(1)), int(m.group(2))
+                sched_today = now.replace(hour=h, minute=mi, second=0, microsecond=0)
+                if sched_today <= now:
+                    sched_today += datetime.timedelta(days=1)
+                diff_min = int((sched_today - now).total_seconds() / 60)
+                if next_scheduled is None or diff_min < next_scheduled[0]:
+                    dname = de_data.get('display_name') or de_name.upper()
+                    next_scheduled = (diff_min, dname, sched.get('name', 'Scheduled run'))
+        except Exception:
+            pass
+
+    week = [{'date': d, 'total': day_stats[d]['total'], 'errors': day_stats[d]['errors']} for d in days]
+
+    ns = None
+    if next_scheduled:
+        m = next_scheduled[0]
+        if m < 60:
+            eta = f'{m}m'
+        elif m < 1440:
+            eta = f'{m // 60}h {m % 60}m'
+        else:
+            eta = f'{m // 1440}d'
+        ns = {'de': next_scheduled[1], 'schedule': next_scheduled[2], 'eta': eta}
+
+    return handler.send_json(200, {
+        'sessions_today': sessions_today,
+        'errors_today': errors_today,
+        'running_now': running_now,
+        'next_scheduled': ns,
+        'week': week,
+    })
