@@ -260,6 +260,7 @@ textarea, input, select { font-family: inherit; }
   flex: 1; overflow-y: auto; padding: 16px 20px;
   display: flex; flex-direction: column; gap: 8px;
 }
+.prog-steps img,.tl-body img{max-width:100%;height:auto;display:block;border-radius:4px;margin-top:6px;}
 .prog-empty { color:var(--text-muted); font-size:12px; text-align:center; margin-top:40px; }
 .step-card {
   border-left: 3px solid; border-radius: 0 10px 10px 0;
@@ -736,6 +737,9 @@ textarea, input, select { font-family: inherit; }
   .workspace-toolbar { position:sticky; bottom:0; left:0; right:0; z-index:10; }
   .workspace-scroll { padding-bottom:4px; }
   .de-sessions-panel-hdr { padding:8px 12px; }
+  /* When session detail open: merge into single bar */
+  .de-sessions-panel.steps-open .de-sessions-panel-hdr { display:none !important; }
+  .btn-run-in-steps { display:inline-flex !important; }
   .de-sessions-label { font-size:8px; }
 }
 /* ── TOOL LIBRARY OVERLAY ── */
@@ -942,6 +946,7 @@ textarea, input, select { font-family: inherit; }
             <button class="btn-back-sessions" onclick="backToSessionsList()">← Sessions</button>
             <div class="mono" id="de-steps-panel-id" style="font-size:9px;color:var(--text-muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px"></div>
             <span class="live-badge" id="de-steps-live-badge" style="display:none">LIVE</span>
+            <button class="btn-run btn-run-in-steps" onclick="deRun()" style="display:none">▶ RUN</button>
           </div>
           <div class="prog-steps" id="de-steps-panel-content" style="padding:12px 14px"></div>
         </div>
@@ -1636,10 +1641,13 @@ async function loadProgress(de){
   }catch(e){}
 }
 
+let _stepsPoller=null;
 async function loadSteps(de,sid,el){
+  if(_stepsPoller){clearInterval(_stepsPoller);_stepsPoller=null;}
   document.querySelectorAll('.prog-session').forEach(e=>e.classList.remove('active'));
   if(el)el.classList.add('active');
-  const pane=$('prog-steps');pane.innerHTML='<div class="prog-empty">Loading…</div>';
+  document.querySelector('.de-sessions-panel')?.classList.add('steps-open');
+  const pane=$(('prog-steps');pane.innerHTML='<div class="prog-empty">Loading…</div>';
   try{
     const r=await apiFetch(`/de/${de}/sessions/${sid}`);const s=await r.json();
     const isLive=s.status==='running'||s.status==='queued';
@@ -1650,7 +1658,7 @@ async function loadSteps(de,sid,el){
       </div>
       ${(s.steps||[]).map(renderStep).join('')||'<div class="prog-empty">No steps yet.</div>'}`;
     pane.innerHTML=render();
-    if(isLive){const t=setInterval(async()=>{const r2=await apiFetch(`/de/${de}/sessions/${sid}`);const s2=await r2.json();s.steps=s2.steps;s.status=s2.status;pane.innerHTML=render();if(s2.status!=='running'&&s2.status!=='queued')clearInterval(t);},2500);}
+    if(isLive){_stepsPoller=setInterval(async()=>{const r2=await apiFetch(`/de/${de}/sessions/${sid}`);const s2=await r2.json();s.steps=s2.steps;s.status=s2.status;pane.innerHTML=render();if(s2.status!=='running'&&s2.status!=='queued'){clearInterval(_stepsPoller);_stepsPoller=null;}},2500);}
   }catch(e){pane.innerHTML=`<div class="prog-empty">Error: ${esc(e.message)}</div>`;}
 }
 
@@ -2269,14 +2277,15 @@ async function showSessionSteps(de, sid, el) {
 }
 
 function backToSessionsList() {
-  const list = $('de-sessions-list');
-  const stepsPanel = $('de-steps-panel');
-  const liveBadge = $('de-steps-live-badge');
-  if (list) list.style.display = '';
-  if (stepsPanel) stepsPanel.style.display = 'none';
-  if (liveBadge) liveBadge.style.display = 'none';
-  const sessionsPanel = document.querySelector('.de-sessions-panel');
-  if (sessionsPanel) sessionsPanel.classList.remove('expanded');
+  if(_stepsPoller){clearInterval(_stepsPoller);_stepsPoller=null;}
+  const list=$('de-sessions-list');
+  const stepsPanel=$('de-steps-panel');
+  const liveBadge=$('de-steps-live-badge');
+  if(list)list.style.display='';
+  if(stepsPanel)stepsPanel.style.display='none';
+  if(liveBadge)liveBadge.style.display='none';
+  const sessionsPanel=document.querySelector('.de-sessions-panel');
+  if(sessionsPanel)sessionsPanel.classList.remove('expanded','steps-open');
 }
 
 function switchDetailTab(name) {
