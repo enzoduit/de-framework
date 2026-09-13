@@ -25,7 +25,7 @@ from urllib.error import URLError
 OPENCLAW_GATEWAY_URL = os.environ.get('OPENCLAW_GATEWAY_URL', '')
 OPENCLAW_GATEWAY_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
 AGENTS_DIR = pathlib.Path(os.environ.get('AGENTS_DIR', '/var/de-agents'))
-CUSTOM_TOOLS_DIR = pathlib.Path('/var/de-framework-tools')
+CUSTOM_TOOLS_DIR = pathlib.Path(os.environ.get('CUSTOM_TOOLS_DIR', '/var/de-framework-tools'))
 
 # ── Required tool IDs — always present for every DE ─────────────────────────
 REQUIRED_TOOL_IDS = {"request_human_decision", "ask_colleague", "report_to_colleague"}

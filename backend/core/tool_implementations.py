@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 AGENTS_DIR = Path('/var/de-agents')
-CUSTOM_TOOLS_DIR = Path('/var/de-framework-tools')
+CUSTOM_TOOLS_DIR = Path(os.environ.get('CUSTOM_TOOLS_DIR', '/var/de-framework-tools'))
 
 
 def _now_iso():
@@ -422,7 +422,7 @@ def make_custom_tool_fn(script: str, script_args: list = None, required_credenti
             cred_vals, missing = _decrypt_credentials(_required_creds)
             if missing:
                 return {
-                    'error': f'Missing credential(s): {', '.join(missing)}. '
+                    'error': f'Missing credential(s): {", ".join(missing)}. '
                              f'Set them in the portal under Tool Library → 🔑 Credentials.'
                 }
             env.update(cred_vals)

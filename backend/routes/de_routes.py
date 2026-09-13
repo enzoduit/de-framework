@@ -3,6 +3,7 @@ DE Routes — /de-list, /de/<name>, /de/<name>/sessions, /de/<name>/sessions/<id
 """
 
 import json
+import os
 import subprocess as _sp
 import uuid as _uuid
 from datetime import datetime, timedelta, timezone as _tz
@@ -10,7 +11,7 @@ from pathlib import Path
 from backend.config import AGENTS_BASE, DE_NAMES, now_iso
 from backend.core.tool_discovery import get_tools as _get_tools, REQUIRED_TOOL_IDS
 
-CUSTOM_TOOLS_DIR = Path('/var/de-framework-tools')
+CUSTOM_TOOLS_DIR = Path(os.environ.get('CUSTOM_TOOLS_DIR', '/var/de-framework-tools'))
 
 # session_runner.py lives in backend/core/
 _BACKEND_DIR = Path(__file__).parent.parent  # backend/
@@ -859,7 +860,7 @@ def handle_tools_register(handler, body: dict):
     if missing:
         return handler.send_json(400, {
             'ok': False,
-            'error': f'Missing required fields: {', '.join(missing)}',
+            'error': f'Missing required fields: {", ".join(missing)}',
         })
 
     tool_id = body['id'].strip()

@@ -1213,7 +1213,9 @@ let chatPoller = null;
 
 
 /* ═══ BACKEND CONFIG ═══ */
-function getBackendConfig(){try{const s=localStorage.getItem('de_backend');if(s){const c=JSON.parse(s);if(c.url)return c;}}catch{}return{url:'https://de-api.enzoduit.com',token:''};}
+function getBackendConfig(){try{const s=localStorage.getItem('de_backend');if(s){const c=JSON.parse(s);if(c.url)return c;}}catch{}return{url:window.DE_BACKEND_URL||'',token:window.DE_BACKEND_TOKEN||''};}
+// Self-hosted: set window.DE_BACKEND_URL and window.DE_BACKEND_TOKEN before this script
+// or enter them in the ⚙ Settings dialog.
 function isBackendConfigured(){const c=getBackendConfig();return!!(c.url&&c.token);}
 function updateGearIcon(){const g=$('btn-gear');if(!g)return;g.classList.toggle('btn-connected',isBackendConfigured());g.title=isBackendConfigured()?'Backend connected — click to change':'Connect your backend';}
 async function apiFetch(path,options={}){
