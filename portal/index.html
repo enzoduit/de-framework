@@ -669,7 +669,7 @@ textarea, input, select { font-family: inherit; }
 .session-summary-box strong { color: var(--text); font-weight: 600; }
 /* ── VIEW TOGGLE ── */
 .view-toggle{display:flex;gap:2px;margin-left:4px;}
-.ai-summary-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin:10px 14px 0;flex-shrink:0;}
+.ai-summary-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;}
 .ai-summary-text{font-size:12px;color:var(--text-sec);line-height:1.65;}
 .vt-btn{background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:14px;padding:2px 6px;opacity:0.5;transition:all 0.15s;}
 .vt-btn.active{opacity:1;border-color:var(--accent);}
@@ -730,7 +730,8 @@ textarea, input, select { font-family: inherit; }
   .btn-ham { background:none; color:var(--text-sec); font-size:20px; padding:0; line-height:1; }
 
   /* ── DE header: prevent RUN button overflow ── */
-  .de-header { flex-wrap:wrap; padding:10px 14px; gap:8px; }
+  .de-header { display:none; } /* on mobile, DE name shows in topbar */
+  .mobile-topbar-title { max-width:calc(100vw - 100px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .de-header-info { min-width:0; flex:1; }
   .de-header-actions { flex-shrink:1; gap:6px; }
   .btn-run { padding:6px 12px; font-size:9px; white-space:nowrap; }
@@ -999,7 +1000,6 @@ textarea, input, select { font-family: inherit; }
             </div>
             <button class="btn-run btn-run-in-steps" onclick="deRun()" style="display:none">▶ RUN</button>
           </div>
-          <div id="ai-summary-card" class="ai-summary-card" style="display:none"><span class="ai-summary-text" id="ai-summary-text">Loading summary…</span></div>
           <div class="prog-steps" id="de-steps-panel-content" style="padding:12px 14px"></div>
         </div>
         <!-- Message input: type to start a session -->
@@ -1574,6 +1574,7 @@ async function loadList(){
     const c=$('de-list');
     if(!des.length){c.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">No employees yet.<br>Click + NEW to create one.</div>';$("empty-state").style.display="";const hd=$("home-dash");if(hd)hd.classList.remove("visible");return;}
     $("empty-state").style.display="none";
+    {const _mt=document.querySelector(".mobile-topbar-title");if(_mt)_mt.textContent="⚡ DE Framework";}
     renderHomeDash(des);
     c.innerHTML=des.map(de=>`
       <div class="de-item ${selectedDE===de.name?'active':''}" id="di-${de.name}" onclick="selectDE('${de.name}')">
@@ -1606,6 +1607,7 @@ async function selectDE(name){
     const r=await apiFetch('/de/'+name);const de=await r.json();
     $('dv-name').textContent=de.display_name||name.toUpperCase();
     $('dv-role').textContent=de.role||'';
+    const _mtt=document.querySelector('.mobile-topbar-title');if(_mtt)_mtt.textContent=de.display_name||name.toUpperCase();
     const av=$('dv-avatar');
     av.textContent=(de.display_name||name)[0].toUpperCase();
     av.style.background=de.color||'#FF4500';
@@ -1736,9 +1738,6 @@ function setStepsView(mode){
   const vs=$("vt-story"),vt=$("vt-trace");
   if(vs)vs.classList.toggle("active",mode==="story");
   if(vt)vt.classList.toggle("active",mode==="trace");
-  // show/hide summary card
-  const sc=$("ai-summary-card");if(sc)sc.style.display=(mode==="story")?"":"none";
-  // re-render current session if available
   if(_currentStepsDE&&_currentStepsSid)showSessionSteps(_currentStepsDE,_currentStepsSid,null);
 }
 
@@ -2371,20 +2370,16 @@ async function showSessionSteps(de, sid, el) {
   };
 
   _currentStepsDE=de;_currentStepsSid=sid;
-  const sc=$("ai-summary-card"),st=$("ai-summary-text");
-  if(sc){sc.style.display="none";}
   try {
     const r = await apiFetch(`/de/${de}/sessions/${sid}`);
     const s = await r.json();
     stepsContent.innerHTML = renderSessionDetail(s);
-    // Async fetch AI summary for story mode on completed sessions
     const isDone=s.status!=="running"&&s.status!=="queued";
-    if(_stepsViewMode==="story"&&isDone&&sc&&st){
-      sc.style.display="";st.textContent="Loading summary…";
+    if(_stepsViewMode==="story"&&isDone){
+      stepsContent.insertAdjacentHTML("afterbegin",'<div id="ai-summary-card" class="ai-summary-card"><span class="ai-summary-text" id="ai-summary-text">Loading summary…</span></div>');
       apiFetch(`/de/${de}/sessions/${sid}/summary`)
-        .then(r2=>r2.json()).then(d=>{
-          if(d.summary&&sc&&_stepsViewMode==="story"){st.textContent=d.summary;}
-        }).catch(()=>{if(sc)sc.style.display="none";});
+        .then(r2=>r2.json()).then(d=>{const el=$("ai-summary-text");if(el&&d.summary)el.textContent=d.summary;})
+        .catch(()=>{const el=$("ai-summary-card");if(el)el.remove();});
     }
     if (s.status === 'running' || s.status === 'queued') {
       const t = setInterval(async () => {
@@ -2395,12 +2390,11 @@ async function showSessionSteps(de, sid, el) {
           if (s2.status !== 'running' && s2.status !== 'queued') {
             clearInterval(t);
             loadSessionsPanel(de);
-            // Fetch summary now that it completed
-            if(_stepsViewMode==="story"&&sc&&st){
-              sc.style.display="";st.textContent="Loading summary…";
-              apiFetch(`/de/${de}/sessions/${sid}/summary`)
-                .then(r3=>r3.json()).then(d=>{if(d.summary&&sc&&_stepsViewMode==="story")st.textContent=d.summary;})
-                .catch(()=>{if(sc)sc.style.display="none";});
+            if(_stepsViewMode==="story"){
+              if(!$("ai-summary-card"))stepsContent.insertAdjacentHTML("afterbegin",'<div id="ai-summary-card" class="ai-summary-card"><span class="ai-summary-text" id="ai-summary-text">Loading…</span></div>');
+              apiFetch(`/de/${de}/sessions/${sid}/summary`).then(r3=>r3.json())
+                .then(d=>{const el=$("ai-summary-text");if(el&&d.summary)el.textContent=d.summary;})
+                .catch(()=>{const el=$("ai-summary-card");if(el)el.remove();});
             }
           }
         } catch(e2) { clearInterval(t); }
@@ -2782,9 +2776,20 @@ function renderTimelineStep(step, idx) {
     }
   } else if (step.type === 'observation') {
     const res = step.result || '';
-    const isErr = res.toLowerCase().startsWith('error') || res.includes('Error:');
-    mainText = `<span style="color:${isErr?'var(--red)':'inherit'}">${esc(res.substring(0,140))}${res.length>140?'…':''}</span>`;
-    if (res.length > 140) detailRaw = res;
+    if(_stepsViewMode==='story'){
+      const lc=res.toLowerCase();
+      if(lc.includes('file not found')||lc.includes('no such file'))mainText='⚠️ File not available';
+      else if(lc.includes('permission denied')||lc.includes('access denied'))mainText='⚠️ Access denied';
+      else if(lc.includes('timeout'))mainText='⏱️ Request timed out';
+      else if(res.trim().startsWith('{')&&lc.includes('error'))mainText='⚠️ Encountered an issue';
+      else if(lc.startsWith('error'))mainText='⚠️ '+esc(res.substring(0,80));
+      else if(res.trim().startsWith('{')||res.trim().startsWith('['))mainText='✅ Got a response';
+      else{mainText=esc(stripMd(res,100))+(res.length>100?'…':'');}
+    } else {
+      const isErr = res.toLowerCase().startsWith('error') || res.includes('Error:');
+      mainText = `<span style="color:${isErr?'var(--red)':'inherit'}">${esc(res.substring(0,140))}${res.length>140?'…':''}</span>`;
+      if (res.length > 140) detailRaw = res;
+    }
   } else if (step.type === 'decision_request') {
     mainText = `<strong>${esc(step.title || 'Approval required')}</strong>`;
     if (step.description) mainText += `<br><span style="color:var(--text-muted);font-size:10px">${esc(step.description.substring(0,100))}</span>`;
