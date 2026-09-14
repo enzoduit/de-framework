@@ -363,6 +363,35 @@ class ReActEngine:
             lines.append(f'Write to it using: write_file(path=\'{workspace_abs}/MEMORY.md\', content=\'...\')')
             lines.append('Read it at session start (it will be in the Your Workspace section above).')
 
+        # Self-scheduling: cron guidance for DEs with trigger configs
+        de_json_file = self.agent_dir / 'de.json'
+        try:
+            if de_json_file.exists():
+                de_raw = json.loads(de_json_file.read_text())
+                cron_triggers = [t for t in de_raw.get('triggers', [])
+                                 if isinstance(t, dict) and t.get('type') == 'cron']
+                if cron_triggers:
+                    n = self.agent_name
+                    lines.append('')
+                    lines.append('## Self-Scheduling -- Your Responsibility')
+                    lines.append('')
+                    lines.append('Your configured schedule triggers (from your profile):')
+                    for t in cron_triggers:
+                        desc = t.get('description', t.get('schedule', ''))
+                        sched = t.get('schedule', '')
+                        lines.append('- ' + desc + (' [' + sched + ']' if sched and sched not in desc else ''))
+                    lines.append('')
+                    lines.append('Check if you have cron jobs -- run in exec_shell:')
+                    lines.append('  openclaw cron list 2>/dev/null  (look for jobs with ' + n + ' in the name)')
+                    lines.append('')
+                    lines.append('If 0 jobs: create them now. This is YOUR own schedule -- act autonomously, no approval needed.')
+                    lines.append('  Trigger URL: POST http://localhost:8769/de/' + n + '/trigger-scheduled')
+                    lines.append('  Auth token: grep DE_API_TOKEN /etc/de-framework.env | cut -d= -f2')
+                    lines.append('  Create cron: openclaw cron create --agent test-intern --cron EXPR --command CURL_CMD NAME')
+                    lines.append("  Cron: '0 6 * * *'=daily 06:00, '0 6,10,14 * * *'=3x daily, '0 9 * * 1'=Mon 09:00")
+        except Exception:
+            pass
+
         # QA step — mandatory last step for every DE
         lines.append('')
         lines.append('## Quality Assurance — Mandatory Last Step')

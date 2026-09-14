@@ -93,6 +93,17 @@ def main():
 
     de_info = json.loads(de_json_file.read_text()) if de_json_file.exists() else {}
     job_md = job_md_file.read_text()
+
+    # Bootstrap: auto-create workspace dir + MEMORY.md if missing
+    workspace_dir = de_dir / 'workspace'
+    workspace_dir.mkdir(exist_ok=True)
+    memory_file = workspace_dir / 'MEMORY.md'
+    if not memory_file.exists():
+        memory_file.write_text(
+            f'# {de_info.get("display_name", de_name.upper())} — Memory\n\n'
+            f'Initialized {_now()[:10]}. Write key decisions, findings, and progress here.\n'
+        )
+        print(f'[session_runner] Created MEMORY.md for {de_name}')
     session_raw = json.loads(session_file.read_text())
 
     trigger_type = session_raw.get('trigger_type', 'user')
@@ -158,7 +169,7 @@ def main():
             agent_name=de_name,
             mission=task_prompt,
             tools=de_tools,
-            max_iterations=8,
+            max_iterations=15,
             model='claude-sonnet-4-6',
             session=ws,
         )
