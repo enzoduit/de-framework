@@ -95,7 +95,9 @@ def _send_telegram(inp: dict) -> dict:
     # Load bot token from openclaw config
     try:
         cfg = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
-        bot_token = cfg['telegram']['accounts'][0]['botToken']
+        tg_accounts = cfg['channels']['telegram']['accounts']
+        key = 'test-intern' if 'test-intern' in tg_accounts else next(iter(tg_accounts))
+        bot_token = tg_accounts[key]['botToken']
     except Exception as e:
         return {'error': f'Cannot load bot token: {e}'}
 
