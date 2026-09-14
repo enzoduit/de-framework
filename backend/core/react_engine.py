@@ -529,6 +529,8 @@ class ReActEngine:
         # Load existing decisions
         try:
             decisions = json.loads(self.decisions_file.read_text())
+            if isinstance(decisions, list):  # old format — migrate
+                decisions = {"pending": [], "resolved": []}
         except Exception:
             decisions = {"pending": [], "resolved": []}
 
