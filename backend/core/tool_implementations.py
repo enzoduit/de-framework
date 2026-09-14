@@ -558,7 +558,6 @@ TOOL_LIBRARY['log_assumption'] = {
         'required': ['action', 'expected_outcome'],
     },
     'fn': _log_assumption,
-    'source': 'builtin',
 }
 
 TOOL_LIBRARY['measure_assumption'] = {
@@ -575,7 +574,6 @@ TOOL_LIBRARY['measure_assumption'] = {
         'required': ['actual_result', 'reward'],
     },
     'fn': _measure_assumption,
-    'source': 'builtin',
 }
 
 

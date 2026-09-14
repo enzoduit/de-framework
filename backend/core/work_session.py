@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # Path from environment variable — no hardcoded assumptions
-AGENTS_DIR = Path(os.environ.get("AGENTS_DIR", "./agents"))
+AGENTS_DIR = Path(os.environ.get("AGENTS_DIR", "/var/de-agents"))
 
 
 def _now_iso() -> str:
