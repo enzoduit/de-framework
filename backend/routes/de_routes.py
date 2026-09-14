@@ -1708,3 +1708,40 @@ def handle_monitor_status(handler):
         return handler.send_json(200, data)
     except Exception as e:
         return handler.send_json(500, {'error': str(e)})
+
+
+def handle_de_chat(handler, de_name: str, body: dict):
+    """POST /de/<name>/chat — lightweight conversational loop (Chat Mode).
+
+    Body: {message: str, history: [{role, content}]?}
+    Returns: {message: str, tools_used: [str]}
+    """
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+
+    message = (body.get('message') or '').strip()
+    if not message:
+        return handler.send_json(400, {'error': 'message is required'})
+
+    history = body.get('history', [])
+    if not isinstance(history, list):
+        history = []
+
+    # Sanitise history — only valid role/content pairs
+    history = [
+        h for h in history
+        if isinstance(h, dict)
+        and h.get('role') in ('user', 'assistant')
+        and h.get('content')
+    ]
+
+    try:
+        from backend.core.chat_engine import ChatEngine
+        engine = ChatEngine(de_name)
+        result = engine.run(message, history)
+        return handler.send_json(200, result)
+    except Exception as e:
+        import traceback as _tb
+        print(f'[de_chat] ERROR for {de_name}: {e}\n{_tb.format_exc()}')
+        return handler.send_json(500, {'error': str(e)})

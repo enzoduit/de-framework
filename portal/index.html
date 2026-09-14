@@ -651,6 +651,71 @@ textarea, input, select { font-family: inherit; }
 .de-detail-content { display:none; flex:1; min-height:0; flex-direction:column; overflow:hidden; }
 .de-detail-content.active { display:flex; }
 
+/* ── DE INLINE CHAT PANEL ── */
+#detail-de-chat { flex-direction: column; }
+.de-chat-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 14px; border-bottom:1px solid var(--border); flex-shrink:0;
+  font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted);
+}
+.de-chat-hdr-title { font-weight:700; letter-spacing:0.08em; color:var(--text-sec); }
+.de-chat-clear { background:none; border:none; color:var(--text-muted); font-size:11px; cursor:pointer; padding:2px 6px; border-radius:4px; transition:color 0.15s; }
+.de-chat-clear:hover { color:var(--danger); }
+.de-chat-msgs {
+  flex:1; overflow-y:auto; padding:14px 14px 10px;
+  display:flex; flex-direction:column; gap:10px; min-height:0;
+}
+.de-chat-bubble-user {
+  align-self:flex-end; max-width:75%;
+  background:rgba(255,69,0,0.15); border:1px solid rgba(255,69,0,0.3);
+  border-radius:12px 12px 3px 12px; padding:9px 13px;
+  font-size:13px; line-height:1.5; color:var(--text);
+}
+.de-chat-bubble-de {
+  align-self:flex-start; max-width:88%;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:3px 12px 12px 12px; padding:10px 14px;
+  font-size:13px; line-height:1.6; color:var(--text);
+  white-space:pre-wrap; word-break:break-word;
+}
+.de-chat-bubble-de p { margin:0 0 6px; }
+.de-chat-bubble-de p:last-child { margin:0; }
+.de-chat-bubble-de ul,.de-chat-bubble-de ol { margin:4px 0 4px 18px; }
+.de-chat-bubble-de code { font-family:var(--font-mono); font-size:11px; background:var(--border); padding:1px 4px; border-radius:3px; }
+.de-chat-bubble-de pre { font-family:var(--font-mono); font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 10px; overflow-x:auto; margin:6px 0; }
+.de-chat-tools-used {
+  margin-top:5px; font-family:'JetBrains Mono',monospace; font-size:10px;
+  color:var(--text-muted); letter-spacing:0.03em;
+}
+.de-chat-thinking {
+  align-self:flex-start; display:flex; align-items:center; gap:8px;
+  color:var(--text-muted); font-size:12px; font-family:'JetBrains Mono',monospace;
+}
+.de-chat-thinking-dots { display:flex; gap:3px; }
+.de-chat-thinking-dots span { width:5px; height:5px; border-radius:50%; background:var(--accent); animation:blink 1.4s infinite; }
+.de-chat-thinking-dots span:nth-child(2){animation-delay:.2s;}
+.de-chat-thinking-dots span:nth-child(3){animation-delay:.4s;}
+.de-chat-input-bar {
+  padding:10px 12px; border-top:1px solid var(--border);
+  display:flex; gap:8px; align-items:flex-end;
+  background:var(--surface); flex-shrink:0;
+}
+#de-chat-input {
+  flex:1; background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px;
+  font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text);
+  resize:none; min-height:36px; max-height:100px; line-height:1.5; transition:border-color 0.15s;
+}
+#de-chat-input:focus { outline:none; border-color:var(--accent); }
+#de-chat-input::placeholder { color:var(--text-muted); }
+.de-chat-send {
+  background:var(--accent); color:#fff;
+  font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700;
+  padding:0 14px; height:36px; border-radius:8px; flex-shrink:0; transition:opacity 0.15s;
+}
+.de-chat-send:hover { opacity:0.85; }
+.de-chat-send:disabled { opacity:0.4; cursor:not-allowed; }
+
 /* ── WORK SESSION CARDS ── */
 .ws-card {
   padding: 14px 16px; border-bottom: 1px solid var(--border);
@@ -1060,6 +1125,7 @@ textarea, input, select { font-family: inherit; }
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
           <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRICS</button>
           <button class="de-detail-tab" id="dtab-workspace" onclick="switchDetailTab('workspace')">📁 FILES</button>
+          <button class="de-detail-tab" id="dtab-de-chat" onclick="switchDetailTab('de-chat')">💬 CHAT</button>
           <button class="de-detail-tab" id="dtab-sessions" onclick="switchDetailTab('sessions')">📋 SESSIONS</button>
         </div>
 
@@ -1101,6 +1167,21 @@ textarea, input, select { font-family: inherit; }
           <div class="workspace-toolbar">
             <button class="btn-new-file" onclick="openNewFileDialog()">&#xFF0B; New file</button>
             <label class="btn-upload-file">&#128206; Upload <input type="file" id="workspace-upload-input" style="display:none" onchange="uploadWorkspaceFile(this)" multiple></label>
+          </div>
+        </div>
+
+        <!-- 💬 DE Chat -->
+        <div class="de-detail-content" id="detail-de-chat">
+          <div class="de-chat-hdr">
+            <span class="de-chat-hdr-title">💬 CHAT WITH DE</span>
+            <button class="de-chat-clear" onclick="deChatClear()" title="Clear conversation">Clear</button>
+          </div>
+          <div class="de-chat-msgs" id="de-chat-msgs">
+            <div style="color:var(--text-muted);font-size:12px;text-align:center;padding-top:32px" id="de-chat-empty">Select a Digital Employee and ask anything.</div>
+          </div>
+          <div class="de-chat-input-bar">
+            <textarea id="de-chat-input" rows="1" placeholder="Ask your DE anything…" onkeydown="deChatKey(event)" oninput="autoResize(this)"></textarea>
+            <button class="de-chat-send" id="de-chat-send" onclick="deChatSend()">&#8593;</button>
           </div>
         </div>
 
@@ -2529,16 +2610,160 @@ function switchDetailTab(name) {
   }
   const sessBtn = $('dtab-sessions');
   if (sessBtn) sessBtn.classList.remove('active');
-  const names = ['profile','schedule','metrics','workspace'];
+  const names = ['profile','schedule','metrics','workspace','de-chat'];
   document.querySelectorAll('.de-detail-tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.de-detail-content').forEach((c,i) => c.classList.toggle('active', names[i]===name));
   if (name==='profile' && selectedDE) loadProfile(selectedDE);
   if (name==='schedule' && selectedDE) loadSchedule(selectedDE);
   if (name==='metrics' && selectedDE) loadMetrics(selectedDE);
   if (name==='workspace' && selectedDE) loadWorkspaceTab(selectedDE);
+  if (name==='de-chat' && selectedDE) deChatLoad(selectedDE);
 }
 // Keep old switchTab as alias for backward compat
 function switchTab(name) { if(name==='profile') switchDetailTab('profile'); else if(name==='schedule') switchDetailTab('schedule'); }
+
+/* ═══ DE CHAT PANEL ══════════════════════════════════════════════════════ */
+// Conversation history for the currently selected DE chat.
+// Each item: {role:'user'|'assistant', content:str, tools_used?:[str]}
+let _deChatHistory = [];
+let _deChatCurrentDE = null;
+let _deChatBusy = false;
+
+function _deChatStorageKey(de) { return 'de-chat-' + de; }
+
+function deChatLoad(de) {
+  _deChatCurrentDE = de;
+  _deChatHistory = [];
+  try {
+    const raw = localStorage.getItem(_deChatStorageKey(de));
+    if (raw) _deChatHistory = JSON.parse(raw);
+  } catch(e) { _deChatHistory = []; }
+
+  const msgs = $('de-chat-msgs');
+  if (!msgs) return;
+
+  if (_deChatHistory.length === 0) {
+    msgs.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding-top:32px" id="de-chat-empty">Ask your DE anything \u2014 it can read files, check status, and update its own config.</div>';
+    return;
+  }
+  msgs.innerHTML = '';
+  for (const h of _deChatHistory) {
+    if (h.role === 'user') {
+      const el = document.createElement('div');
+      el.className = 'de-chat-bubble-user';
+      el.textContent = h.content;
+      msgs.appendChild(el);
+    } else if (h.role === 'assistant') {
+      const toolsHtml = (h.tools_used && h.tools_used.length)
+        ? '<div class="de-chat-tools-used">\ud83d\udd27 used: ' + h.tools_used.join(', ') + '</div>'
+        : '';
+      const el = document.createElement('div');
+      el.className = 'de-chat-bubble-de';
+      el.innerHTML = deChatRenderMd(h.content) + toolsHtml;
+      msgs.appendChild(el);
+    }
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function deChatClear() {
+  if (!_deChatCurrentDE) return;
+  _deChatHistory = [];
+  try { localStorage.removeItem(_deChatStorageKey(_deChatCurrentDE)); } catch(e) {}
+  const msgs = $('de-chat-msgs');
+  if (msgs) msgs.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding-top:32px">Conversation cleared.</div>';
+}
+
+function deChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); deChatSend(); }
+}
+
+function deChatRenderMd(text) {
+  try {
+    if (typeof marked !== 'undefined') return marked.parse(text);
+  } catch(e) {}
+  return esc(text).replace(/\n/g, '<br>');
+}
+
+async function deChatSend() {
+  if (_deChatBusy || !selectedDE) return;
+  const input = $('de-chat-input');
+  const sendBtn = $('de-chat-send');
+  const msgs = $('de-chat-msgs');
+  const msg = (input.value || '').trim();
+  if (!msg) return;
+
+  input.value = '';
+  input.style.height = '';
+  _deChatBusy = true;
+  if (sendBtn) sendBtn.disabled = true;
+
+  const empty = $('de-chat-empty');
+  if (empty) empty.remove();
+
+  const userBubble = document.createElement('div');
+  userBubble.className = 'de-chat-bubble-user';
+  userBubble.textContent = msg;
+  msgs.appendChild(userBubble);
+
+  const thinkId = 'dct-' + Date.now();
+  const thinkEl = document.createElement('div');
+  thinkEl.className = 'de-chat-thinking';
+  thinkEl.id = thinkId;
+  thinkEl.innerHTML = '<div class="de-chat-thinking-dots"><span></span><span></span><span></span></div><span style="font-size:11px">\u2026</span>';
+  msgs.appendChild(thinkEl);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  const apiHistory = _deChatHistory
+    .filter(h => h.role === 'user' || h.role === 'assistant')
+    .map(h => ({ role: h.role, content: h.content }));
+
+  try {
+    const r = await apiFetch('/de/' + selectedDE + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, history: apiHistory }),
+    });
+    const data = await r.json();
+
+    const tEl = $(thinkId);
+    if (tEl) tEl.remove();
+
+    if (data.message) {
+      const toolsHtml = (data.tools_used && data.tools_used.length)
+        ? '<div class="de-chat-tools-used">\ud83d\udd27 used: ' + data.tools_used.join(', ') + '</div>'
+        : '';
+      const deBubble = document.createElement('div');
+      deBubble.className = 'de-chat-bubble-de';
+      deBubble.innerHTML = deChatRenderMd(data.message) + toolsHtml;
+      msgs.appendChild(deBubble);
+
+      _deChatHistory.push({ role: 'user', content: msg });
+      _deChatHistory.push({ role: 'assistant', content: data.message, tools_used: data.tools_used || [] });
+      if (_deChatHistory.length > 40) _deChatHistory = _deChatHistory.slice(-40);
+      try { localStorage.setItem(_deChatStorageKey(selectedDE), JSON.stringify(_deChatHistory)); } catch(e) {}
+    } else {
+      const errEl = document.createElement('div');
+      errEl.className = 'de-chat-bubble-de';
+      errEl.style.color = 'var(--danger)';
+      errEl.textContent = data.error || 'No response received';
+      msgs.appendChild(errEl);
+    }
+  } catch(e) {
+    const tEl = $(thinkId);
+    if (tEl) tEl.remove();
+    const errEl = document.createElement('div');
+    errEl.className = 'de-chat-bubble-de';
+    errEl.style.color = 'var(--danger)';
+    errEl.textContent = 'Error: ' + e.message;
+    msgs.appendChild(errEl);
+  } finally {
+    _deChatBusy = false;
+    if (sendBtn) sendBtn.disabled = false;
+    msgs.scrollTop = msgs.scrollHeight;
+    input.focus();
+  }
+}
 
 /* ═══ WORKSPACE TAB ══════════════════════════════════════════════════════ */
 let _wsCurrentDE = null;

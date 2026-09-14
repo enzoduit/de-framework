@@ -243,6 +243,10 @@ class DEHandler(BaseHTTPRequestHandler):
                 and parts[2] == 'improve' and parts[3] == 'apply'):
             return de_routes.handle_improve_apply(self, parts[1], body)
 
+        # POST /de/<name>/chat — lightweight conversational chat mode
+        if (len(parts) == 3 and parts[0] == 'de' and parts[2] == 'chat'):
+            return de_routes.handle_de_chat(self, parts[1], body)
+
         # POST /de/<name>/workspace/<filename> — create or overwrite text file
         if (len(parts) == 4 and parts[0] == 'de'
                 and parts[2] == 'workspace'):
