@@ -97,6 +97,9 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/dashboard-stats':
             return de_routes.handle_dashboard_stats(self)
 
+        if path == '/monitor-status':
+            return de_routes.handle_monitor_status(self)
+
         # ── REST /api/des ────────────────────────────────────────────────────
         if path == '/api/des':
             return de_routes.handle_api_des_list(self)

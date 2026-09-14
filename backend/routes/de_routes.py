@@ -1695,3 +1695,16 @@ def handle_dashboard_stats(handler):
         'next_scheduled': ns,
         'week': week,
     })
+
+
+def handle_monitor_status(handler):
+    """GET /monitor-status — returns lightweight monitor check results (no LLM)."""
+    status_file = AGENTS_BASE / 'monitor-status.json'
+    if not status_file.exists():
+        return handler.send_json(200, {'available': False, 'message': 'No monitor run yet'})
+    try:
+        data = json.loads(status_file.read_text())
+        data['available'] = True
+        return handler.send_json(200, data)
+    except Exception as e:
+        return handler.send_json(500, {'error': str(e)})
