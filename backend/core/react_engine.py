@@ -363,6 +363,27 @@ class ReActEngine:
             lines.append(f'Write to it using: write_file(path=\'{workspace_abs}/MEMORY.md\', content=\'...\')')
             lines.append('Read it at session start (it will be in the Your Workspace section above).')
 
+        # Primary metric: inject DE's default measurement approach into prompt
+        _de_json_pm = self.agent_dir / 'de.json'
+        try:
+            if _de_json_pm.exists():
+                _de_raw_pm = json.loads(_de_json_pm.read_text())
+                _pm = (_de_raw_pm.get('primary_metric') or '').strip()
+                if _pm:
+                    lines.append('')
+                    lines.append('## Your Primary Success Metric')
+                    lines.append('')
+                    lines.append(f'Default measurement approach for your RL loop: {_pm}')
+                    lines.append('Use this as the metric when calling log_assumption() unless the specific action warrants a different measure.')
+                else:
+                    lines.append('')
+                    lines.append('## Your Primary Success Metric')
+                    lines.append('')
+                    lines.append('Not yet defined. On your first run, define it by writing to de.json: primary_metric = "how you measure success for your domain".')
+                    lines.append('Example: "check geo ranking weekly for main keywords" or "check monthly AI spend vs. budget"')
+        except Exception:
+            pass
+
         # Self-scheduling: cron guidance for DEs with trigger configs
         de_json_file = self.agent_dir / 'de.json'
         try:
