@@ -455,6 +455,130 @@ def make_custom_tool_fn(script: str, script_args: list = None, required_credenti
     return _fn
 
 
+
+# ─── RL Loop tools ───────────────────────────────────────────────────────────
+
+def _log_assumption(inp: dict) -> dict:
+    """Log an assumed outcome after taking an action — starts the RL measurement loop."""
+    import uuid as _uuid
+    from datetime import datetime, timedelta
+    agent_name = inp.get('_agent_name', '')
+    action = inp.get('action', '').strip()
+    expected_outcome = inp.get('expected_outcome', '').strip()
+    metric = inp.get('metric', '').strip()
+    check_after_days = max(1, int(inp.get('check_after_days', 3)))
+    if not agent_name:
+        return {'error': 'agent context missing'}
+    if not action or not expected_outcome:
+        return {'error': 'action and expected_outcome are required'}
+    workspace = AGENTS_DIR / agent_name / 'workspace'
+    workspace.mkdir(exist_ok=True)
+    af = workspace / 'assumptions.json'
+    try:
+        data = json.loads(af.read_text()) if af.exists() else []
+    except Exception:
+        data = []
+    assumption_id = _uuid.uuid4().hex[:8]
+    check_date = (datetime.now() + timedelta(days=check_after_days)).strftime('%Y-%m-%d')
+    data.append({
+        'id': assumption_id,
+        'created_at': datetime.now().isoformat(),
+        'action': action,
+        'expected_outcome': expected_outcome,
+        'metric': metric,
+        'check_after_days': check_after_days,
+        'check_date': check_date,
+        'status': 'pending',
+    })
+    af.write_text(json.dumps(data, indent=2))
+    return {'ok': True, 'assumption_id': assumption_id, 'check_date': check_date,
+            'message': f'Assumption logged — check back on {check_date} (id: {assumption_id})'}
+
+
+def _measure_assumption(inp: dict) -> dict:
+    """Record the measurement result for a pending assumption. Closes the RL loop."""
+    from datetime import datetime
+    agent_name = inp.get('_agent_name', '')
+    assumption_id = inp.get('assumption_id', '').strip()
+    actual_result = inp.get('actual_result', '').strip()
+    reward = inp.get('reward', '').strip()
+    note = inp.get('note', '').strip()
+    if not agent_name:
+        return {'error': 'agent context missing'}
+    if not actual_result or reward not in ('reward', 'disreward'):
+        return {'error': 'actual_result required; reward must be "reward" or "disreward"'}
+    workspace = AGENTS_DIR / agent_name / 'workspace'
+    af = workspace / 'assumptions.json'
+    try:
+        data = json.loads(af.read_text()) if af.exists() else []
+    except Exception:
+        return {'error': 'Could not read assumptions.json'}
+    target = None
+    for a in data:
+        if a.get('status') == 'pending':
+            if not assumption_id or a.get('id') == assumption_id:
+                target = a
+                break
+    if not target:
+        return {'error': f'No pending assumption found' + (f' with id: {assumption_id}' if assumption_id else '')}
+    now = datetime.now()
+    target.update({'status': 'measured', 'measured_at': now.isoformat(),
+                   'actual_result': actual_result, 'reward': reward, 'note': note})
+    af.write_text(json.dumps(data, indent=2))
+    # Write to LEARNING_LOG.md
+    log = workspace / 'LEARNING_LOG.md'
+    today = now.strftime('%Y-%m-%d')
+    emoji = '✅' if reward == 'reward' else '❌'
+    label = '[+REWARD]' if reward == 'reward' else '[-DISREWARD]'
+    entry = f'\n## [{today}] {target["action"]}\n'
+    entry += f'**Expected:** {target["expected_outcome"]}\n'
+    entry += f'**Actual:** {actual_result}\n'
+    if note:
+        entry += f'**Note:** {note}\n'
+    entry += f'**Result:** {emoji} {label}\n'
+    if not log.exists():
+        log.write_text(f'# LEARNING_LOG\u2014{agent_name.upper()}\n\nAssumption-measure cycles. [+REWARD]=confirmed, [-DISREWARD]=no impact.\n')
+    with open(log, 'a') as f:
+        f.write(entry)
+    return {'ok': True, 'reward': reward, 'logged': True,
+            'message': f'{emoji} {label} logged to LEARNING_LOG.md'}
+
+
+TOOL_LIBRARY['log_assumption'] = {
+    'name': 'log_assumption',
+    'description': 'After taking an action, log the expected outcome and when to check it. Part of the autonomous RL learning loop.',
+    'input_schema': {
+        'type': 'object',
+        'properties': {
+            'action': {'type': 'string', 'description': 'What action you just took'},
+            'expected_outcome': {'type': 'string', 'description': 'What outcome you expect and why'},
+            'metric': {'type': 'string', 'description': 'How to measure success (e.g. check website visitors, geo ranking for keyword X)'},
+            'check_after_days': {'type': 'integer', 'description': 'Days until you check the result (default: 3)', 'default': 3},
+        },
+        'required': ['action', 'expected_outcome'],
+    },
+    'fn': _log_assumption,
+    'source': 'builtin',
+}
+
+TOOL_LIBRARY['measure_assumption'] = {
+    'name': 'measure_assumption',
+    'description': 'Record the measurement result for a pending assumption. Close the RL loop with a reward or disreward.',
+    'input_schema': {
+        'type': 'object',
+        'properties': {
+            'assumption_id': {'type': 'string', 'description': 'ID from log_assumption (empty = oldest pending)'},
+            'actual_result': {'type': 'string', 'description': 'What actually happened when you measured'},
+            'reward': {'type': 'string', 'description': '"reward" if expected outcome achieved, "disreward" if not', 'enum': ['reward', 'disreward']},
+            'note': {'type': 'string', 'description': 'What you learned and will do differently'},
+        },
+        'required': ['actual_result', 'reward'],
+    },
+    'fn': _measure_assumption,
+    'source': 'builtin',
+}
+
+
 def _load_and_register_custom_tools() -> None:
     """
     Scan CUSTOM_TOOLS_DIR for *.json definitions and inject each into TOOL_LIBRARY.

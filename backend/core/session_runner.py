@@ -133,6 +133,31 @@ def main():
         f'Be specific and action-oriented. This log will be reviewed by your manager.'
     )
 
+    # ─── RL Loop: inject due assumptions for measurement ──────────────────────
+    try:
+        from datetime import date as _date
+        _af = de_dir / 'workspace' / 'assumptions.json'
+        if _af.exists():
+            import json as _json
+            _today = _date.today().isoformat()
+            _all = _json.loads(_af.read_text())
+            _due = [a for a in _all if a.get('status') == 'pending' and a.get('check_date', '9999') <= _today]
+            if _due:
+                _section = '\n\n## ⚠️ PRIORITY — Measure These Pending Assumptions First\n\n'
+                _section += 'Before your main task, measure each one below and call measure_assumption():\n\n'
+                for _a in _due:
+                    _section += f'**ID: {_a["id"]}**\n'
+                    _section += f'- Action: {_a["action"]}\n'
+                    _section += f'- Expected: {_a["expected_outcome"]}\n'
+                    if _a.get('metric'):
+                        _section += f'- How to measure: {_a["metric"]}\n'
+                    _section += f'- Was due: {_a["check_date"]}\n'
+                    _section += f'  → Call: measure_assumption(assumption_id=\"{_a["id"]}\", actual_result=\"...", reward=\"reward\"|\"disreward\", note=\"...")\n\n'
+                task_prompt += _section
+                print(f'[session_runner] {len(_due)} assumption(s) due for measurement injected')
+    except Exception as _rl_err:
+        print(f'[session_runner] RL check skipped: {_rl_err}')
+
     # Inject recent human feedback so the session learns from past corrections
     try:
         from feedback_db import get_recent_feedback

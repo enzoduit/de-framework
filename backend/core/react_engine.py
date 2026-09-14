@@ -392,6 +392,19 @@ class ReActEngine:
         except Exception:
             pass
 
+        # RL loop: explain assumption/measure cycle in system prompt
+        lines.append('')
+        lines.append('## Autonomous Learning Loop (RL)')
+        lines.append('')
+        lines.append('After taking any meaningful action (posting content, changing a config, sending a report, running an analysis):')
+        lines.append('1. Call log_assumption(action="...", expected_outcome="...", metric="how to measure it", check_after_days=N)')
+        lines.append('2. On the check date, your next session will remind you — measure the actual outcome')
+        lines.append('3. Call measure_assumption(assumption_id="...", actual_result="...", reward="reward"/"disreward", note="what you learned")')
+        lines.append('4. The result is written to LEARNING_LOG.md — this is how you improve over time without human intervention')
+        lines.append('')
+        lines.append('Use this for every action where you have a hypothesis about the outcome.')
+        lines.append('Your LEARNING_LOG.md accumulates evidence of what works and what does not — read it every session.')
+
         # QA step — mandatory last step for every DE
         lines.append('')
         lines.append('## Quality Assurance — Mandatory Last Step')
@@ -443,7 +456,7 @@ class ReActEngine:
         if fn is None:
             return json.dumps({"error": f"Unknown tool: {tool_name}"})
         try:
-            result = fn(tool_input)
+            result = fn({**tool_input, "_agent_name": self.agent_name})
             if isinstance(result, (dict, list)):
                 return json.dumps(result, default=str)
             return str(result)
