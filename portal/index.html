@@ -1789,8 +1789,7 @@ async function selectDE(name){
   const _msb=$('mode-sessions');if(_msb)_msb.classList.add('active');
   const _mcb=$('mode-chat');if(_mcb)_mcb.classList.remove('active');
   const _sp=document.querySelector('.de-sessions-panel');if(_sp)_sp.classList.remove('chat-mode');
-  switchDetailTab('profile');
-  loadSessionsPanel(name);
+  if(window.innerWidth<=767){switchDetailTab('sessions');}else{switchDetailTab('profile');loadSessionsPanel(name);}
   const mb=$('de-msg-bar');if(mb)mb.style.display='flex';
   try{
     const r=await apiFetch('/de/'+name);const de=await r.json();
