@@ -3098,12 +3098,13 @@ async function deleteWorkspaceFile(event, de, name) {
 function qualityGate(s) {
   if (!s) return { label: '—', cls: 'quality-neutral' };
   if (s.status === 'error') return { label: '❌ Error', cls: 'quality-error' };
-  const steps = s.steps || [];
-  const hasAction = steps.some(st => st.type === 'action');
-  const hasDecision = steps.some(st => st.type === 'decision_request');
-  const hasObservation = steps.some(st => st.type === 'observation');
+  const stepsArr = Array.isArray(s.steps) ? s.steps : [];
+  const stepCount = s.step_count || stepsArr.length;
+  const hasAction = stepsArr.some(st => st.type === 'action');
+  const hasDecision = stepsArr.some(st => st.type === 'decision_request');
+  const hasObservation = stepsArr.some(st => st.type === 'observation');
   if (s.status === 'running' || s.status === 'queued') return { label: '🔄 Running', cls: 'quality-neutral' };
-  if (hasAction || hasDecision || hasObservation || steps.length > 5) return { label: '💡 Value created', cls: 'quality-value' };
+  if (hasAction || hasDecision || hasObservation || stepCount > 5) return { label: '💡 Value created', cls: 'quality-value' };
   if (s.summary) return { label: '✓ Checked', cls: 'quality-neutral' };
   return { label: '⚠ No output', cls: 'quality-warn' };
 }
