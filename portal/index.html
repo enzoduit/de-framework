@@ -997,6 +997,9 @@ textarea, input, select { font-family: inherit; }
 .discover-creds{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:var(--text-muted);line-height:1.8;}
 /* ── MODE SWITCHER ── */
 .de-mode-switcher{display:flex;gap:2px;background:var(--surface2);border-radius:8px;padding:3px;margin:8px 12px 4px;flex-shrink:0;}
+.de-sessions-panel.chat-mode .de-sessions-panel-hdr,.de-sessions-panel.chat-mode #de-sessions-list,.de-sessions-panel.chat-mode #de-steps-panel,.de-sessions-panel.chat-mode #de-msg-bar{display:none!important;}
+.de-sessions-panel.chat-mode #detail-de-chat{display:flex!important;flex:1;overflow:hidden;}
+#detail-de-chat{display:none;flex-direction:column;}
 .mode-btn{flex:1;background:none;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all 0.15s;font-family:inherit;}
 .mode-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.2);}
 </style>
@@ -1095,6 +1098,7 @@ textarea, input, select { font-family: inherit; }
 
       <!-- LEFT: Sessions panel -->
       <div class="de-sessions-panel">
+        <div class="de-mode-switcher"><button id="mode-sessions" class="mode-btn active" onclick="setDEMode('sessions')">⚡ Sessions</button><button id="mode-chat" class="mode-btn" onclick="setDEMode('chat')">💬 Chat</button></div>
         <div class="de-sessions-panel-hdr">
           <span class="de-sessions-label">SESSIONS</span>
           <div style="display:flex;align-items:center;gap:8px">
@@ -1125,6 +1129,12 @@ textarea, input, select { font-family: inherit; }
           <textarea id="de-msg-input" rows="1" placeholder="Send a message…" onkeydown="deMsgKey(event)" oninput="autoResize(this)"></textarea>
           <button class="btn-send" id="de-msg-send" onclick="deSendMsg()">↑</button>
         </div>
+        <!-- Chat panel (shown in chat mode) -->
+        <div id="detail-de-chat">
+          <div class="de-chat-hdr"><span class="de-chat-hdr-title">💬 CHAT WITH DE</span><button class="de-chat-clear" onclick="deChatClear()" title="Clear conversation">Clear</button></div>
+          <div class="de-chat-msgs" id="de-chat-msgs"><div style="color:var(--text-muted);font-size:12px;text-align:center;padding-top:32px" id="de-chat-empty">Ask your DE anything — it can read files, check status, and update its own config.</div></div>
+          <div class="de-chat-input-bar"><textarea id="de-chat-input" rows="1" placeholder="Ask your DE anything…" onkeydown="deChatKey(event)" oninput="autoResize(this)"></textarea><button class="de-chat-send" id="de-chat-send" onclick="deChatSend()">&#8593;</button></div>
+        </div>
       </div>
 
       <!-- Resize handle -->
@@ -1132,16 +1142,11 @@ textarea, input, select { font-family: inherit; }
 
       <!-- RIGHT: Chat / Profile / Schedule -->
       <div class="de-detail-panel">
-        <div class="de-mode-switcher">
-          <button id="mode-sessions" class="mode-btn active" onclick="setDEMode('sessions')">⚡ Sessions</button>
-          <button id="mode-chat" class="mode-btn" onclick="setDEMode('chat')">💬 Chat</button>
-        </div>
         <div class="de-detail-tabs">
           <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFILE</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
           <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRICS</button>
           <button class="de-detail-tab" id="dtab-workspace" onclick="switchDetailTab('workspace')">📁 FILES</button>
-          <button class="de-detail-tab" id="dtab-sessions" onclick="switchDetailTab('sessions')">📋 SESSIONS</button>
         </div>
 
         <!-- Profile -->
@@ -1185,20 +1190,7 @@ textarea, input, select { font-family: inherit; }
           </div>
         </div>
 
-        <!-- 💬 DE Chat -->
-        <div class="de-detail-content" id="detail-de-chat">
-          <div class="de-chat-hdr">
-            <span class="de-chat-hdr-title">💬 CHAT WITH DE</span>
-            <button class="de-chat-clear" onclick="deChatClear()" title="Clear conversation">Clear</button>
-          </div>
-          <div class="de-chat-msgs" id="de-chat-msgs">
-            <div style="color:var(--text-muted);font-size:12px;text-align:center;padding-top:32px" id="de-chat-empty">Select a Digital Employee and ask anything.</div>
-          </div>
-          <div class="de-chat-input-bar">
-            <textarea id="de-chat-input" rows="1" placeholder="Ask your DE anything…" onkeydown="deChatKey(event)" oninput="autoResize(this)"></textarea>
-            <button class="de-chat-send" id="de-chat-send" onclick="deChatSend()">&#8593;</button>
-          </div>
-        </div>
+
 
       </div>
     </div>
@@ -1513,6 +1505,7 @@ let wizardStep = 0;
 const STEPS = 5;
 let chatPoller = null;
 let _currentDEMode = 'sessions';
+let _pendingDecisionSessIds = new Set();
 let _lastActiveDetailTab = 'profile';
 
 
@@ -1795,8 +1788,7 @@ async function selectDE(name){
   _lastActiveDetailTab = 'profile'; _currentDEMode = 'sessions';
   const _msb=$('mode-sessions');if(_msb)_msb.classList.add('active');
   const _mcb=$('mode-chat');if(_mcb)_mcb.classList.remove('active');
-  const _dtb=document.querySelector('.de-detail-tabs');if(_dtb)_dtb.style.display='';
-  const _cpb=$('detail-de-chat');if(_cpb)_cpb.classList.remove('active');
+  const _sp=document.querySelector('.de-sessions-panel');if(_sp)_sp.classList.remove('chat-mode');
   switchDetailTab('profile');
   loadSessionsPanel(name);
   const mb=$('de-msg-bar');if(mb)mb.style.display='flex';
@@ -2058,6 +2050,7 @@ async function loadDecisionsPending(){
   try{
     const r=await apiFetch('/decisions');const d=await r.json();
     const pending=d.pending||[];
+    _pendingDecisionSessIds = new Set(pending.map(d=>d.session_id).filter(Boolean));
     const pill=$('decisions-pill');
     if(pill){pill.textContent=`⏳ ${pending.length} decision${pending.length!==1?'s':''}`;pill.classList.toggle('active',pending.length>0);}
     if(!pending.length){body.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:8px 0">No pending decisions ✓</div>';return;}
@@ -2117,7 +2110,7 @@ async function trueReject(id){
 function navigateToSession(deName,sessionId){
   closeDecisions();
   selectDE(deName);
-  setTimeout(()=>switchDetailTab('sessions'),400);
+  setTimeout(()=>loadSessionsPanel(deName,sessionId),800);
 }
 
 /* ═══ SETUP CHAT (Create DE via conversation) ═══ */
@@ -2506,6 +2499,7 @@ async function loadSessionsPanel(de, autoOpenSessionId) {
       <div class="ws-card" onclick="showSessionSteps('${esc(de)}','${esc(s.id)}',this)">
         <div class="ws-card-top">
           ${triggerBadge(s.trigger_type)}
+          ${_pendingDecisionSessIds.has(s.id)?'<span style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.4);border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;color:#f97316;">⏳ DECISION</span>':''}
           <span class="ws-quality ${qg.cls}">${qg.label}</span>
         </div>
         ${s.summary ? `<div class="ws-summary">${esc(stripMd(s.summary,90))}${s.summary.length>90?'…':''}</div>` : ''}
@@ -2685,20 +2679,16 @@ function setDEMode(mode) {
   _currentDEMode = mode;
   const sessBtn = $('mode-sessions');
   const chatBtn = $('mode-chat');
-  const tabBar = document.querySelector('.de-detail-tabs');
-  const chatPanel = $('detail-de-chat');
+  const sessPanel = document.querySelector('.de-sessions-panel');
   if (mode === 'chat') {
     if (sessBtn) sessBtn.classList.remove('active');
     if (chatBtn) chatBtn.classList.add('active');
-    if (tabBar) tabBar.style.display = 'none';
-    document.querySelectorAll('.de-detail-content').forEach(c => c.classList.remove('active'));
-    if (chatPanel) chatPanel.classList.add('active');
+    if (sessPanel) sessPanel.classList.add('chat-mode');
     if (selectedDE) deChatLoad(selectedDE);
   } else {
     if (sessBtn) sessBtn.classList.add('active');
     if (chatBtn) chatBtn.classList.remove('active');
-    if (tabBar) tabBar.style.display = '';
-    if (chatPanel) chatPanel.classList.remove('active');
+    if (sessPanel) sessPanel.classList.remove('chat-mode');
     switchDetailTab(_lastActiveDetailTab || 'profile');
   }
 }
