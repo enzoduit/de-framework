@@ -579,6 +579,33 @@ TOOL_LIBRARY['measure_assumption'] = {
 }
 
 
+def _request_more_iterations(inp: dict) -> dict:
+    reason = inp.get('reason', '')
+    additional = max(1, min(int(inp.get('additional_needed', 10)), 15))
+    return {
+        'ok': True,
+        'granted': additional,
+        'reason': reason,
+        '_extend_iterations': additional,
+        'message': f'Granted {additional} more iterations. Continuing: {reason}',
+    }
+
+
+TOOL_LIBRARY['request_more_iterations'] = {
+    'name': 'request_more_iterations',
+    'description': 'Request more iterations when you have genuine important work left to complete. Call this mid-task when you need more runway — not just to extend. Only use when you are doing real, valuable work.',
+    'input_schema': {
+        'type': 'object',
+        'properties': {
+            'reason': {'type': 'string', 'description': 'What important work you still need to complete and why it matters'},
+            'additional_needed': {'type': 'integer', 'description': 'How many more iterations you need (1–15)', 'default': 10},
+        },
+        'required': ['reason'],
+    },
+    'fn': _request_more_iterations,
+}
+
+
 def _load_and_register_custom_tools() -> None:
     """
     Scan CUSTOM_TOOLS_DIR for *.json definitions and inject each into TOOL_LIBRARY.

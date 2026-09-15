@@ -130,7 +130,11 @@ def main():
         f'2. What actions you would take\n'
         f'3. Results/findings\n'
         f'4. Next steps or scheduled follow-ups\n\n'
-        f'Be specific and action-oriented. This log will be reviewed by your manager.'
+        f'Be specific and action-oriented. This log will be reviewed by your manager.\n\n'
+        f'== RL LOOP — DO THIS AFTER EVERY ACTION ==\n'
+        f'After EACH meaningful action (publishing content, running a script, making a change, writing something), '
+        f'call log_assumption IMMEDIATELY — right then, before your next step. Do not save it for the end. '
+        f'If you are approaching the iteration limit with real, valuable work still left to do, call request_more_iterations first.'
     )
 
     # ─── RL Loop: inject due assumptions for measurement ──────────────────────

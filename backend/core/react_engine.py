@@ -764,6 +764,19 @@ class ReActEngine:
                         "content": result_str,
                     })
 
+                    # Extend max_iterations if tool requests more runway
+                    try:
+                        import json as _j
+                        _r = _j.loads(result_str) if result_str and result_str.strip().startswith('{') else {}
+                        if isinstance(_r, dict) and _r.get('_extend_iterations'):
+                            extra = min(int(_r['_extend_iterations']), 15)
+                            new_max = min(self.max_iterations + extra, 50)
+                            if new_max > self.max_iterations:
+                                print(f"[ReAct] Extended max_iterations {self.max_iterations}\u2192{new_max} (reason: {_r.get('reason', '')[:60]})")
+                                self.max_iterations = new_max
+                    except Exception:
+                        pass
+
                     # Check if human decision was requested → stop after this iteration
                     if tool_name == "request_human_decision":
                         human_decision_triggered = True
