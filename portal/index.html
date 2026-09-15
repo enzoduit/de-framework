@@ -995,6 +995,10 @@ textarea, input, select { font-family: inherit; }
 .badge-registered{background:rgba(0,180,0,.12);color:#0a0;}
 .badge-new{background:rgba(255,69,0,.12);color:var(--accent);}
 .discover-creds{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:var(--text-muted);line-height:1.8;}
+/* ── MODE SWITCHER ── */
+.de-mode-switcher{display:flex;gap:2px;background:var(--surface2);border-radius:8px;padding:3px;margin:8px 12px 4px;flex-shrink:0;}
+.mode-btn{flex:1;background:none;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all 0.15s;font-family:inherit;}
+.mode-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.2);}
 </style>
 </head>
 <body>
@@ -1128,12 +1132,15 @@ textarea, input, select { font-family: inherit; }
 
       <!-- RIGHT: Chat / Profile / Schedule -->
       <div class="de-detail-panel">
+        <div class="de-mode-switcher">
+          <button id="mode-sessions" class="mode-btn active" onclick="setDEMode('sessions')">⚡ Sessions</button>
+          <button id="mode-chat" class="mode-btn" onclick="setDEMode('chat')">💬 Chat</button>
+        </div>
         <div class="de-detail-tabs">
           <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFILE</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
           <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRICS</button>
           <button class="de-detail-tab" id="dtab-workspace" onclick="switchDetailTab('workspace')">📁 FILES</button>
-          <button class="de-detail-tab" id="dtab-de-chat" onclick="switchDetailTab('de-chat')">💬 CHAT</button>
           <button class="de-detail-tab" id="dtab-sessions" onclick="switchDetailTab('sessions')">📋 SESSIONS</button>
         </div>
 
@@ -1505,6 +1512,8 @@ let selectedColor = '#FF4500';
 let wizardStep = 0;
 const STEPS = 5;
 let chatPoller = null;
+let _currentDEMode = 'sessions';
+let _lastActiveDetailTab = 'profile';
 
 
 /* ═══ BACKEND CONFIG ═══ */
@@ -1783,6 +1792,11 @@ async function selectDE(name){
   const _hd=$('home-dash');if(_hd)_hd.classList.remove('visible');
   $('de-view').classList.add('visible');
   backToSessionsList();
+  _lastActiveDetailTab = 'profile'; _currentDEMode = 'sessions';
+  const _msb=$('mode-sessions');if(_msb)_msb.classList.add('active');
+  const _mcb=$('mode-chat');if(_mcb)_mcb.classList.remove('active');
+  const _dtb=document.querySelector('.de-detail-tabs');if(_dtb)_dtb.style.display='';
+  const _cpb=$('detail-de-chat');if(_cpb)_cpb.classList.remove('active');
   switchDetailTab('profile');
   loadSessionsPanel(name);
   const mb=$('de-msg-bar');if(mb)mb.style.display='flex';
@@ -2059,15 +2073,16 @@ async function loadDecisionsPending(){
         (d.proposed_action?`<div class="dec-proposed">Proposed: ${esc(d.proposed_action)}</div>`:'')+
         `<div class="dec-actions" id="da-${d.id}">`+
           `<button class="btn-approve" onclick="decide('${d.id}','approve')">✓ APPROVE</button>`+
-          `<button class="btn-reject" onclick="showRejectInput('${d.id}')">✗ REJECT</button>`+
+          `<button class="btn-reject" onclick="showRejectInput('${d.id}')">↩ REPLY</button>`+
         `</div>`+
         `<div class="dec-reject-input" id="dri-${d.id}" style="display:none">`+
-          `<textarea class="dec-reject-textarea" id="dreason-${d.id}" rows="2" placeholder="Why are you rejecting this? The DE will see your reason."></textarea>`+
+          `<textarea class="dec-reject-textarea" id="dreason-${d.id}" rows="2" placeholder="Your reply or feedback — the session will resume with this message."></textarea>`+
           `<div class="dec-reject-btns">`+
-            `<button class="btn-reject-send" onclick="submitReject('${d.id}')">Send Rejection</button>`+
+            `<button class="btn-reject-send" onclick="submitReject('${d.id}')">Reply to session</button>`+
             `<button class="btn-reject-cancel" onclick="cancelReject('${d.id}')">Cancel</button>`+
           `</div>`+
         `</div>`+
+        `<div style="text-align:right;margin-top:6px"><a style="font-size:10px;color:var(--text-muted);cursor:pointer;text-decoration:underline dotted" onclick="trueReject('${d.id}')">✗ Reject</a></div>`+
       `</div>`;
     }).join('');
   }catch(e){body.innerHTML='<div style="color:var(--text-muted);font-size:12px">Unavailable</div>';}
@@ -2093,7 +2108,11 @@ async function submitReject(id){
   const ta=$('dreason-'+id);
   const reason=(ta&&ta.value||'').trim();
   if(!reason){if(ta){ta.style.borderColor='var(--red)';ta.focus();}return;}
-  await decide(id,'reject',reason);
+  await decide(id,'sendback',reason);
+}
+async function trueReject(id){
+  if(!confirm('Permanently reject this idea? The session will be killed.'))return;
+  await decide(id,'reject','');
 }
 function navigateToSession(deName,sessionId){
   closeDecisions();
@@ -2636,6 +2655,8 @@ function backToSessionsList() {
 }
 
 function switchDetailTab(name) {
+  if (name === 'de-chat') { setDEMode('chat'); return; }
+  _lastActiveDetailTab = name;
   const isMobile = window.innerWidth <= 767;
   const sp = document.querySelector('.de-sessions-panel');
   const dp = document.querySelector('.de-detail-panel');
@@ -2652,14 +2673,34 @@ function switchDetailTab(name) {
   }
   const sessBtn = $('dtab-sessions');
   if (sessBtn) sessBtn.classList.remove('active');
-  const names = ['profile','schedule','metrics','workspace','de-chat'];
+  const names = ['profile','schedule','metrics','workspace'];
   document.querySelectorAll('.de-detail-tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.de-detail-content').forEach((c,i) => c.classList.toggle('active', names[i]===name));
   if (name==='profile' && selectedDE) loadProfile(selectedDE);
   if (name==='schedule' && selectedDE) loadSchedule(selectedDE);
   if (name==='metrics' && selectedDE) loadMetrics(selectedDE);
   if (name==='workspace' && selectedDE) loadWorkspaceTab(selectedDE);
-  if (name==='de-chat' && selectedDE) deChatLoad(selectedDE);
+}
+function setDEMode(mode) {
+  _currentDEMode = mode;
+  const sessBtn = $('mode-sessions');
+  const chatBtn = $('mode-chat');
+  const tabBar = document.querySelector('.de-detail-tabs');
+  const chatPanel = $('detail-de-chat');
+  if (mode === 'chat') {
+    if (sessBtn) sessBtn.classList.remove('active');
+    if (chatBtn) chatBtn.classList.add('active');
+    if (tabBar) tabBar.style.display = 'none';
+    document.querySelectorAll('.de-detail-content').forEach(c => c.classList.remove('active'));
+    if (chatPanel) chatPanel.classList.add('active');
+    if (selectedDE) deChatLoad(selectedDE);
+  } else {
+    if (sessBtn) sessBtn.classList.add('active');
+    if (chatBtn) chatBtn.classList.remove('active');
+    if (tabBar) tabBar.style.display = '';
+    if (chatPanel) chatPanel.classList.remove('active');
+    switchDetailTab(_lastActiveDetailTab || 'profile');
+  }
 }
 // Keep old switchTab as alias for backward compat
 function switchTab(name) { if(name==='profile') switchDetailTab('profile'); else if(name==='schedule') switchDetailTab('schedule'); }
