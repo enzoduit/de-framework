@@ -359,6 +359,14 @@ textarea, input, select { font-family: inherit; }
 .dec-title { font-size:13px; font-weight:600; color:var(--text); margin-bottom:4px; }
 .dec-desc { font-size:12px; color:var(--text-sec); margin-bottom:10px; line-height:1.5; }
 .dec-proposed { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); margin-bottom:10px; line-height:1.5; }
+.dec-session { font-size:10px; color:var(--accent); cursor:pointer; margin:2px 0 8px; font-family:'JetBrains Mono',monospace; opacity:0.8; }
+.dec-session:hover { opacity:1; text-decoration:underline; }
+.dec-reject-input { margin-top:8px; }
+.dec-reject-textarea { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px; color:var(--text); font-size:11px; resize:none; box-sizing:border-box; margin-bottom:6px; font-family:inherit; }
+.dec-reject-textarea:focus { outline:none; border-color:var(--red); }
+.dec-reject-btns { display:flex; gap:6px; }
+.btn-reject-send { flex:1; background:rgba(220,38,38,0.12); border:1px solid rgba(220,38,38,0.35); border-radius:6px; padding:6px 10px; color:var(--red); font-size:11px; font-weight:600; cursor:pointer; }
+.btn-reject-cancel { background:none; border:1px solid var(--border); border-radius:6px; padding:6px 10px; color:var(--text-muted); font-size:11px; cursor:pointer; }
 .dec-actions { display:flex; gap:8px; }
 .btn-approve {
   flex:1; background:rgba(0,200,100,0.12); border:1px solid rgba(0,200,100,0.35);
@@ -2039,24 +2047,58 @@ async function loadDecisionsPending(){
     const pill=$('decisions-pill');
     if(pill){pill.textContent=`⏳ ${pending.length} decision${pending.length!==1?'s':''}`;pill.classList.toggle('active',pending.length>0);}
     if(!pending.length){body.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:8px 0">No pending decisions ✓</div>';return;}
-    body.innerHTML=pending.map(d=>`
-      <div class="dec-card" id="dc-${d.id}">
-        <div class="dec-agent">${esc((d.agent||'?').toUpperCase())}</div>
-        <div class="dec-title">${esc(d.title||'')}</div>
-        ${d.description?`<div class="dec-desc">${esc(d.description)}</div>`:''}
-        ${d.proposed_action?`<div class="dec-proposed">Proposed: ${esc(d.proposed_action)}</div>`:''}
-        <div class="dec-actions">
-          <button class="btn-approve" onclick="decide('${d.id}','approve')">✓ APPROVE</button>
-          <button class="btn-reject" onclick="decide('${d.id}','reject')">✗ REJECT</button>
-        </div>
-      </div>`).join('');
+    body.innerHTML=pending.map(d=>{
+      const sid=d.session_id||'';
+      const sidShort=sid?sid.substring(0,32)+'…':'';
+      const agentDir=d._agent_dir||d.agent||'';
+      return `<div class="dec-card" id="dc-${d.id}">`+
+        `<div class="dec-agent">${esc((d.agent||'?').toUpperCase())}</div>`+
+        `<div class="dec-title">${esc(d.title||'')}</div>`+
+        (sid?`<div class="dec-session" onclick="navigateToSession('${esc(agentDir)}','${esc(sid)}')">📋 ${esc(sidShort)}</div>`:'')+
+        (d.description?`<div class="dec-desc">${esc(d.description)}</div>`:'')+
+        (d.proposed_action?`<div class="dec-proposed">Proposed: ${esc(d.proposed_action)}</div>`:'')+
+        `<div class="dec-actions" id="da-${d.id}">`+
+          `<button class="btn-approve" onclick="decide('${d.id}','approve')">✓ APPROVE</button>`+
+          `<button class="btn-reject" onclick="showRejectInput('${d.id}')">✗ REJECT</button>`+
+        `</div>`+
+        `<div class="dec-reject-input" id="dri-${d.id}" style="display:none">`+
+          `<textarea class="dec-reject-textarea" id="dreason-${d.id}" rows="2" placeholder="Why are you rejecting this? The DE will see your reason."></textarea>`+
+          `<div class="dec-reject-btns">`+
+            `<button class="btn-reject-send" onclick="submitReject('${d.id}')">Send Rejection</button>`+
+            `<button class="btn-reject-cancel" onclick="cancelReject('${d.id}')">Cancel</button>`+
+          `</div>`+
+        `</div>`+
+      `</div>`;
+    }).join('');
   }catch(e){body.innerHTML='<div style="color:var(--text-muted);font-size:12px">Unavailable</div>';}
 }
-async function decide(id,action){
+async function decide(id,action,note=''){
   const card=$('dc-'+id);
-  try{await apiFetch('/decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,action})});}catch(e){}
-  if(card){card.style.opacity='0.4';card.querySelector('.dec-actions').style.display='none';}
+  try{await apiFetch('/decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,action,note})});}catch(e){}
+  if(card){card.style.opacity='0.4';const da=$('da-'+id);if(da)da.style.display='none';}
   setTimeout(loadDecisionsPending,1000);
+}
+function showRejectInput(id){
+  const da=$('da-'+id),ri=$('dri-'+id);
+  if(da)da.style.display='none';
+  if(ri)ri.style.display='';
+  const ta=$('dreason-'+id);if(ta)ta.focus();
+}
+function cancelReject(id){
+  const da=$('da-'+id),ri=$('dri-'+id);
+  if(ri)ri.style.display='none';
+  if(da)da.style.display='';
+}
+async function submitReject(id){
+  const ta=$('dreason-'+id);
+  const reason=(ta&&ta.value||'').trim();
+  if(!reason){if(ta){ta.style.borderColor='var(--red)';ta.focus();}return;}
+  await decide(id,'reject',reason);
+}
+function navigateToSession(deName,sessionId){
+  closeDecisions();
+  selectDE(deName);
+  setTimeout(()=>switchDetailTab('sessions'),400);
 }
 
 /* ═══ SETUP CHAT (Create DE via conversation) ═══ */
@@ -3018,8 +3060,9 @@ function qualityGate(s) {
   const steps = s.steps || [];
   const hasAction = steps.some(st => st.type === 'action');
   const hasDecision = steps.some(st => st.type === 'decision_request');
+  const hasObservation = steps.some(st => st.type === 'observation');
   if (s.status === 'running' || s.status === 'queued') return { label: '🔄 Running', cls: 'quality-neutral' };
-  if (hasAction || hasDecision) return { label: '💡 Value created', cls: 'quality-value' };
+  if (hasAction || hasDecision || hasObservation || steps.length > 5) return { label: '💡 Value created', cls: 'quality-value' };
   if (s.summary) return { label: '✓ Checked', cls: 'quality-neutral' };
   return { label: '⚠ No output', cls: 'quality-warn' };
 }

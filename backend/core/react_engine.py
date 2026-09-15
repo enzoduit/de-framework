@@ -538,6 +538,7 @@ class ReActEngine:
         item = {
             "id": decision_id,
             "agent": self.agent_name,
+            "session_id": self.session.id if self.session else None,
             "level": 2,
             "title": input_data.get("title", "Decision needed"),
             "description": input_data.get("description", ""),

@@ -160,6 +160,20 @@ After updating, confirm what changed in a brief message to Ed."""
 
                 result = {'status': 'ok', 'action': action + 'd', 'id': decision_id}
 
+                # On reject with reason — write to DE inbox so next session sees it
+                if action == 'reject' and note:
+                    inbox_file = agent_dir / 'workspace' / 'inbox.jsonl'
+                    inbox_file.parent.mkdir(parents=True, exist_ok=True)
+                    with open(inbox_file, 'a') as f:
+                        f.write(json.dumps({
+                            'type': 'decision_rejected',
+                            'ts': now_iso(),
+                            'decision_id': decision_id,
+                            'title': match.get('title', ''),
+                            'reason': note,
+                            'message': f"Your decision '{match.get('title','')}' was rejected. Reason: {note}. Rethink your approach.",
+                        }) + '\n')
+
                 if action == 'approve':
                     # If decision came from a paused session, resume it
                     sess_id = match.get('session_id')
