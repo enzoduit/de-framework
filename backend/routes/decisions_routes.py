@@ -99,10 +99,16 @@ def handle_decide(handler, body):
             if match:
                 # SEND BACK: keep in pending, add feedback, queue for re-thinking
                 if action == 'sendback':
-                    match['status'] = 'pending'
+                    match['status'] = 'replied'
                     match['ed_feedback'] = note
-                    match['sendback_at'] = now_iso()
+                    match['replied_at'] = now_iso()
                     match['sendback_count'] = match.get('sendback_count', 0) + 1
+                    # Move from pending to resolved so it leaves "Needs Attention"
+                    decisions['pending'] = [i for i in pending if i['id'] != decision_id]
+                    resolved_key = 'resolved' if 'resolved' in decisions else 'resolved'
+                    if resolved_key not in decisions:
+                        decisions[resolved_key] = []
+                    decisions[resolved_key].append(match)
                     decisions_file.write_text(json.dumps(decisions, indent=2))
 
                     # Resume the paused session — inject Ed's reply as context, re-run runner
