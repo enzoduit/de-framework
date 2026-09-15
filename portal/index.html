@@ -703,6 +703,25 @@ textarea, input, select { font-family: inherit; }
 .de-chat-thinking-dots span { width:5px; height:5px; border-radius:50%; background:var(--accent); animation:blink 1.4s infinite; }
 .de-chat-thinking-dots span:nth-child(2){animation-delay:.2s;}
 .de-chat-thinking-dots span:nth-child(3){animation-delay:.4s;}
+.de-chat-list-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color 0.15s;}
+.de-chat-list-card:hover{border-color:var(--accent);background:var(--surface2);}
+.de-chat-list-card-title{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.de-chat-list-card-meta{font-size:11px;color:var(--text-muted);margin-top:3px;display:flex;gap:8px;}
+.de-chat-list-items{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px;}
+#de-chat-list-view{display:flex;flex-direction:column;flex:1;overflow:hidden;}
+.de-chat-list-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.de-chat-list-hdr-title{font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;}
+.de-chat-new-btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;}
+.de-chat-new-btn:hover{opacity:.85;}
+#de-chat-detail-view{display:none;flex-direction:column;flex:1;overflow:hidden;}
+.de-chat-detail-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.de-chat-back-btn{background:none;border:none;color:var(--text-sec);font-size:12px;cursor:pointer;padding:0;white-space:nowrap;}
+.de-chat-back-btn:hover{color:var(--text);}
+.de-chat-detail-title-text{flex:1;font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.de-chat-delete-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0;}
+.de-chat-delete-btn:hover{color:#ef4444;}
+.de-chat-list-empty{text-align:center;padding:40px 16px;color:var(--text-muted);font-size:12px;}
+.de-chat-list-empty-btn{margin-top:12px;display:inline-block;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;cursor:pointer;}
 .de-chat-input-bar {
   padding:10px 12px; border-top:1px solid var(--border);
   display:flex; gap:8px; align-items:flex-end;
@@ -1131,9 +1150,15 @@ textarea, input, select { font-family: inherit; }
         </div>
         <!-- Chat panel (shown in chat mode) -->
         <div id="detail-de-chat">
-          <div class="de-chat-hdr"><span class="de-chat-hdr-title">💬 CHAT WITH DE</span><button class="de-chat-clear" onclick="deChatClear()" title="Clear conversation">Clear</button></div>
-          <div class="de-chat-msgs" id="de-chat-msgs"><div style="color:var(--text-muted);font-size:12px;text-align:center;padding-top:32px" id="de-chat-empty">Ask your DE anything — it can read files, check status, and update its own config.</div></div>
-          <div class="de-chat-input-bar"><textarea id="de-chat-input" rows="1" placeholder="Ask your DE anything…" onkeydown="deChatKey(event)" oninput="autoResize(this)"></textarea><button class="de-chat-send" id="de-chat-send" onclick="deChatSend()">&#8593;</button></div>
+          <div id="de-chat-list-view">
+            <div class="de-chat-list-hdr"><span class="de-chat-list-hdr-title">💬 CHATS</span><button class="de-chat-new-btn" onclick="deChatNew()">＋ New</button></div>
+            <div id="de-chat-list-items" class="de-chat-list-items"></div>
+          </div>
+          <div id="de-chat-detail-view">
+            <div class="de-chat-detail-hdr"><button class="de-chat-back-btn" onclick="deChatBack()">← Back</button><span id="de-chat-detail-title" class="de-chat-detail-title-text"></span><button class="de-chat-delete-btn" onclick="deChatDelete()" title="Delete">🗑</button></div>
+            <div class="de-chat-msgs" id="de-chat-msgs"></div>
+            <div class="de-chat-input-bar"><textarea id="de-chat-input" rows="1" placeholder="Ask your DE anything…" onkeydown="deChatKey(event)" oninput="autoResize(this)"></textarea><button class="de-chat-send" id="de-chat-send" onclick="deChatSend()">&#8593;</button></div>
+          </div>
         </div>
       </div>
 
@@ -2697,53 +2722,67 @@ function switchTab(name) { if(name==='profile') switchDetailTab('profile'); else
 /* ═══ DE CHAT PANEL ══════════════════════════════════════════════════════ */
 // Conversation history for the currently selected DE chat.
 // Each item: {role:'user'|'assistant', content:str, tools_used?:[str]}
-let _deChatHistory = [];
 let _deChatCurrentDE = null;
 let _deChatBusy = false;
-
-function _deChatStorageKey(de) { return 'de-chat-' + de; }
+let _deChatCurrentChatId = null;
 
 function deChatLoad(de) {
   _deChatCurrentDE = de;
-  _deChatHistory = [];
-  try {
-    const raw = localStorage.getItem(_deChatStorageKey(de));
-    if (raw) _deChatHistory = JSON.parse(raw);
-  } catch(e) { _deChatHistory = []; }
-
-  const msgs = $('de-chat-msgs');
-  if (!msgs) return;
-
-  if (_deChatHistory.length === 0) {
-    msgs.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding-top:32px" id="de-chat-empty">Ask your DE anything \u2014 it can read files, check status, and update its own config.</div>';
-    return;
-  }
-  msgs.innerHTML = '';
-  for (const h of _deChatHistory) {
-    if (h.role === 'user') {
-      const el = document.createElement('div');
-      el.className = 'de-chat-bubble-user';
-      el.textContent = h.content;
-      msgs.appendChild(el);
-    } else if (h.role === 'assistant') {
-      const toolsHtml = (h.tools_used && h.tools_used.length)
-        ? '<div class="de-chat-tools-used">\ud83d\udd27 used: ' + h.tools_used.join(', ') + '</div>'
-        : '';
-      const el = document.createElement('div');
-      el.className = 'de-chat-bubble-de';
-      el.innerHTML = deChatRenderMd(h.content) + toolsHtml;
-      msgs.appendChild(el);
-    }
-  }
-  msgs.scrollTop = msgs.scrollHeight;
+  _deChatCurrentChatId = null;
+  loadChatList(de);
 }
 
-function deChatClear() {
-  if (!_deChatCurrentDE) return;
-  _deChatHistory = [];
-  try { localStorage.removeItem(_deChatStorageKey(_deChatCurrentDE)); } catch(e) {}
-  const msgs = $('de-chat-msgs');
-  if (msgs) msgs.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding-top:32px">Conversation cleared.</div>';
+async function loadChatList(de) {
+  const lv=$('de-chat-list-view'),dv=$('de-chat-detail-view');
+  if(lv)lv.style.display='flex'; if(dv)dv.style.display='none';
+  _deChatCurrentChatId=null;
+  const items=$('de-chat-list-items'); if(!items)return;
+  items.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">Loading…</div>';
+  try{
+    const r=await apiFetch('/de/'+de+'/chats'),d=await r.json(),chats=d.chats||[];
+    if(!chats.length){items.innerHTML='<div class="de-chat-list-empty">No chats yet<br><button class="de-chat-list-empty-btn" onclick="deChatNew()">Start your first chat →</button></div>';return;}
+    items.innerHTML=chats.map(c=>'<div class="de-chat-list-card" data-cid="'+esc(c.id)+'" onclick="deChatOpenChat(this.dataset.cid)"><div class="de-chat-list-card-title">'+esc(c.title||'Chat')+'</div><div class="de-chat-list-card-meta"><span>'+timeAgo(c.updated_at||c.created_at)+'</span><span>·</span><span>'+(c.message_count||0)+' msgs</span></div></div>').join('');
+  }catch(e){if(items)items.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">Could not load chats.</div>';}
+}
+
+async function deChatOpenChat(cid){
+  if(!selectedDE)return;
+  _deChatCurrentChatId=cid;
+  const lv=$('de-chat-list-view'),dv=$('de-chat-detail-view');
+  if(lv)lv.style.display='none'; if(dv)dv.style.display='flex';
+  const msgs=$('de-chat-msgs');
+  if(msgs)msgs.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">Loading…</div>';
+  try{
+    const r=await apiFetch('/de/'+selectedDE+'/chats/'+cid),chat=await r.json();
+    const tEl=$('de-chat-detail-title');if(tEl)tEl.textContent=chat.title||'Chat';
+    if(msgs){msgs.innerHTML='';for(const m of(chat.messages||[]))_deChatAppendMsg(m.role,m.content,m.tools_used);msgs.scrollTop=msgs.scrollHeight;}
+  }catch(e){if(msgs)msgs.innerHTML='<div style="padding:16px;font-size:11px;color:var(--text-muted)">Could not load chat.</div>';}
+}
+
+async function deChatNew(){
+  if(!selectedDE)return;
+  try{
+    const r=await apiFetch('/de/'+selectedDE+'/chats',{method:'POST'}),d=await r.json();
+    await deChatOpenChat(d.id);
+    const inp=$('de-chat-input');if(inp)inp.focus();
+  }catch(e){console.error('deChatNew',e);}
+}
+
+function deChatBack(){
+  _deChatCurrentChatId=null;
+  if(selectedDE)loadChatList(selectedDE);
+}
+
+async function deChatDelete(){
+  if(!selectedDE||!_deChatCurrentChatId)return;
+  if(!confirm('Delete this chat?'))return;
+  try{await apiFetch('/de/'+selectedDE+'/chats/'+_deChatCurrentChatId,{method:'DELETE'});deChatBack();}catch(e){console.error('deChatDelete',e);}
+}
+
+function _deChatAppendMsg(role,content,toolsUsed){
+  const msgs=$('de-chat-msgs');if(!msgs)return;
+  if(role==='user'){const el=document.createElement('div');el.className='de-chat-bubble-user';el.textContent=content;msgs.appendChild(el);}
+  else if(role==='assistant'){const th=(toolsUsed&&toolsUsed.length)?'<div class="de-chat-tools-used">used: '+toolsUsed.join(', ')+'</div>':'';const el=document.createElement('div');el.className='de-chat-bubble-de';el.innerHTML=deChatRenderMd(content)+th;msgs.appendChild(el);}
 }
 
 function deChatKey(e) {

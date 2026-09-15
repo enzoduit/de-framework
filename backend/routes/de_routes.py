@@ -1745,3 +1745,132 @@ def handle_de_chat(handler, de_name: str, body: dict):
         import traceback as _tb
         print(f'[de_chat] ERROR for {de_name}: {e}\n{_tb.format_exc()}')
         return handler.send_json(500, {'error': str(e)})
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Persistent multi-chat endpoints
+# ────────────────────────────────────────────────────────────────────────────
+
+def _chats_dir(de_name: str) -> Path:
+    d = AGENTS_BASE / de_name / 'chats'
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def handle_chats_list(handler, de_name: str):
+    """GET /de/<name>/chats — list all chats, newest first."""
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    chats_dir = de_dir / 'chats'
+    if not chats_dir.exists():
+        return handler.send_json(200, {'chats': []})
+    chats = []
+    for f in sorted(chats_dir.glob('*.json'), reverse=True):
+        try:
+            d = json.loads(f.read_text())
+            chats.append({
+                'id': d.get('id'),
+                'title': d.get('title', 'Chat'),
+                'created_at': d.get('created_at'),
+                'updated_at': d.get('updated_at'),
+                'message_count': len(d.get('messages', [])),
+            })
+        except Exception:
+            pass
+    return handler.send_json(200, {'chats': chats})
+
+
+def handle_chats_create(handler, de_name: str):
+    """POST /de/<name>/chats — create a new empty chat."""
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    chats_dir = _chats_dir(de_name)
+    chat_id = 'chat-' + _uuid.uuid4().hex[:12]
+    now = now_iso()
+    chat = {
+        'id': chat_id,
+        'de': de_name,
+        'title': 'New Chat',
+        'created_at': now,
+        'updated_at': now,
+        'messages': [],
+    }
+    (chats_dir / f'{chat_id}.json').write_text(json.dumps(chat, indent=2))
+    return handler.send_json(201, {'id': chat_id, 'created_at': now})
+
+
+def handle_chats_get(handler, de_name: str, chat_id: str):
+    """GET /de/<name>/chats/<cid> — get full chat with messages."""
+    chat_file = AGENTS_BASE / de_name / 'chats' / f'{chat_id}.json'
+    if not chat_file.exists():
+        return handler.send_json(404, {'error': f'Chat not found: {chat_id}'})
+    try:
+        return handler.send_json(200, json.loads(chat_file.read_text()))
+    except Exception as e:
+        return handler.send_json(500, {'error': str(e)})
+
+
+def handle_chats_send(handler, de_name: str, chat_id: str, body: dict):
+    """POST /de/<name>/chats/<cid> — send a user message, run chat engine, save both turns."""
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+    chat_file = de_dir / 'chats' / f'{chat_id}.json'
+    if not chat_file.exists():
+        return handler.send_json(404, {'error': f'Chat not found: {chat_id}'})
+    message = (body.get('message') or '').strip()
+    if not message:
+        return handler.send_json(400, {'error': 'message is required'})
+    try:
+        chat = json.loads(chat_file.read_text())
+    except Exception as e:
+        return handler.send_json(500, {'error': f'Could not read chat: {e}'})
+
+    # Auto-title from first user message
+    if not chat.get('messages'):
+        chat['title'] = message[:60]
+
+    msg_ts = now_iso()
+    chat['messages'].append({'role': 'user', 'content': message, 'ts': msg_ts})
+
+    # Build history (all prior messages) for chat engine
+    history = [
+        {'role': m['role'], 'content': m['content']}
+        for m in chat['messages'][:-1]
+        if m.get('role') in ('user', 'assistant')
+    ]
+
+    try:
+        from backend.core.chat_engine import ChatEngine
+        engine = ChatEngine(de_name)
+        result = engine.run(message, history)
+        reply = result.get('message', '')
+        tools_used = result.get('tools_used', [])
+        chat['messages'].append({'role': 'assistant', 'content': reply, 'ts': now_iso(), 'tools_used': tools_used})
+        chat['updated_at'] = now_iso()
+        chat_file.write_text(json.dumps(chat, indent=2))
+        return handler.send_json(200, {'message': reply, 'tools_used': tools_used})
+    except Exception as e:
+        import traceback as _tb
+        print(f'[chats_send] ERROR {de_name}/{chat_id}: {e}\n{_tb.format_exc()}')
+        # Save user message even on engine failure
+        chat['updated_at'] = now_iso()
+        try:
+            chat_file.write_text(json.dumps(chat, indent=2))
+        except Exception:
+            pass
+        return handler.send_json(500, {'error': str(e)})
+
+
+def handle_chats_delete(handler, de_name: str, chat_id: str):
+    """DELETE /de/<name>/chats/<cid> — delete a chat."""
+    chat_file = AGENTS_BASE / de_name / 'chats' / f'{chat_id}.json'
+    if not chat_file.exists():
+        return handler.send_json(404, {'error': f'Chat not found: {chat_id}'})
+    try:
+        chat_file.unlink()
+        return handler.send_json(200, {'ok': True})
+    except Exception as e:
+        return handler.send_json(500, {'error': str(e)})

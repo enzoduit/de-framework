@@ -115,6 +115,14 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/api/credentials':
             return creds_routes.handle_credentials_get(self)
 
+        # GET /de/<name>/chats — list all persistent chats
+        if len(parts) == 3 and parts[0] == 'de' and parts[2] == 'chats':
+            return de_routes.handle_chats_list(self, parts[1])
+
+        # GET /de/<name>/chats/<cid> — get full chat with messages
+        if len(parts) == 4 and parts[0] == 'de' and parts[2] == 'chats':
+            return de_routes.handle_chats_get(self, parts[1], parts[3])
+
         if parts and parts[0] == 'de':
             return de_routes.handle_de_get(self, parts)
 
@@ -243,7 +251,15 @@ class DEHandler(BaseHTTPRequestHandler):
                 and parts[2] == 'improve' and parts[3] == 'apply'):
             return de_routes.handle_improve_apply(self, parts[1], body)
 
-        # POST /de/<name>/chat — lightweight conversational chat mode
+        # POST /de/<name>/chats — create a new persistent chat
+        if (len(parts) == 3 and parts[0] == 'de' and parts[2] == 'chats'):
+            return de_routes.handle_chats_create(self, parts[1])
+
+        # POST /de/<name>/chats/<cid> — send message in a persistent chat
+        if (len(parts) == 4 and parts[0] == 'de' and parts[2] == 'chats'):
+            return de_routes.handle_chats_send(self, parts[1], parts[3], body)
+
+        # POST /de/<name>/chat — lightweight conversational chat mode (legacy)
         if (len(parts) == 3 and parts[0] == 'de' and parts[2] == 'chat'):
             return de_routes.handle_de_chat(self, parts[1], body)
 
@@ -299,6 +315,10 @@ class DEHandler(BaseHTTPRequestHandler):
         # DELETE /api/credentials/<id>
         if len(parts) == 3 and parts[0] == 'api' and parts[1] == 'credentials':
             return creds_routes.handle_credentials_delete(self, parts[2])
+
+        # DELETE /de/<name>/chats/<cid> — delete a persistent chat
+        if len(parts) == 4 and parts[0] == 'de' and parts[2] == 'chats':
+            return de_routes.handle_chats_delete(self, parts[1], parts[3])
 
         # DELETE /de/<name>/workspace/<filename>
         if (len(parts) == 4 and parts[0] == 'de'

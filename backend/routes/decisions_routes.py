@@ -4,7 +4,10 @@ Decisions Routes — /decisions, /decide, /audit-log, /revert
 
 import json
 import subprocess as _sp
+from pathlib import Path
 from backend.config import AGENTS_BASE, now_iso
+
+_SESSION_RUNNER = Path(__file__).parent.parent / 'core' / 'session_runner.py'
 from backend.routes.tasks_routes import create_human_task, execute_decision
 
 
@@ -102,45 +105,36 @@ def handle_decide(handler, body):
                     match['sendback_count'] = match.get('sendback_count', 0) + 1
                     decisions_file.write_text(json.dumps(decisions, indent=2))
 
-                    feedback_prompt = f"""## DECISION SENT BACK FOR REVISION
-
-**Decision ID:** {match['id']}
-**Agent:** {match.get('agent', '?').upper()}
-**Original title:** {match.get('title', '')}
-
-**What was proposed:**
-{match.get('proposed_action', '')}
-
-**Ed's feedback / new direction:**
-{note}
-
-**Your task:** Rethink this decision based on Ed's feedback. Update the decision in {AGENTS_BASE}/{agent_dir.name}/decisions.json — find the decision by ID and update:
-- proposed_action: revised concrete action based on Ed's feedback
-- description: updated reasoning
-- estimated_impact: updated if relevant
-- reasoning_context: include what changed and why
-
-Keep status as 'pending'. Do NOT create a new decision — update the existing one in place.
-After updating, confirm what changed in a brief message to Ed."""
-
-                    queue_file = AGENTS_BASE / 'decision-execute-queue.jsonl'
-                    entry = {
-                        'ts': now_iso(),
-                        'decision': match,
-                        'agent_dir': agent_dir.name,
-                        'note': note,
-                        'action': 'sendback',
-                        'prompt_override': feedback_prompt,
-                    }
-                    with open(queue_file, 'a') as f:
-                        f.write(json.dumps(entry) + '\n')
+                    # Resume the paused session — inject Ed's reply as context, re-run runner
+                    sess_id = match.get('session_id')
+                    de_from_dec = match.get('agent', '')
+                    session_resumed = None
+                    if sess_id and de_from_dec:
+                        sess_file = AGENTS_BASE / de_from_dec / 'sessions' / f'{sess_id}.json'
+                        if sess_file.exists():
+                            sess_data = json.loads(sess_file.read_text())
+                            if sess_data.get('status') == 'paused_human':
+                                reply_ctx = f'[Human reply to "{match.get("title","")}"] {note}'
+                                sess_data['trigger_context'] = reply_ctx
+                                steps = sess_data.get('steps', [])
+                                steps.append({'type': 'human_reply', 'ts': now_iso(), 'content': reply_ctx})
+                                sess_data['steps'] = steps
+                                sess_data['status'] = 'pending'
+                                sess_file.write_text(json.dumps(sess_data, indent=2))
+                                _rlog = f'/tmp/sendback-{de_from_dec}-{sess_id}.log'
+                                _sp.Popen(
+                                    ['python3', str(_SESSION_RUNNER), de_from_dec, sess_id],
+                                    stdout=open(_rlog, 'w'), stderr=_sp.STDOUT,
+                                    cwd=str(AGENTS_BASE),
+                                )
+                                session_resumed = sess_id
 
                     return handler.send_json(200, {
                         'status': 'ok',
                         'action': 'sentback',
                         'id': decision_id,
-                        'queued': True,
-                        'message': 'Decision sent back to agent for revision with your feedback.',
+                        'session_resumed': session_resumed,
+                        'message': 'Reply sent — session is continuing.' if session_resumed else 'Reply recorded.',
                     })
 
                 # APPROVE or REJECT: move to resolved
@@ -190,8 +184,7 @@ After updating, confirm what changed in a brief message to Ed."""
                                 })
                                 _rlog = f'/tmp/resume-{de_from_dec}-{sess_id}.log'
                                 _sp.Popen(
-                                    ['python3', str(AGENTS_BASE / 'session_runner.py'),
-                                     de_from_dec, sess_id, '--resume', resume_payload],
+                                    ['python3', str(_SESSION_RUNNER), de_from_dec, sess_id],
                                     stdout=open(_rlog, 'w'),
                                     stderr=_sp.STDOUT,
                                     cwd=str(AGENTS_BASE),
