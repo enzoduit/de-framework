@@ -13,6 +13,10 @@ from backend.config import AGENTS_BASE, DE_NAMES, now_iso
 from backend.core.tool_discovery import get_tools as _get_tools, REQUIRED_TOOL_IDS
 from backend.core.feedback_db import store_feedback, get_feedback, mark_applied, get_summary, store_summary
 
+# REQUIRED for LLM inference: All _llm_call() requests route through an OpenClaw Gateway
+# (OpenAI-compatible /v1/chat/completions). Without a running gateway, all LLM calls fail.
+# Set OPENCLAW_GATEWAY_URL + OPENCLAW_GATEWAY_TOKEN in /etc/de-framework.env.
+# Default URL assumes OpenClaw runs locally on port 18789. See SETUP.md → Environment Variables.
 _OPENCLAW_GATEWAY_URL = os.environ.get('OPENCLAW_GATEWAY_URL', 'http://127.0.0.1:18789')
 _OPENCLAW_GATEWAY_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
 _DE_MODEL = os.environ.get('DE_MODEL', 'claude-sonnet-4-6')

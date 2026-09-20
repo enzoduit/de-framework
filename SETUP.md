@@ -58,7 +58,11 @@ Fill in at minimum:
 ```env
 ANTHROPIC_API_KEY=sk-ant-...         # get at https://console.anthropic.com
 DE_API_TOKEN=choose-a-secret-token   # protect the API — use a strong random string
+OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789  # required — all LLM calls route through here
+OPENCLAW_GATEWAY_TOKEN=your-openclaw-token   # required alongside OPENCLAW_GATEWAY_URL
 ```
+
+> **Note:** The backend uses an OpenClaw Gateway for all LLM inference (`/v1/chat/completions` in OpenAI format). Without a running gateway, all DE sessions and chat calls will fail with a connection error. The default URL assumes OpenClaw is running locally. If you're self-hosting without OpenClaw, you'll need a compatible OpenAI-format proxy pointed at your LLM provider.
 
 Full reference:
 
@@ -69,8 +73,8 @@ Full reference:
 | `AGENTS_DIR` | — | `/var/de-agents` | Root dir for all DE configs + sessions |
 | `DE_MODEL` | — | `claude-haiku-4-5` | Default model (override per-DE in `de.json`) |
 | `DE_API_PORT` | — | `8769` | Backend port |
-| `OPENCLAW_GATEWAY_URL` | — | — | OpenClaw gateway URL (if using OpenClaw tools) |
-| `OPENCLAW_GATEWAY_TOKEN` | — | — | OpenClaw gateway auth token |
+| `OPENCLAW_GATEWAY_URL` | ✅ | `http://127.0.0.1:18789` | OpenClaw gateway URL — **required for all LLM inference** (`_llm_call` routes here) |
+| `OPENCLAW_GATEWAY_TOKEN` | ✅ | — | OpenClaw gateway bearer token — required alongside `OPENCLAW_GATEWAY_URL` |
 | `TELEGRAM_BOT_TOKEN` | — | — | For Telegram notifications from DEs |
 | `TELEGRAM_NOTIFY_CHAT_ID` | — | — | Telegram chat ID to notify |
 | `DECISIONS_API_URL` | — | — | External webhook for decision notifications |
