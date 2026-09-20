@@ -802,7 +802,7 @@ textarea, input, select { font-family: inherit; }
 .tl-text { font-size: 11px; color: var(--text-sec); line-height: 1.5; word-break: break-word; }
 .tl-expand { background: none; border: none; color: var(--accent); font-size: 10px; font-family: 'JetBrains Mono', monospace; cursor: pointer; padding: 0; margin-top: 4px; display: block; transition: opacity 0.15s; }
 .tl-expand:hover { opacity: 0.7; }
-.tl-detail { display: none; margin-top: 8px; padding: 12px 14px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); font-size: 12px; color: var(--text); overflow-y: auto; line-height: 1.7; max-height: 600px; }
+.tl-detail { display: none; margin-top: 8px; padding: 12px 14px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); font-size: 12px; color: var(--text); line-height: 1.7; }
 .tl-detail.open { display: block; }
 /* Markdown rendered inside tl-detail */
 .tl-detail h1,.tl-detail h2,.tl-detail h3 { font-family:'JetBrains Mono',monospace; font-weight:700; margin:14px 0 6px; color:var(--text); letter-spacing:0.02em; }
@@ -1168,6 +1168,7 @@ textarea, input, select { font-family: inherit; }
       <!-- RIGHT: Chat / Profile / Schedule -->
       <div class="de-detail-panel">
         <div class="de-detail-tabs">
+          <button class="de-detail-tab" id="dtab-sessions" onclick="switchDetailTab('sessions')">⚡ SESSIONS</button>
           <button class="de-detail-tab active" id="dtab-profile" onclick="switchDetailTab('profile')">ℹ PROFILE</button>
           <button class="de-detail-tab" id="dtab-schedule" onclick="switchDetailTab('schedule')">📅 SCHEDULE</button>
           <button class="de-detail-tab" id="dtab-metrics" onclick="switchDetailTab('metrics')">📊 METRICS</button>
@@ -2691,9 +2692,8 @@ function switchDetailTab(name) {
   }
   const sessBtn = $('dtab-sessions');
   if (sessBtn) sessBtn.classList.remove('active');
-  const names = ['profile','schedule','metrics','workspace'];
-  document.querySelectorAll('.de-detail-tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
-  document.querySelectorAll('.de-detail-content').forEach((c,i) => c.classList.toggle('active', names[i]===name));
+  document.querySelectorAll('.de-detail-tab').forEach(t => t.classList.toggle('active', t.id === 'dtab-' + name));
+  document.querySelectorAll('.de-detail-content').forEach(c => c.classList.toggle('active', c.id === 'detail-' + name));
   if (name==='profile' && selectedDE) loadProfile(selectedDE);
   if (name==='schedule' && selectedDE) loadSchedule(selectedDE);
   if (name==='metrics' && selectedDE) loadMetrics(selectedDE);

@@ -666,7 +666,7 @@ class ReActEngine:
 
         # Session: log trigger step
         if self.session is not None:
-            self.session.add_step("trigger", content=self.mission[:300])
+            self.session.add_step("trigger", content=self.mission)
 
         messages = [
             {"role": "user", "content": self.mission}
