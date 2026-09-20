@@ -1989,11 +1989,11 @@ function renderStep(step){
   const cv=cfg[step.type]||{l:(step.type||'').toUpperCase(),c:'var(--text-muted)',bg:'var(--surface)'};
   const ts=step.ts?new Date(step.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
   let body='';
-  if(step.content)body+=`<div class="step-card-body">${esc(step.content.substring(0,400))}</div>`;
+  if(step.content)body+=`<div class="step-card-body md-content">${renderMd(step.content.substring(0,800))}</div>`;
   if(step.tool)body+=`<div class="step-card-body step-card-mono" style="color:${cv.c}">→ ${esc(step.tool)}</div>`;
   if(step.input){const inp=typeof step.input==='string'?step.input:JSON.stringify(step.input,null,2);body+=`<div class="step-card-body step-card-mono" style="color:var(--text-muted);font-size:10px">${esc(inp.substring(0,300))}</div>`;}
-  if(step.result){const err=step.result.toLowerCase().includes('error');body+=`<div class="step-card-body step-card-mono" style="color:${err?'var(--red)':'var(--green)'}">${esc(step.result.substring(0,300))}</div>`;}
-  if(step.summary)body+=`<div class="step-card-body" style="color:var(--text)">${esc(step.summary.substring(0,200))}</div>`;
+  if(step.result){const err=(step.result||'').toLowerCase().includes('error');body+=`<div class="step-card-body md-content" style="color:${err?'var(--red)':'var(--green)'}">${renderMd(step.result.substring(0,500))}</div>`;}
+  if(step.summary)body+=`<div class="step-card-body md-content" style="color:var(--text)">${renderMd(step.summary)}</div>`;
   if(step.title)body+=`<div class="step-card-body" style="color:var(--yellow);font-weight:600">${esc(step.title)}</div>`;
   if(step.colleague)body+=`<div class="step-card-body" style="color:#a855f7">→ ${esc(step.colleague)}: ${esc((step.message||'').substring(0,100))}</div>`;
   return`<div class="step-card" style="border-color:${cv.c};background:${cv.bg}">
