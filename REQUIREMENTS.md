@@ -40,6 +40,114 @@ Living document. Every decision goes here. Nothing deleted — only amended or m
 
 ---
 
+## Output Types — Core Design Pattern
+
+Not all agent outputs are equal. The system distinguishes three types with different UX and different human-response options. **This is the most important design pattern in the framework.**
+
+The human's attention is a scarce resource. The output type determines whether and how to consume it.
+
+### 🔔 Decision (the agent is waiting)
+
+The agent cannot proceed without human input. It has hit something outside its authority.
+
+**When to create a Decision:**
+- Budget or strategy choice needed
+- Action would write to external systems (send email, pause campaign, spend money)
+- Risk or anomaly requiring approval
+
+**Human response options:**
+- ✅ **Continue** — go ahead
+- 💬 **Feedback + Continue** — free-text context, agent integrates it and proceeds
+- 🛑 **Stop** — cancel with reason
+
+**Technically:** Session is live, waiting. Response goes as a message into the running session → agent integrates and executes.
+
+---
+
+### 📄 Document (the agent delivered something)
+
+The agent finished a piece of work and is handing it off. It is NOT waiting.
+
+**Examples:** Q4 strategy proposal, weekly report, email draft, analysis
+
+**Human response options:**
+- 👍 **Useful** — signal: "keep going, exactly what I need"
+- 💬 **Could be better:** ___ — free-text feedback → written to DE's `memory.md` → next document improves
+
+**Important:** "Stop" on a Document makes no sense. The agent is not waiting. Binary Approve/Reject is wrong here (see below).
+
+---
+
+### 📊 Insight (the agent is informing, no action needed)
+
+The agent has information the human should know. No action required, no waiting.
+
+**Examples:** Spend anomaly, open rate drop, trend from social listening
+
+**Human response options:**
+- ✓ **Seen** — acknowledged
+- ❓ **What do I do with this?** — opens chat with the DE for further explanation
+
+**Important:** Insights inform, they don't block. They appear as notifications, not blocking modals.
+
+---
+
+### Why Binary Approve/Reject is wrong
+
+The classic Approve/Reject pattern doesn't fit this kind of AI work:
+
+- **Approve** implies: "I authorized exactly this" — but often the human means "yes, but focus on donors over 2 years"
+- **Reject** implies: "never do this" — but often means "not this time, try differently"
+- No channel for nuance or context
+
+**Right:** Free-text response. The human writes "continue but focus on donors over 2 years" → goes as a message into the session → agent integrates and executes.
+
+---
+
+## Human Attention Principle
+
+The human is not a reviewer of every step — they are a manager whose attention is a scarce resource. Design every output, notification, and escalation with this in mind.
+
+**The 4 reasons a DE should contact a human:**
+
+| # | Trigger | Example |
+|---|---------|--------|
+| 1 | Decision outside its authority | "Should I pause the campaign?" |
+| 2 | Deliverable finished | "Here's the Q4 report" |
+| 3 | Anomaly/risk the human MUST know | "Spend +40% in 2h" |
+| 4 | Blocked, needs direction | "I have no data for this period" |
+
+**Everything else:** resolve itself or message a colleague DE.
+
+**Noise reduction without a manager layer:**
+1. Output types (Decision/Document/Insight) — halves noise immediately
+2. Preference memory per DE — after 3 identical rejections, stop asking
+3. Priority/urgency — only push notifications for critical items
+4. DE-to-DE direct via `inbox.jsonl` — no manager as middleman
+
+---
+
+## Autonomy Level Progression
+
+DEs start in **Validation Mode** — everything escalates to the human as a Decision. No autonomous external actions.
+
+With track record, autonomy increases:
+
+| Level | What the human sees |
+|-------|-------------------|
+| **1 (Validation)** | Everything — every action, every output |
+| **2** | Only Decisions and critical Insights |
+| **3** | Only Decisions above a defined threshold |
+
+**Transition:** Manual — the human decides when trust is established. The DE does not self-promote.
+
+**Preference memory per DE:**
+- Which output types are accepted
+- Which format preferences the human has
+- After 3 identical rejections of the same type → DE stops asking, delegates differently
+
+---
+
 ## Portal Requirements
 
 ### Mobile
@@ -112,6 +220,24 @@ Living document. Every decision goes here. Nothing deleted — only amended or m
 ---
 
 ## Multi-Tenant / Deployment Requirements
+
+### Hosting Architecture
+
+**For demos / development:** Run locally or Render.com (free tier). Render uses ephemeral storage — agents lose memory on redeploy. Acceptable for demos, not for production.
+
+**For production (recommended):** Ubuntu 22.04 LTS VPS + systemd + Caddy
+- Persistent disk storage: agents keep memory across deploys and restarts
+- systemd: auto-restart on crash
+- Caddy: HTTPS + routing, minimal config
+- `bootstrap.sh`: one-script setup, idempotent
+
+This is the only deployment mode where the two non-negotiables hold:
+1. Portal always loads
+2. DE Framework always runs (embedded scheduler, no external cron)
+
+**Container deployments:** Set `CUSTOM_TOOLS_DIR` to a persistent volume path.
+
+---
 
 ### Fresh server setup
 - `bootstrap.sh` — idempotent, installs everything, creates folder structure
