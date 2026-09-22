@@ -421,16 +421,18 @@
     .de-detail-header {
       display: flex;
       align-items: center;
-      gap: 18px;
-      padding: 22px 28px;
+      gap: 14px;
+      padding: 20px 28px;
       border-bottom: 1px solid var(--border);
       background: var(--surface);
       flex-wrap: wrap;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .de-hdr-info { flex: 1; min-width: 0; }
-    .de-hdr-name { font-size: 21px; font-weight: 700; margin-bottom: 4px; }
-    .de-hdr-role { color: var(--text-sec); font-size: 14px; }
-    .de-hdr-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .de-hdr-name { font-size: 20px; font-weight: 700; margin-bottom: 3px; }
+    .de-hdr-role { color: var(--text-sec); font-size: 13px; }
+    .de-hdr-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
     .tabs-row {
       display: flex;
@@ -455,38 +457,35 @@
 
     #de-tab-body { padding: 24px 28px; }
 
-    /* Sessions list */
+    /* Sessions list — clean, minimal */
     .session-item {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 18px;
-      margin-bottom: 8px;
-      cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 14px;
-      transition: all var(--tr);
+      gap: 12px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: opacity var(--tr);
+      max-width: 100%;
+      box-sizing: border-box;
     }
-    .session-item:hover { border-color: var(--border-med); transform: translateX(3px); }
-    .sess-quality { font-size: 20px; flex-shrink: 0; }
+    .session-item:hover { opacity: 0.7; }
+    .sess-quality { font-size: 16px; flex-shrink: 0; width: 20px; text-align: center; }
     .sess-body { flex: 1; min-width: 0; }
-    .sess-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
-    .sess-trigger { font-size: 12px; color: var(--text-sec); }
+    .sess-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap; }
+    .sess-trigger { font-size: 12px; color: var(--text-muted); }
     .sess-time { font-size: 12px; color: var(--text-muted); }
-    .sess-summary { font-size: 14px; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sess-summary { font-size: 13px; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sess-status {
       font-size: 11px;
-      font-weight: 700;
-      padding: 3px 9px;
-      border-radius: 6px;
-      text-transform: uppercase;
+      color: var(--text-muted);
       white-space: nowrap;
+      flex-shrink: 0;
     }
-    .sess-status.complete { background: rgba(34,197,94,0.1); color: var(--green); }
-    .sess-status.running { background: var(--brand-dim); color: var(--brand); }
-    .sess-status.waiting { background: rgba(245,158,11,0.14); color: var(--amber); }
-    .sess-status.error { background: rgba(239,68,68,0.1); color: var(--red); }
+    .sess-status.complete { color: var(--green); }
+    .sess-status.running { color: var(--brand); }
+    .sess-status.waiting { color: var(--amber); }
+    .sess-status.error { color: var(--red); }
 
     /* Timeline */
     .timeline-back {
@@ -880,6 +879,10 @@
     #de-view { overflow-x: hidden; max-width: 100vw; }
     .session-item, .step-row, .out-card, .dec-card { max-width: 100%; box-sizing: border-box; }
     .md pre, .md code { overflow-x: auto; max-width: 100%; }
+    .de-detail-header { padding: 16px; }
+    .de-hdr-actions { width: 100%; margin-top: 10px; }
+    .de-hdr-actions button { flex: 1; justify-content: center; }
+    #de-view, #de-tab-body, .de-detail-header { overflow-x: hidden; max-width: 100vw; box-sizing: border-box; }
       .tabs-row { padding: 0 16px; }
       .team-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
       .settings-panel { width: 100%; }
