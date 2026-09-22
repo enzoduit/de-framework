@@ -108,6 +108,22 @@ def main():
 
     trigger_type = session_raw.get('trigger_type', 'user')
     trigger_context = session_raw.get('trigger_context', 'Manual start')
+
+    # ── Pre-fetch: run workspace/pre_fetch.py if exists (no LLM, injects live data) ──
+    pre_fetch_script = workspace_dir / 'pre_fetch.py'
+    if pre_fetch_script.exists():
+        import subprocess as _sp
+        try:
+            result = _sp.run(
+                ['python3', str(pre_fetch_script)],
+                capture_output=True, text=True, timeout=30,
+                env={**__import__('os').environ, 'AGENTS_DIR': str(AGENTS_DIR)}
+            )
+            if result.stdout.strip():
+                trigger_context = result.stdout.strip() + '\n\n---\n\n' + trigger_context
+                print(f'[session_runner] pre_fetch.py injected {len(result.stdout)} chars')
+        except Exception as _e:
+            print(f'[session_runner] pre_fetch.py failed (non-fatal): {_e}')
     display_name = de_info.get('display_name', de_name.upper())
     role = de_info.get('role', 'Digital Employee')
 
