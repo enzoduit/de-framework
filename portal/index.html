@@ -1368,7 +1368,7 @@ function decisionCardHTML(d, i) {
     <span class="dec-time">${timeAgo(d.created_at)}</span>
   </div>
   <div class="dec-title">${esc(d.title)}</div>
-  <div class="dec-desc">${esc(d.description || '')}</div>
+  <div class="dec-desc md">${renderMd(d.description || '')}</div>
   <div class="dec-actions">
     <button class="btn-go" onclick="decideGo('${esc(d.id)}')">✅ Go ahead</button>
     <button onclick="decideGoWith('${esc(d.id)}')">💬 Go ahead, but…</button>
@@ -1409,7 +1409,7 @@ function outputCardHTML(s, de, i) {
       <span class="out-time">${timeAgo(s.created_at)}</span>
     </div>
     <div class="out-title">${esc((s.summary||'Session completed').slice(0,80))}</div>
-    <div class="out-summary">${esc(summary)}${s.summary?.length > 180 ? '…' : ''}</div>
+    <div class="out-summary md">${renderMd(summary)}${s.summary?.length > 180 ? '…' : ''}</div>
     <div class="out-actions">${actions}</div>
     <div class="out-feedback hidden" id="fb-${esc(s.id)}">
       <textarea id="fb-txt-${esc(s.id)}" placeholder="What could be better?"></textarea>
@@ -1552,7 +1552,7 @@ async function renderSessionsTab(de) {
       <span class="sess-time">${timeAgo(s.created_at)}</span>
       ${s.duration_seconds ? `<span class="sess-time">${s.duration_seconds}s</span>` : ''}
     </div>
-    <div class="sess-summary">${esc(s.summary || 'No summary')}</div>
+    <div class="sess-summary md">${renderMd(s.summary || 'No summary')}</div>
   </div>
   <div class="sess-status ${s.status}">${s.status}</div>
 </div>`;
@@ -1609,7 +1609,7 @@ function renderTimeline(session, container) {
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
   <span style="font-size:24px">${qg.icon}</span>
   <div>
-    <div style="font-weight:600">${esc(session.summary || 'Session')}</div>
+    <div class="md" style="font-weight:600">${renderMd(session.summary || 'Session')}</div>
     <div style="font-size:12px;color:var(--text-muted)">${triggerBadge(session.trigger_type)} · ${timeAgo(session.created_at)} · ${session.status}</div>
   </div>
 </div>
@@ -1806,8 +1806,8 @@ async function loadData() {
       apiJSON('/de-list').catch(()=>[]),
       apiJSON('/decisions').catch(()=>[]),
     ]);
-    S.des = des;
-    S.decisions = decisions;
+    S.des = Array.isArray(des) ? des : (des.des || des.DEs || []);
+    S.decisions = Array.isArray(decisions) ? decisions : (decisions.decisions || decisions.pending || []);
     updateBadges();
   } catch(e) { console.warn('Load error:', e); }
 }
