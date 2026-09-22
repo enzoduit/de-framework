@@ -1197,6 +1197,15 @@ function qualityGate(s) {
 function triggerBadge(t) {
   return { cron:'⏰ Scheduled', user:'👤 Manual', chat:'💬 Chat', colleague:'👥 Colleague', auto:'📊 Auto' }[t] || t;
 }
+function statusLabel(s) {
+  const m = {
+    complete: 'Done', error: 'Error', running: 'Running',
+    paused_human: 'Waiting for you',
+    max_iterations_reached: 'Timed out',
+    cancelled: 'Cancelled'
+  };
+  return m[s] || s;
+}
 
 /* ───────────────────────────────────────────────────
    UTILITIES
@@ -1562,7 +1571,7 @@ async function renderSessionsTab(de) {
     </div>
     <div class="sess-summary md">${renderMd(s.summary || 'No summary')}</div>
   </div>
-  <div class="sess-status ${s.status}">${s.status}</div>
+  <div class="sess-status ${s.status}">${statusLabel(s.status)}</div>
 </div>`;
     }).join('');
   } catch(e) {
@@ -1618,7 +1627,7 @@ function renderTimeline(session, container) {
   <span style="font-size:24px">${qg.icon}</span>
   <div>
     <div class="md" style="font-weight:600">${renderMd(session.summary || 'Session')}</div>
-    <div style="font-size:12px;color:var(--text-muted)">${triggerBadge(session.trigger_type)} · ${timeAgo(session.created_at)} · ${session.status}</div>
+    <div style="font-size:12px;color:var(--text-muted)">${triggerBadge(session.trigger_type)} · ${timeAgo(session.created_at)} · ${statusLabel(session.status)}</div>
   </div>
 </div>
 ${stepsHTML}`;
