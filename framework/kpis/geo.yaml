@@ -1,0 +1,17 @@
+de: geo
+kpis:
+  - id: soav_score
+    name: SoAV Score (cross-portfolio avg)
+    target: 30
+    unit: "%"
+    direction: up
+    measure: "python3 workspace/measure_soav.py 2>/dev/null || echo 'not_measured'"
+    frequency: weekly
+
+  - id: satellite_pages
+    name: Active satellite pages
+    target: 10
+    unit: pages
+    direction: up
+    measure: "python3 -c \"import json,os; d=json.load(open('workspace/pages.json')) if os.path.exists('workspace/pages.json') else {}; print(len(d.get('pages',[])))\" 2>/dev/null || echo 0"
+    frequency: weekly

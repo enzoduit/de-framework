@@ -1,0 +1,17 @@
+de: max
+kpis:
+  - id: avg_cron_cost
+    name: Avg cost per cron session
+    target: 0.05
+    unit: USD
+    direction: down
+    measure: "python3 workspace/measure_cost.py --trigger cron --metric avg_cost 2>/dev/null || echo 'not_measured'"
+    frequency: daily
+
+  - id: waste_rate
+    name: Waste rate (no output)
+    target: 20
+    unit: "%"
+    direction: down
+    measure: "python3 workspace/measure_cost.py --metric waste_rate 2>/dev/null || echo 'not_measured'"
+    frequency: daily

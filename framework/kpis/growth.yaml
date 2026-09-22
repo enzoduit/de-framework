@@ -1,0 +1,9 @@
+de: growth
+kpis:
+  - id: weekly_visitors
+    name: Real visitors/week (agentic-living.com)
+    target: 100
+    unit: visitors
+    direction: up
+    measure: "python3 -c \"import json,os; d=json.load(open('workspace/traffic_cache.json')) if os.path.exists('workspace/traffic_cache.json') else {}; print(d.get('weekly_visitors','not_measured'))\" 2>/dev/null || echo 'not_measured'"
+    frequency: weekly

@@ -1,0 +1,9 @@
+de: scribe
+kpis:
+  - id: pending_experiments
+    name: Pending experiment docs
+    target: 0
+    unit: items
+    direction: down
+    measure: "python3 -c \"import json,os; d=json.load(open('metrics.json')) if os.path.exists('metrics.json') else {}; kpis=d.get('kpis',[]); exp=[k for k in kpis if k.get('id')=='pending_experiments']; print(exp[0].get('value',0) if exp else 0)\" 2>/dev/null || echo 0"
+    frequency: daily

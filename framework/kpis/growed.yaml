@@ -1,0 +1,9 @@
+de: growed
+kpis:
+  - id: soav_score
+    name: SoAV Score (personal brand)
+    target: 20
+    unit: "%"
+    direction: up
+    measure: "python3 workspace/measure_soav.py 2>/dev/null || echo 'not_measured'"
+    frequency: weekly

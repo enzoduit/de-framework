@@ -1,0 +1,9 @@
+de: coach
+kpis:
+  - id: training_adherence
+    name: Training plan adherence
+    target: 90
+    unit: "%"
+    direction: up
+    measure: "python3 -c \"import json,os; d=json.load(open('workspace/metrics_cache.json')) if os.path.exists('workspace/metrics_cache.json') else {}; print(d.get('training_adherence','not_measured'))\" 2>/dev/null || echo 'not_measured'"
+    frequency: weekly

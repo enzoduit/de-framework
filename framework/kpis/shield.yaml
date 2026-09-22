@@ -1,0 +1,9 @@
+de: shield
+kpis:
+  - id: services_healthy
+    name: Core services healthy
+    target: 100
+    unit: "%"
+    direction: up
+    measure: "python3 -c \"import subprocess; svcs=['de-backend','canvas-server']; ok=sum(1 for s in svcs if subprocess.run(['systemctl','is-active',s],capture_output=True,text=True,timeout=3).stdout.strip()=='active'); print(int(100*ok/len(svcs)))\" 2>/dev/null || echo 0"
+    frequency: daily

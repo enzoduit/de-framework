@@ -1,0 +1,9 @@
+de: grow_flyraising
+kpis:
+  - id: soav_score
+    name: SoAV Score (Perplexity)
+    target: 25
+    unit: "%"
+    direction: up
+    measure: "python3 workspace/measure_soav.py 2>/dev/null || echo 'not_measured'"
+    frequency: weekly

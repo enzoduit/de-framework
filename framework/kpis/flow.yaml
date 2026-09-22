@@ -1,0 +1,17 @@
+de: flow
+kpis:
+  - id: timed_out_rate
+    name: Timed-out sessions rate (7d)
+    target: 10
+    unit: "%"
+    direction: down
+    measure: "python3 workspace/measure_sessions.py --metric timed_out_rate 2>/dev/null || echo 'not_measured'"
+    frequency: daily
+
+  - id: no_output_rate
+    name: No-output sessions rate (7d)
+    target: 15
+    unit: "%"
+    direction: down
+    measure: "python3 workspace/measure_sessions.py --metric no_output_rate 2>/dev/null || echo 'not_measured'"
+    frequency: daily
