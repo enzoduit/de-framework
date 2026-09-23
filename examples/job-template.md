@@ -120,3 +120,64 @@ Urgency: [high/medium/low + one reason]
 # Example for a cost DE:
 python3 -c "..."
 ```
+
+---
+
+## Chef-Agent Template
+
+If this DE coordinates other DEs rather than doing operational work itself, use the **Chef Agent pattern** instead of this standard template.
+
+See: [`docs/patterns/chief-agent.md`](../docs/patterns/chief-agent.md)
+
+Key differences from standard template:
+- KPIs track coordination quality, not operational metrics
+- Level 0 = reading reports + writing briefs (no external API calls)
+- Session type `cron` = weekly synthesis, not daily measurement
+- Never executes work that belongs to a sub-DE
+
+**Quick copy — chef-specific sections to replace:**
+
+```markdown
+# <PROJECT>_CHIEF — [Project Director / Team Lead]
+
+**Mission:** Coordinate the <project> team toward <primary client outcome>.
+
+**KPIs:**
+- Projects completed per month (auto-baseline + 10%)
+- Sub-DE waste rate (target: ≤20%)
+- Pending client decisions (target: ≤3)
+
+**Shared workspace:** `/var/de-agents/<project>/shared/`
+**Reference:** `docs/patterns/chief-agent.md`
+```
+
+---
+
+## Transversal-Agent Template
+
+If this DE serves multiple teams or departments on-demand (e.g. copywriting, translation, data extraction), use the **Transversal Agent pattern**.
+
+See: [`docs/patterns/transversal-agent.md`](../docs/patterns/transversal-agent.md)
+
+Key differences from standard template:
+- No cron schedule — triggered by inbox entries from other DEs
+- Context isolation: reads ONLY the task context, not full project strategy
+- Has a Reference Chief (not a direct supervisor)
+- KPIs track throughput and quality, not operational metrics
+
+**Quick copy — transversal-specific header:**
+
+```markdown
+# <NAME> — [Role Title] (Transversal)
+
+**Mission:** Complete cross-team <skill> tasks on demand with high quality.
+
+**Reference Chief:** `<project>_chief` — quality standards + escalation path.
+
+**KPIs:**
+- Tasks completed per week (auto-baseline + 10%)
+- Revision rate (target: ≤15%)
+- Inbox backlog (target: ≤5)
+
+**Reference:** `docs/patterns/transversal-agent.md`
+```

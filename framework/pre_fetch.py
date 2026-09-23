@@ -74,6 +74,76 @@ def load_metrics():
     return {'kpis': []}
 
 
+def apply_benchmark_mode(kpis_data, new_values):
+    """Benchmark Mode: if target is null and target_auto=True, set target from first measurement.
+
+    Direction rules:
+      - 'up'              → target = baseline × (1 + improvement)   e.g. 30 → 33
+      - 'lower_is_better' → target = baseline × (1 - improvement)   e.g. 8% → 7.2%
+
+    Writes the computed target back into kpis.yaml so next run has a real target.
+    Marks kpi entry with target_auto_set=True and baseline=<first_value> in metrics.json.
+    """
+    kpis_file = WORKSPACE / 'kpis.yaml'
+    if not kpis_file.exists():
+        return
+
+    updated = False
+    content = kpis_file.read_text()
+
+    for kpi in kpis_data:
+        kid = kpi.get('id', '')
+        target = kpi.get('target')
+        target_auto = kpi.get('target_auto', False)
+        if target is not None or not target_auto:
+            continue  # not in benchmark mode, skip
+
+        val = new_values.get(kid)
+        if val is None or val == 'not_measured' or val == '':
+            continue  # no measurement yet
+
+        try:
+            baseline = float(val)
+        except (TypeError, ValueError):
+            continue
+
+        direction = kpi.get('direction', 'up')
+        try:
+            improvement = float(kpi.get('target_improvement', 0.10))
+        except (TypeError, ValueError):
+            improvement = 0.10
+
+        if direction == 'up':
+            new_target = round(baseline * (1.0 + improvement), 4)
+        else:  # lower_is_better
+            new_target = round(baseline * (1.0 - improvement), 4)
+
+        # Patch kpis.yaml: replace 'target: null' for this kpi's block with 'target: <value>'
+        # Strategy: find the id line, then replace the next 'target: null' line after it
+        lines = content.splitlines()
+        in_block = False
+        patched_lines = []
+        for line in lines:
+            if f'id: {kid}' in line:
+                in_block = True
+            if in_block and 'target: null' in line:
+                indent = len(line) - len(line.lstrip())
+                line = ' ' * indent + f'target: {new_target}  # auto-set from baseline {baseline}'
+                in_block = False
+                updated = True
+            patched_lines.append(line)
+        content = '\n'.join(patched_lines)
+
+        # Store baseline info back on the kpi dict (picked up by save_metrics)
+        kpi['target'] = new_target
+        kpi['target_auto_set'] = True
+        kpi['baseline'] = baseline
+        print(f'[benchmark] {kid}: baseline={baseline} → auto-target={new_target} ({direction}, {improvement*100:.0f}% improvement)', file=__import__('sys').stderr)
+
+    if updated:
+        kpis_file.write_text(content)
+
+
 def save_metrics(kpis_data, new_values):
     m = load_metrics()
     existing = {k['id']: k for k in m.get('kpis', [])}
@@ -93,7 +163,12 @@ def save_metrics(kpis_data, new_values):
             }
         prev = existing[kid].get('value')
         existing[kid]['value'] = val
+        existing[kid]['target'] = kpi.get('target')  # may have been updated by benchmark mode
         existing[kid]['updated'] = datetime.now(timezone.utc).isoformat()
+        # Store benchmark metadata if present
+        if kpi.get('target_auto_set'):
+            existing[kid]['target_auto_set'] = True
+            existing[kid]['baseline'] = kpi.get('baseline')
         if prev is not None and prev != val:
             existing[kid].setdefault('history', []).append(
                 {'ts': datetime.now(timezone.utc).isoformat()[:10], 'value': prev}
@@ -120,20 +195,24 @@ def build_briefing(kpis_data, values):
         unit = kpi.get('unit', '')
 
         if val is None or val == 'not_measured' or val == '':
-            not_measured.append(f"  ⚠ {name}: not measured (target: {target} {unit})")
+            if kpi.get('target_auto') and target is None:
+                not_measured.append(f"  ⚠ {name}: not measured yet (benchmark mode — first run sets baseline)")
+            else:
+                not_measured.append(f"  ⚠ {name}: not measured (target: {target} {unit})")
             continue
 
         if target is not None:
             try:
                 v, t = float(val), float(target)
                 ok = (v >= t) if direction == 'up' else (v <= t)
-                icon = '✓' if ok else '✗'
-                entry = f"  {icon} {name}: {val} {unit} (target: {target} {unit})"
+                icon = '\u2713' if ok else '\u2717'
+                auto_note = ' \u2014 auto-set from baseline' if kpi.get('target_auto_set') else ''
+                entry = f"  {icon} {name}: {val} {unit} (target: {target} {unit}{auto_note})"
                 (on_track if ok else off_track).append(entry)
             except (TypeError, ValueError):
-                on_track.append(f"  · {name}: {val} {unit}")
+                on_track.append(f"  \u00b7 {name}: {val} {unit}")
         else:
-            on_track.append(f"  · {name}: {val} {unit}")
+            on_track.append(f"  \u00b7 {name}: {val} {unit}")
 
     if off_track:
         lines.append("\nOFF TRACK — action needed:")
@@ -178,6 +257,9 @@ def main():
     for kpi in kpis_data:
         val = measure_kpi(kpi)
         values[kpi['id']] = val
+
+    # Apply benchmark mode before saving (may update targets in kpis.yaml + kpi dicts)
+    apply_benchmark_mode(kpis_data, values)
 
     save_metrics(kpis_data, values)
     print(build_briefing(kpis_data, values))

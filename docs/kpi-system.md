@@ -150,6 +150,86 @@ RULE: Address off-track KPIs first. One focused action per session.
 | shield | Core services healthy | 100% | systemctl |
 | growth | Weekly visitors | 100 | workspace/traffic_cache.json |
 
+## Benchmark Mode
+
+Use Benchmark Mode when a client has **no historical data and no agreed numeric target**. Instead of guessing a target upfront, the first measurement becomes the baseline, and the target is auto-calculated as a 10% improvement from there.
+
+### kpis.yaml with Benchmark Mode
+
+```yaml
+de: "<de_name>"
+kpis:
+  - id: churn_rate
+    name: "Monthly Churn Rate"
+    description: "% Donors who cancel in a given month"
+    measure: "python3 workspace/measure_churn.py"
+    unit: "%"
+    direction: "lower_is_better"  # use 'up' for metrics where higher = better
+    target: null                  # null = not set yet; will be auto-filled after first run
+    target_auto: true             # enables benchmark mode
+    target_improvement: 0.10     # 10% improvement from baseline
+    frequency: monthly
+```
+
+### How `pre_fetch.py` handles benchmark mode
+
+On every run, after measuring each KPI:
+
+```python
+# Pseudocode — actual logic in framework/pre_fetch.py
+for kpi in kpis:
+    value = measure_kpi(kpi)                    # run measure command
+    target = kpi.get('target')
+    target_auto = kpi.get('target_auto', False)
+
+    if value is not None and target is None and target_auto:
+        # First real measurement → set baseline as target
+        direction = kpi.get('direction', 'up')
+        improvement = float(kpi.get('target_improvement', 0.10))
+
+        if direction == 'up':
+            new_target = round(float(value) * (1 + improvement), 4)
+        else:  # lower_is_better
+            new_target = round(float(value) * (1 - improvement), 4)
+
+        # Write concrete target back into kpis.yaml
+        update_kpis_yaml_target(kpi['id'], new_target)  # sets target: <value>
+        # Mark in metrics.json so we know this was auto-set
+        kpi['target'] = new_target
+        kpi['target_auto_set'] = True
+        kpi['baseline'] = float(value)
+```
+
+**Result:** After the first session, `kpis.yaml` has a real `target:` value. All subsequent runs use normal on-track/off-track comparison.
+
+### Direction rules for auto-target calculation
+
+| `direction` value | Formula | Example |
+|------------------|---------|--------|
+| `up` | `baseline × 1.10` | SoAV: 30% → target 33% |
+| `lower_is_better` | `baseline × 0.90` | Churn: 8% → target 7.2% |
+
+Customize the multiplier via `target_improvement` (0.10 = 10%, 0.20 = 20%, etc.).
+
+### What the briefing shows in benchmark mode
+
+Before first measurement:
+```
+⚠ Monthly Churn Rate: not measured yet (benchmark mode — first run sets baseline)
+```
+
+After first measurement (baseline set, shown next run):
+```
+✓ Monthly Churn Rate: 8.2 % (target: 7.4 % — auto-set from baseline 8.2%)
+```
+
+Off track:
+```
+✗ Monthly Churn Rate: 9.1 % (target: 7.4 % — auto-set from baseline 8.2%)
+```
+
+---
+
 ## Adding KPIs for a New DE
 
 1. Create `/var/de-agents/<de>/workspace/kpis.yaml` following the schema above.
