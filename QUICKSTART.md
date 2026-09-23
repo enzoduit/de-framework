@@ -19,6 +19,30 @@ If any item is missing → stop, list what's missing, ask client.
 
 ---
 
+## 0.5. Discover Available Integrations
+
+**Run this before writing any pre_fetch.py or kpis.yaml.** The goal: know exactly what data each DE can actually reach.
+
+```bash
+bash /root/.openclaw/workspace/de-framework/scripts/discover-integrations.sh /etc/de-framework.env ./integrations.yaml
+```
+
+This probes Salesforce, Meta Ads, Google Ads, DataCrush, Yoizen, Telegram, Power BI — and outputs:
+- A status table (✓ ready / ⚠ partial / ✗ missing)
+- An `integrations.yaml` file documenting what's available
+- A client-facing checklist of what still needs to be provided
+
+**What to do with the results:**
+- `status: ready` → configure this integration in pre_fetch.py and kpis.yaml normally
+- `status: partial` → document the limitation in notes; use what's available
+- `status: missing` → mark KPIs that depend on it as `status: pending_integration`; DE still starts in benchmark mode with other data
+
+Full reference: `docs/integration-discovery.md` — includes measure script templates for each integration type.
+
+**Key principle:** Don't block DE setup on missing integrations. Configure what works, document what's missing, send the checklist to the client. DEs start immediately with available data.
+
+---
+
 ## 1. Map Roles → DEs
 
 Read the org chart. Apply these rules:
