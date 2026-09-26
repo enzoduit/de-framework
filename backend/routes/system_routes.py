@@ -233,3 +233,27 @@ def handle_update_voice_prompt(handler, body):
         return handler.send_json(200, {'ok': True})
     except Exception as e:
         return handler.send_json(500, {'error': str(e)})
+
+# ── Portal Setup Code (One-Time Magic Link) ──────────────────────────────────
+import secrets, time
+
+_SETUP_CODES = {}  # code -> {expires, url, token}
+
+def generate_setup_code(url, token, ttl_seconds=86400):
+    code = secrets.token_urlsafe(8)
+    _SETUP_CODES[code] = {
+        'expires': time.time() + ttl_seconds,
+        'url': url,
+        'token': token,
+    }
+    return code
+
+def exchange_setup_code(code):
+    entry = _SETUP_CODES.get(code)
+    if not entry:
+        return None, 'not_found'
+    if time.time() > entry['expires']:
+        del _SETUP_CODES[code]
+        return None, 'expired'
+    del _SETUP_CODES[code]  # one-time use
+    return entry, None

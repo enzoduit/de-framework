@@ -12,6 +12,8 @@ Environment:
 """
 
 import json
+import secrets
+import time
 import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -35,8 +37,12 @@ from backend.routes import (
     discovery_routes,
     costs_routes,
     chat_routes,
+    portalsetup_routes,
 )
 
+
+
+_SETUP_CODES = {}  # code -> {expires, url, token}
 
 class DEHandler(BaseHTTPRequestHandler):
 
@@ -136,6 +142,9 @@ class DEHandler(BaseHTTPRequestHandler):
         if len(parts) == 3 and parts[0] == 'decisions' and parts[2] == 'thread':
             return decisions_routes.handle_decision_thread(self, parts[1])
 
+        if path.startswith('/portal-setup/'):
+            return portalsetup_routes.handle_exchange(self, path.split('/')[-1])
+
         if path == '/costs':
             return costs_routes.handle_costs_get(self)
 
@@ -180,6 +189,12 @@ class DEHandler(BaseHTTPRequestHandler):
                 body = json.loads(self.rfile.read(length))
             except Exception:
                 body = {}
+
+        # ── Setup code (auth required) ───────────────────────────────────────────
+        if path == '/portal-setup':
+            if not self.check_auth():
+                return self.send_json(401, {'error': 'unauthorized'})
+            return portalsetup_routes.handle_create(self, body)
 
         # ── Public POST endpoints (no auth required) ─────────────────────────
         if path == '/signup':

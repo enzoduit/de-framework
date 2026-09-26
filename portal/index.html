@@ -4,13 +4,29 @@
 <script>
 // Auto-config from magic link: #setup?url=...&token=...
 (function(){
+  // Magic link: ?setup=CODE exchanges for config from backend
+  var qp = new URLSearchParams(location.search);
+  var setupCode = qp.get('setup');
+  if(setupCode) {
+    fetch('https://de-api.enzoduit.com/portal-setup/' + setupCode)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.url && d.token) {
+          localStorage.setItem('de_backend', JSON.stringify({url:d.url, token:d.token}));
+          history.replaceState(null,'',location.pathname);
+          location.reload();
+        }
+      });
+    return;
+  }
+  // Hash magic link (legacy): #setup?url=...&token=***
   var h = location.hash;
   if(h.startsWith('#setup?')) {
     var p = new URLSearchParams(h.slice(7));
     var url = p.get('url'), token = p.get('token');
     if(url && token) {
       localStorage.setItem('de_backend', JSON.stringify({url:url, token:token}));
-      history.replaceState(null, '', location.pathname + location.search);
+      history.replaceState(null, '', location.pathname);
     }
   }
 })();
