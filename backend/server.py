@@ -23,6 +23,7 @@ from backend.config import AUTH_TOKEN, PORT
 from backend.routes import (
     de_routes,
     decisions_routes,
+    inbox_routes,
     tasks_routes,
     workspace_routes,
     session_start_routes,
@@ -32,6 +33,8 @@ from backend.routes import (
     creds_routes,
     branding_routes,
     discovery_routes,
+    costs_routes,
+    chat_routes,
 )
 
 
@@ -129,6 +132,16 @@ class DEHandler(BaseHTTPRequestHandler):
         if path == '/decisions':
             return decisions_routes.handle_decisions_get(self)
 
+        # GET /decisions/<id>/thread
+        if len(parts) == 3 and parts[0] == 'decisions' and parts[2] == 'thread':
+            return decisions_routes.handle_decision_thread(self, parts[1])
+
+        if path == '/costs':
+            return costs_routes.handle_costs_get(self)
+
+        if path == '/inbox':
+            return inbox_routes.handle_inbox_get(self)
+
         if path == '/audit-log':
             return decisions_routes.handle_audit_log_get(self)
 
@@ -187,6 +200,13 @@ class DEHandler(BaseHTTPRequestHandler):
 
         if path == '/decide':
             return decisions_routes.handle_decide(self, body)
+
+        if path == '/feedback':
+            return decisions_routes.handle_feedback_post(self, body)
+
+        # POST /chat/<de_name>
+        if len(parts) == 2 and parts[0] == 'chat':
+            return chat_routes.handle_chat(self, parts[1], body)
 
         if path == '/audit-log':
             return decisions_routes.handle_audit_log_post(self, body)
@@ -315,6 +335,10 @@ class DEHandler(BaseHTTPRequestHandler):
         # DELETE /api/credentials/<id>
         if len(parts) == 3 and parts[0] == 'api' and parts[1] == 'credentials':
             return creds_routes.handle_credentials_delete(self, parts[2])
+
+        # DELETE /cron/<id>
+        if len(parts) == 2 and parts[0] == 'cron':
+            return costs_routes.handle_cron_delete(self, parts[1])
 
         # DELETE /de/<name>/chats/<cid> — delete a persistent chat
         if len(parts) == 4 and parts[0] == 'de' and parts[2] == 'chats':

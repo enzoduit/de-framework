@@ -748,6 +748,261 @@
     .tool-source { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
 
     /* ═══════════════════════════════════════════
+       INBOX FEED
+    ═══════════════════════════════════════════ */
+    #inbox-feed { display: flex; flex-direction: column; gap: 10px; max-width: 780px; }
+    .inbox-card {
+      display: flex; gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--de-color, var(--brand));
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      transition: box-shadow var(--tr), border-color var(--tr);
+      animation: cardIn 0.35s ease both;
+    }
+    .inbox-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.18); border-color: var(--de-color, var(--brand)); }
+    .inbox-card-left { flex-shrink: 0; }
+    .inbox-de-avatar {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .inbox-card-body { flex: 1; min-width: 0; }
+    .inbox-card-header {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      margin-bottom: 5px;
+    }
+    .inbox-de-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .inbox-time { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+    .inbox-status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .inbox-status-label {
+      font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .inbox-status-label.ok  { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .inbox-status-label.err { background: rgba(239,68,68,0.15);  color: #ef4444; }
+    .inbox-status-label.warn{ background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .inbox-steps { font-size: 12px; color: var(--text-muted); }
+    .inbox-summary { font-size: 13px; color: var(--text-sec); line-height: 1.5; margin-bottom: 8px; }
+    .inbox-kpis { display: flex; flex-wrap: wrap; gap: 6px; }
+    .inbox-kpi-badge {
+      font-size: 11px; color: var(--text-muted);
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 2px 8px;
+    }
+    .inbox-card-actions {
+      display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
+    }
+    .inbox-action-btn {
+      font-size: 12px; font-weight: 500;
+      padding: 4px 10px; border-radius: 6px;
+      border: 1px solid var(--border-med);
+      background: var(--surface2); color: var(--text-sec);
+      cursor: pointer; transition: all var(--tr);
+    }
+    .inbox-action-btn:hover { border-color: var(--brand); color: var(--brand); }
+    .inbox-action-btn.dismiss:hover { border-color: var(--text-muted); color: var(--text-muted); }
+    .inbox-card.dismissed { opacity: 0.45; }
+
+    /* ═══════════════════════════════════════════
+       COSTS PAGE
+    ═══════════════════════════════════════════ */
+    .costs-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+    }
+    .costs-total-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex; align-items: center; gap: 20px;
+    }
+    .costs-total-label { font-size: 13px; color: var(--text-sec); }
+    .costs-total-amount { font-size: 28px; font-weight: 700; color: var(--green); }
+    .costs-note { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .costs-table {
+      width: 100%; border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .costs-table th {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-muted);
+      padding: 10px 14px; background: var(--surface2);
+      text-align: left; border-bottom: 1px solid var(--border);
+    }
+    .costs-table td {
+      padding: 12px 14px; font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .costs-table tr:last-child td { border-bottom: none; }
+    .costs-de-name { font-weight: 600; font-size: 14px; }
+    .costs-usd { font-weight: 700; color: var(--green); }
+    .costs-bar-mini {
+      height: 4px; background: var(--surface2); border-radius: 2px;
+      margin-top: 4px; width: 100%;
+    }
+    .costs-bar-mini-fill { height: 100%; border-radius: 2px; background: var(--green); transition: width 0.6s ease; }
+    .btn-del-cron {
+      font-size: 11px; padding: 3px 8px;
+      border-radius: 6px; border: 1px solid rgba(239,68,68,0.3);
+      background: rgba(239,68,68,0.08); color: var(--red);
+      cursor: pointer; transition: all var(--tr);
+    }
+    .btn-del-cron:hover { background: rgba(239,68,68,0.16); }
+
+    /* ═══════════════════════════════════════════
+       DECISION THREAD MODAL
+    ═══════════════════════════════════════════ */
+    .thread-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      z-index: 200; display: none; align-items: center; justify-content: center;
+    }
+    .thread-overlay.open { display: flex; }
+    .thread-modal {
+      background: var(--surface);
+      border: 1px solid var(--border-med);
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 620px; width: 92%;
+      max-height: 85vh; overflow-y: auto;
+    }
+    .thread-modal-hdr {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 20px; gap: 12px;
+    }
+    .thread-modal-title { font-size: 17px; font-weight: 700; line-height: 1.4; }
+    .tl-horiz {
+      display: flex; align-items: center; gap: 0;
+      margin: 0 0 24px;
+      position: relative;
+    }
+    .tl-node {
+      display: flex; flex-direction: column; align-items: center;
+      flex: 1; position: relative;
+    }
+    .tl-node-dot {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; border: 2px solid var(--border);
+      background: var(--surface2); z-index: 1; position: relative;
+      flex-shrink: 0;
+    }
+    .tl-node.human .tl-node-dot {
+      background: rgba(245,158,11,0.14);
+      border-color: var(--amber);
+    }
+    .tl-node.resolved .tl-node-dot {
+      background: rgba(34,197,94,0.14);
+      border-color: var(--green);
+    }
+    .tl-node.rejected .tl-node-dot {
+      background: rgba(239,68,68,0.14);
+      border-color: var(--red);
+    }
+    .tl-node-label {
+      font-size: 11px; color: var(--text-sec); text-align: center;
+      margin-top: 6px; max-width: 80px;
+    }
+    .tl-connector {
+      flex: 1; height: 2px;
+      background: var(--border); margin-top: -18px;
+    }
+    .thread-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-bottom: 20px;
+    }
+    .thread-stat {
+      background: var(--surface2); border-radius: 8px; padding: 12px;
+      text-align: center;
+    }
+    .thread-stat-val { font-size: 22px; font-weight: 700; }
+    .thread-stat-lbl { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    .thread-answer {
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.22);
+      border-radius: 10px; padding: 14px;
+      margin-bottom: 16px;
+    }
+    .thread-answer-lbl { font-size: 11px; font-weight: 700; color: var(--amber); text-transform: uppercase; margin-bottom: 6px; }
+    .thread-answer-text { font-size: 14px; color: var(--text); line-height: 1.5; }
+
+    /* ═══════════════════════════════════════════
+       DE CHAT PANEL
+    ═══════════════════════════════════════════ */
+    .chat-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 150; display: none;
+    }
+    .chat-overlay.open { display: block; }
+    .chat-panel {
+      position: fixed; top: 0; right: -440px; height: 100vh;
+      width: 420px; max-width: 96vw;
+      background: var(--surface);
+      border-left: 1px solid var(--border-med);
+      display: flex; flex-direction: column;
+      z-index: 160;
+      transition: right 0.28s cubic-bezier(.4,0,.2,1);
+    }
+    .chat-panel.open { right: 0; }
+    .chat-panel-hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .chat-panel-title { font-size: 16px; font-weight: 700; }
+    .chat-panel-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 16px 20px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .chat-msg {
+      max-width: 88%; padding: 10px 14px;
+      border-radius: 12px; font-size: 14px; line-height: 1.5;
+    }
+    .chat-msg.user {
+      align-self: flex-end;
+      background: var(--brand); color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-msg.system {
+      align-self: flex-start;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+      color: var(--text-sec);
+    }
+    .chat-input-row {
+      display: flex; gap: 8px; padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .chat-input-row textarea {
+      flex: 1; min-height: 44px; max-height: 120px;
+      background: var(--surface2); border: 1px solid var(--border-med);
+      border-radius: 10px; color: var(--text);
+      font-family: inherit; font-size: 14px;
+      padding: 10px 12px; resize: none; outline: none;
+      transition: border-color var(--tr);
+    }
+    .chat-input-row textarea:focus { border-color: var(--brand); }
+    .chat-send-btn {
+      width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+      background: var(--brand); color: white; border: none;
+      font-size: 18px; cursor: pointer; align-self: flex-end;
+      transition: opacity var(--tr);
+    }
+    .chat-send-btn:hover { opacity: 0.85; }
+
+    /* ═══════════════════════════════════════════
        EMPTY & LOADING
     ═══════════════════════════════════════════ */
     .empty-state {
@@ -926,6 +1181,12 @@
     <div class="nav-item" id="ni-tools" onclick="nav('tools')">
       <span class="nav-icon">🔧</span> Tools
     </div>
+    <div class="nav-item" id="ni-inbox" onclick="nav('inbox')">
+      <span class="nav-icon">📥</span> Inbox
+    </div>
+    <div class="nav-item" id="ni-costs" onclick="nav('costs')">
+      <span class="nav-icon">💰</span> Costs
+    </div>
   </nav>
   <div class="sidebar-footer">
     <div class="nav-item" onclick="openSettings()">
@@ -1054,6 +1315,34 @@
   </div>
 
   <!-- ══════════════
+       INBOX PAGE
+  ══════════════ -->
+  <div class="page hidden" id="page-inbox">
+    <div class="greeting">
+      <h1>📥 Inbox</h1>
+      <div class="sub" id="inbox-generated">Latest output from every DE — all in one place.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <button class="btn-secondary" id="show-dismissed-btn" onclick="toggleDismissed()" style="font-size:12px;padding:5px 12px">Show dismissed</button>
+    </div>
+    <div id="inbox-feed"></div>
+    <div id="inbox-archived" class="hidden" style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;letter-spacing:0.06em">Dismissed</div>
+    </div>
+  </div>
+
+  <!-- ══════════════
+       COSTS PAGE
+  ══════════════ -->
+  <div class="page hidden" id="page-costs">
+    <div class="greeting">
+      <h1>💰 Costs</h1>
+      <div class="sub">Estimated API spend per digital employee — last 30 days.</div>
+    </div>
+    <div id="costs-body"></div>
+  </div>
+
+  <!-- ══════════════
        DE DETAIL PAGE
   ══════════════ -->
   <div class="page hidden" id="page-de" style="padding:0">
@@ -1068,6 +1357,33 @@
   </div>
 
 </main>
+
+<!-- ════════════════════════════════════
+     DECISION THREAD MODAL
+════════════════════════════════════ -->
+<div class="thread-overlay" id="thread-overlay" onclick="closeThreadModal(event)">
+  <div class="thread-modal" id="thread-modal"></div>
+</div>
+
+<!-- ════════════════════════════════════
+     DE CHAT PANEL
+════════════════════════════════════ -->
+<div class="chat-overlay" id="chat-overlay" onclick="closeChatPanel()"></div>
+<aside class="chat-panel" id="chat-panel">
+  <div class="chat-panel-hdr">
+    <div>
+      <div class="chat-panel-title" id="chat-panel-title">💬 Chat</div>
+      <div class="chat-panel-subtitle">Message goes straight to their next session</div>
+    </div>
+    <button class="icon-btn" onclick="closeChatPanel()">&#x2715;</button>
+  </div>
+  <div class="chat-messages" id="chat-messages"></div>
+  <div class="chat-input-row">
+    <textarea id="chat-input" placeholder="Type a message…" rows="2"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
+    <button class="chat-send-btn" onclick="sendChatMessage()">&#x27A4;</button>
+  </div>
+</aside>
 
 <!-- ════════════════════════════════════
      SETTINGS PANEL
@@ -1277,6 +1593,8 @@ function nav(view) {
   else if (view === 'team') { setNav('ni-team'); showPage('page-team','Your Team'); renderTeam(); }
   else if (view === 'decisions') { setNav('ni-decisions'); showPage('page-decisions','Decisions'); renderDecisionsPage(); }
   else if (view === 'tools') { setNav('ni-tools'); showPage('page-tools','Tools'); loadTools(); }
+  else if (view === 'inbox') { setNav('ni-inbox'); showPage('page-inbox','📥 Inbox'); loadInbox(); }
+  else if (view === 'costs') { setNav('ni-costs'); showPage('page-costs','💰 Costs'); loadCosts(); }
 }
 
 function navDE(name) {
@@ -1389,6 +1707,7 @@ function decisionCardHTML(d, i) {
     <button class="btn-go" onclick="decideGo('${esc(d.id)}')">✅ Go ahead</button>
     <button onclick="decideGoWith('${esc(d.id)}')">💬 Go ahead, but…</button>
     <button class="btn-stop" onclick="decideStop('${esc(d.id)}')">🛑 Stop</button>
+    <button onclick="openDecisionThread('${esc(d.id)}')" style="margin-left:auto">🧵 View Thread</button>
   </div>
   <div class="dec-context hidden" id="ctx-${esc(d.id)}">
     <textarea id="ctx-txt-${esc(d.id)}" placeholder="Add context or instructions…"></textarea>
@@ -1502,6 +1821,96 @@ async function loadTools() {
 }
 
 /* ───────────────────────────────────────────────────
+   INBOX
+─────────────────────────────────────────────────── */
+async function loadInbox() {
+  const feed = document.getElementById('inbox-feed');
+  const genEl = document.getElementById('inbox-generated');
+  feed.innerHTML = '<div class="skeleton" style="height:90px;margin-bottom:12px"></div>'.repeat(5);
+  try {
+    const data = await apiJSON('/inbox');
+    const items = data.items || [];
+    if (data.generated_at) {
+      const dt = new Date(data.generated_at);
+      genEl.textContent = `Updated ${timeAgo(data.generated_at)} · ${items.length} digital employees`;
+    }
+    if (!items.length) {
+      feed.innerHTML = `<div class="empty-state"><div class="empty-icon">📥</div><p>No sessions found yet.</p></div>`;
+      return;
+    }
+    const dismissed = getDismissed();
+    feed.innerHTML = items.map(item => inboxCardHTML(item)).join('');
+    // Hide dismissed cards
+    if (dismissed.length) {
+      document.querySelectorAll('#inbox-feed .inbox-card').forEach(card => {
+        const sessId = card.dataset && card.dataset.sessid;
+        if (!sessId) return;
+        if (dismissed.includes(sessId)) {
+          card.classList.add('dismissed');
+          card.style.display = 'none';
+        }
+      });
+    }
+  } catch(e) {
+    feed.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+function inboxStatusIcon(status) {
+  if (status === 'complete') return '🟢';
+  if (status === 'max_iterations_reached') return '🔴';
+  if (status === 'error') return '🔴';
+  if (status === 'running') return '🟡';
+  if (status === 'paused_human') return '🟠';
+  return '⚪';
+}
+
+function inboxStatusLabel(status) {
+  const map = {
+    complete: 'Complete',
+    max_iterations_reached: 'Max iterations',
+    error: 'Error',
+    running: 'Running',
+    paused_human: 'Waiting for you',
+    pending: 'Pending',
+  };
+  return map[status] || status || 'Unknown';
+}
+
+function inboxCardHTML(item) {
+  const icon = inboxStatusIcon(item.status);
+  const label = inboxStatusLabel(item.status);
+  const color = item.color || '#6366f1';
+  const summary = (item.summary || '').replace(/#+\s/g, '').replace(/\n/g, ' ').trim();
+  const shortSummary = summary.length > 150 ? summary.slice(0, 147) + '…' : summary;
+  const kpiHtml = (item.kpis || []).map(k =>
+    `<span class="inbox-kpi-badge">${esc(k.label.length > 40 ? k.label.slice(0,40)+'…' : k.label)}</span>`
+  ).join('');
+  return `
+    <div class="inbox-card" onclick="navDE('${esc(item.de)}')" style="--de-color:${color}" data-sessid="${esc(item.session_id)}">
+      <div class="inbox-card-left">
+        <div class="inbox-de-avatar" style="background:${color}22">${icon}</div>
+      </div>
+      <div class="inbox-card-body">
+        <div class="inbox-card-header">
+          <span class="inbox-de-name">${esc(item.display_name)}</span>
+          <span class="inbox-time">${timeAgo(item.created_at)}</span>
+        </div>
+        <div class="inbox-status-row">
+          <span class="inbox-status-label ${item.status === 'complete' ? 'ok' : (item.status.includes('error') || item.status === 'max_iterations_reached' ? 'err' : 'warn')}">${label}</span>
+          <span class="inbox-steps">${item.steps} steps</span>
+        </div>
+        ${shortSummary ? `<div class="inbox-summary">${esc(shortSummary)}</div>` : ''}
+        ${kpiHtml ? `<div class="inbox-kpis">${kpiHtml}</div>` : ''}
+        <div class="inbox-card-actions" onclick="event.stopPropagation()">
+          <button class="inbox-action-btn" onclick="followUpDE('${esc(item.de)}','${esc(item.session_id)}','${esc(item.created_at)}')">↩ Follow up</button>
+          <button class="inbox-action-btn dismiss" onclick="dismissInboxItem('${esc(item.session_id)}',this)">✕ Dismiss</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ───────────────────────────────────────────────────
    DE DETAIL
 ─────────────────────────────────────────────────── */
 function renderDEDetail(de) {
@@ -1520,7 +1929,7 @@ function renderDEDetail(de) {
       <div class="de-hdr-role">${esc(de.role || '')} · ${statusText}</div>
     </div>
     <div class="de-hdr-actions">
-      <button class="btn-secondary" onclick="toast('💬 Chat coming soon','ok')">💬 Chat</button>
+      <button class="btn-secondary" onclick="openChatPanel('${esc(de.name)}')">💬 Chat</button>
       <button class="btn-primary" onclick="runDE('${esc(de.name)}')">▶ Run now</button>
     </div>`;
 
@@ -1778,10 +2187,16 @@ async function submitDecision(id, action, note) {
 function markUseful(id) { fadeOut('out-'+id); toast('👍 Marked as useful','ok'); }
 function showFeedback(id) { document.getElementById('fb-'+id).classList.remove('hidden'); document.getElementById('fb-txt-'+id).focus(); }
 function hideFeedback(id) { document.getElementById('fb-'+id).classList.add('hidden'); }
-function submitFeedback(id) {
+async function submitFeedback(id) {
   const note = document.getElementById('fb-txt-'+id)?.value.trim();
   if (!note) return;
+  // find the de name from output card context
+  const card = document.getElementById('out-'+id);
+  const deName = card?.dataset?.de || '';
   hideFeedback(id);
+  try {
+    await apiFetch('/feedback', {method:'POST', body:JSON.stringify({session_id:id, de:deName, message:note})});
+  } catch(e) { /* non-critical */ }
   toast('💬 Feedback saved','ok');
 }
 function markSeen(id) { fadeOut('out-'+id); toast('✓ Marked as seen','ok'); }
@@ -1836,6 +2251,7 @@ async function refreshAll() {
   if (S.view==='home') renderHome();
   else if (S.view==='team') renderTeam();
   else if (S.view==='decisions') renderDecisionsPage();
+  else if (S.view==='inbox') loadInbox();
   else if (S.view==='de' && S.currentDE) {
     const de = S.des.find(d=>d.name===S.currentDE.name);
     if (de) { S.currentDE=de; renderDEDetail(de); }
@@ -1991,6 +2407,284 @@ function fiesta(){
   el.innerHTML='🎉🎊🥳🎈🎆🦄🌈✨💥🎸🕺💃🎺🎻🥁🎹🍾🎵'.split('').map(e=>`<span>${e}</span>`).join('');
   document.body.appendChild(el);
   setTimeout(()=>{document.body.classList.remove('fiesta');el.remove();},3000);
+}
+
+
+/* ───────────────────────────────────────────────────
+   P3 — COSTS PAGE
+─────────────────────────────────────────────────── */
+async function loadCosts() {
+  const body = document.getElementById('costs-body');
+  body.innerHTML = '<div class="skeleton" style="height:80px;margin-bottom:16px"></div>' +
+    '<div class="skeleton" style="height:200px"></div>';
+  try {
+    const data = await apiJSON('/costs');
+    const byDE = data.by_de || [];
+    const maxUsd = byDE.length ? byDE[0].estimated_usd : 1;
+
+    const totalHtml = `
+<div class="costs-total-bar">
+  <div>
+    <div class="costs-total-label">Total estimated cost — last 30 days</div>
+    <div class="costs-total-amount">$${(data.total_estimated_usd || 0).toFixed(4)}</div>
+    <div class="costs-note">⚠️ Estimates based on action step counts × $0.0015/step. Not exact billing.</div>
+  </div>
+</div>`;
+
+    const rows = byDE.map(d => {
+      const pct = maxUsd > 0 ? Math.max(2, (d.estimated_usd / maxUsd) * 100) : 2;
+      const cronBtn = d.cron_id
+        ? `<button class="btn-del-cron" onclick="deleteCron('${esc(d.cron_id)}','${esc(d.de)}')">🗑 Delete</button>`
+        : `<span style="color:var(--text-muted);font-size:12px">—</span>`;
+      return `<tr>
+        <td><div class="costs-de-name">${esc(d.de)}</div></td>
+        <td>${d.sessions_30d}</td>
+        <td>${d.avg_steps_per_session}</td>
+        <td>
+          <div class="costs-usd">$${d.estimated_usd.toFixed(4)}</div>
+          <div class="costs-bar-mini"><div class="costs-bar-mini-fill" style="width:${pct}%"></div></div>
+        </td>
+        <td>${esc(d.schedule || '—')}</td>
+        <td>${cronBtn}</td>
+      </tr>`;
+    }).join('');
+
+    const tableHtml = `
+<table class="costs-table">
+  <thead><tr>
+    <th>DE</th><th>Sessions (30d)</th><th>Avg Steps</th><th>Est. Cost</th><th>Schedule</th><th>Cron</th>
+  </tr></thead>
+  <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No data</td></tr>'}</tbody>
+</table>`;
+
+    body.innerHTML = totalHtml + tableHtml;
+  } catch(e) {
+    body.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+async function deleteCron(cronId, deName) {
+  if (!confirm(`Delete cron schedule for ${deName}? This cannot be undone.`)) return;
+  try {
+    await apiFetch(`/cron/${cronId}`, {method:'DELETE'});
+    toast(`🗑 Cron ${cronId} deleted`, 'ok');
+    loadCosts();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'err');
+  }
+}
+
+/* ───────────────────────────────────────────────────
+   P2 — DECISION THREAD MODAL
+─────────────────────────────────────────────────── */
+async function openDecisionThread(id) {
+  const overlay = document.getElementById('thread-overlay');
+  const modal = document.getElementById('thread-modal');
+  modal.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">Loading thread…</div>';
+  overlay.classList.add('open');
+
+  try {
+    const data = await apiJSON(`/decisions/${id}/thread`);
+    const dec = data.decision || {};
+    const tl = data.timeline || [];
+    const ha = data.human_answer;
+    const sb = data.session_before;
+    const sa = data.session_after;
+
+    // Build horizontal timeline nodes
+    const nodeClass = (t) => {
+      if (t === 'human_pause') return 'human';
+      if (t === 'human_decided') return ha?.choice === 'rejected' ? 'rejected' : 'resolved';
+      return '';
+    };
+    const nodeIcon = (t) => {
+      if (t === 'agent_working') return '⚙️';
+      if (t === 'human_pause') return '⏸';
+      if (t === 'human_decided') return ha?.choice === 'rejected' ? '🛑' : '✅';
+      if (t === 'agent_resumed') return '▶️';
+      return '·';
+    };
+
+    let tlHtml = '<div class="tl-horiz">';
+    tl.forEach((node, i) => {
+      if (i > 0) tlHtml += '<div class="tl-connector"></div>';
+      tlHtml += `<div class="tl-node ${nodeClass(node.type)}">
+        <div class="tl-node-dot">${nodeIcon(node.type)}</div>
+        <div class="tl-node-label">${esc(node.label.slice(0,40))}</div>
+      </div>`;
+    });
+    tlHtml += '</div>';
+
+    // Stats
+    const statsHtml = `<div class="thread-stats">
+      <div class="thread-stat">
+        <div class="thread-stat-val">${sb?.steps_before_pause ?? '—'}</div>
+        <div class="thread-stat-lbl">Steps before pause</div>
+      </div>
+      <div class="thread-stat">
+        <div class="thread-stat-val">${ha ? (ha.choice === 'approved' ? '✅' : ha.choice === 'rejected' ? '🛑' : '↩️') : '⏳'}</div>
+        <div class="thread-stat-lbl">Decision</div>
+      </div>
+      <div class="thread-stat">
+        <div class="thread-stat-val">${sa?.steps_after_resume ?? '—'}</div>
+        <div class="thread-stat-lbl">Steps after resume</div>
+      </div>
+    </div>`;
+
+    // Human answer block
+    const answerHtml = ha?.note ? `<div class="thread-answer">
+      <div class="thread-answer-lbl">Your answer</div>
+      <div class="thread-answer-text">${esc(ha.note)}</div>
+    </div>` : '';
+
+    const deName = dec.agent || dec.de_name || '';
+    const sessionId = dec.session_id || '';
+    const contBtn = deName ? `<button class="btn-primary" style="margin-right:8px"
+      onclick="closeTM();openChatPanel('${esc(deName)}','Following up on session ${esc(sessionId)}: ')">
+      💬 Continue conversation</button>` : '';
+
+    modal.innerHTML = `
+<div class="thread-modal-hdr">
+  <div class="thread-modal-title">${esc(dec.title || 'Decision Thread')}</div>
+  <button class="icon-btn" onclick="closeTM()">✕</button>
+</div>
+${tlHtml}
+${statsHtml}
+${answerHtml}
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+  ${contBtn}
+  ${sessionId && deName ? `<button class="btn-secondary" onclick="closeTM();navDE('${esc(deName)}');setTimeout(()=>openSession('${esc(deName)}','${esc(sessionId)}'),200)">📋 View Session</button>` : ''}
+</div>`;
+  } catch(e) {
+    modal.innerHTML = `<div style="padding:20px">
+      <div style="margin-bottom:16px;font-weight:600">Decision Thread</div>
+      <div style="color:var(--text-muted)">${esc(e.message)}</div>
+      <button class="btn-secondary" style="margin-top:16px" onclick="closeTM()">Close</button>
+    </div>`;
+  }
+}
+
+function closeTM() {
+  document.getElementById('thread-overlay').classList.remove('open');
+}
+
+function closeThreadModal(e) {
+  if (e.target === document.getElementById('thread-overlay')) closeTM();
+}
+
+/* ───────────────────────────────────────────────────
+   P4 — DE CHAT PANEL
+─────────────────────────────────────────────────── */
+let _chatDE = '';
+
+function openChatPanel(deName, prefill) {
+  _chatDE = deName;
+  document.getElementById('chat-panel-title').textContent = `💬 Chat with ${deName.toUpperCase()}`;
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = `<div class="chat-msg system">Hi! Send a message and ${esc(deName.toUpperCase())} will respond in their next session.</div>`;
+  const inp = document.getElementById('chat-input');
+  inp.value = prefill || '';
+  document.getElementById('chat-overlay').classList.add('open');
+  document.getElementById('chat-panel').classList.add('open');
+  setTimeout(() => inp.focus(), 200);
+}
+
+function closeChatPanel() {
+  document.getElementById('chat-overlay').classList.remove('open');
+  document.getElementById('chat-panel').classList.remove('open');
+  _chatDE = '';
+}
+
+async function sendChatMessage() {
+  const inp = document.getElementById('chat-input');
+  const msg = inp.value.trim();
+  if (!msg || !_chatDE) return;
+
+  const msgs = document.getElementById('chat-messages');
+  // Show user message
+  msgs.innerHTML += `<div class="chat-msg user">${esc(msg)}</div>`;
+  inp.value = '';
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Show sending indicator
+  const pendId = 'chat-pending-' + Date.now();
+  msgs.innerHTML += `<div class="chat-msg system" id="${pendId}">⏳ Triggering session…</div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const res = await apiJSON(`/chat/${_chatDE}`, {
+      method: 'POST',
+      body: JSON.stringify({message: msg, user: 'human'}),
+    });
+    const sess = res.session_id || '';
+    document.getElementById(pendId).innerHTML =
+      `✅ Message sent → Session <strong>${esc(sess)}</strong> started.` +
+      (sess ? ` <a href="javascript:void(0)" onclick="closeChatPanel();navDE('${esc(_chatDE)}');setTimeout(()=>openSession('${esc(_chatDE)}','${esc(sess)}'),200)" style="color:var(--brand)">View →</a>` : '');
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch(e) {
+    document.getElementById(pendId).textContent = '❌ Failed: ' + e.message;
+  }
+}
+
+/* ───────────────────────────────────────────────────
+   P5 — INBOX DISMISS / FOLLOW-UP
+─────────────────────────────────────────────────── */
+function _dismissedKey() { return 'de_dismissed_sessions'; }
+
+function getDismissed() {
+  try { return JSON.parse(localStorage.getItem(_dismissedKey()) || '[]'); } catch(e) { return []; }
+}
+
+function isDismissed(sessionId) { return getDismissed().includes(sessionId); }
+
+function dismissInboxItem(sessionId, btn) {
+  const card = btn.closest('.inbox-card');
+  const dismissed = getDismissed();
+  if (!dismissed.includes(sessionId)) dismissed.push(sessionId);
+  localStorage.setItem(_dismissedKey(), JSON.stringify(dismissed));
+  if (card) {
+    card.classList.add('dismissed');
+    card.style.display = 'none';
+    // Show in archived section if toggle is on
+    const archSection = document.getElementById('inbox-archived');
+    if (archSection && !archSection.classList.contains('hidden')) {
+      card.style.display = '';
+    }
+  }
+  toast('✕ Dismissed', 'ok');
+}
+
+function followUpDE(deName, sessionId, createdAt) {
+  const dateStr = createdAt ? new Date(createdAt).toLocaleDateString() : '';
+  const prefill = `Following up on session ${sessionId}${dateStr ? ' from ' + dateStr : ''}: `;
+  openChatPanel(deName, prefill);
+}
+
+function toggleDismissed() {
+  const btn = document.getElementById('show-dismissed-btn');
+  const arch = document.getElementById('inbox-archived');
+  if (!arch) return;
+  const showing = arch.classList.toggle('hidden');
+  btn.textContent = showing ? 'Show dismissed' : 'Hide dismissed';
+  // Re-render dismissed cards in that section
+  if (!arch.classList.contains('hidden')) {
+    renderDismissedSection();
+  }
+}
+
+function renderDismissedSection() {
+  const arch = document.getElementById('inbox-archived');
+  if (!arch) return;
+  const dismissed = getDismissed();
+  const cards = document.querySelectorAll('#inbox-feed .inbox-card.dismissed');
+  if (dismissed.length === 0) {
+    arch.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">No dismissed items.</div>';
+    return;
+  }
+  // They're already in the feed, just toggle their visibility
+  document.querySelectorAll('#inbox-feed .inbox-card.dismissed').forEach(c => {
+    c.style.display = arch.classList.contains('hidden') ? 'none' : 'flex';
+  });
 }
 
 /* ───────────────────────────────────────────────────

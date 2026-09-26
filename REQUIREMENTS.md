@@ -302,3 +302,246 @@ Before any deploy, verify each item:
 | 2026-09-13 | Mobile: 4 tabs always visible, content below | Standard native app pattern; split-pane desktop only |
 | 2026-09-13 | DE workspace + MEMORY.md + context loading | DEs need persistent memory and file-based context across sessions |
 | 2026-09-13 | QA step before reporting to human | Save human time and attention — core design principle |
+
+---
+
+## Quality Baseline — Session Efficiency (Added 2026-09-26)
+
+*Living quality gates. Check against these during every health audit.*
+
+---
+
+### R1 — Session Efficiency by DE Type
+
+| DE Type | Max Steps | Notes |
+|---|---|---|
+| Monitoring (ops-style) | ≤ 40 | Many services to check; completions are OK |
+| Scheduling/Admin (flow, coach) | ≤ 25 | Briefing-driven; no exploration allowed |
+| Product/Content (aria, growth) | ≤ 40 | One focused action per session |
+| GEO Research (grow_*) | ≤ 30 | Perplexity runs in pre_fetch, NOT in session |
+| Security (shield) | ≤ 55 | Deep scan requires more steps |
+| Cost Control (max) | ≤ 35 | API + data review |
+
+`max_iterations_reached` = FAILURE state. Acceptable only for growth/shield with explicit budget.
+
+---
+
+### R2 — Session Completion Rate
+
+- **Target:** ≥ 80% `complete` (not `max_iterations` or `error`)
+- **Current Baseline (2026-09-26):** ops✅ shield✅ coach✅ growth✅ = 4 of 12 active DEs = 33% → **BELOW TARGET**
+- **Systemic failure pattern:** grow_* hitting 43-52 steps due to in-session Perplexity queries
+
+---
+
+### R3 — KPI Measurement
+
+- Every DE must have at least 1 measurable KPI in `kpis.yaml`
+- `measure` command must output a number or `not_measured`
+- `not_measured` is OK during bootstrap; after 2nd session it is a failure signal
+- **Root cause of grow_* overrun:** `measure_soav.py` returning `not_measured` → agent runs full benchmark in session (→ 20+ extra steps)
+
+**Fix applied 2026-09-26:**
+- `measure_soav.py` updated for grow_flyraising, grow_agentfabric, grow_engelreal to read from `/root/.openclaw/workspace/agents/{de}/soav_history.json`
+
+---
+
+### R4 — pre_fetch Pipeline
+
+- `pre_fetch.py` MUST run successfully before every session
+- If pre_fetch fails → session MUST abort (not run without briefing)
+- **grow_* pre_fetch must cache Perplexity benchmark** (max 6h old) before session starts
+
+**Fix applied 2026-09-26:**
+- `run_benchmark_if_stale()` function added to all 5 grow_* `pre_fetch.py` files
+- Calls `benchmark_v2.py` or `geo_benchmark.py` when soav data is > 6h old
+- 5-minute timeout; failure is non-fatal (continues with cached data)
+
+---
+
+### R5 — STOP Block Specificity
+
+Every DE job.md MUST have STOP block with:
+1. HARD tool call limit (not just "max N iterations")
+2. Concrete DONE definition: "DONE = [specific file] updated"
+3. Explicit "DO NOT" list for common rabbit holes
+
+**Weak (old):** "max 5 iterations, stop after KPI check"
+**Strong (new):** "HARD LIMIT: max 4 tool calls. DONE = workspace/log.md updated. DO NOT re-investigate KPI calculations."
+
+**Fixed 2026-09-26:** flow, aria, growth, grow_agentic_living, growed, grow_flyraising, grow_agentfabric, grow_engelreal
+
+---
+
+### R6 — Service Monitoring (OPS)
+
+- OPS must run every 2h (cron: `0 */2 * * *`)
+- OPS target: ≤ 40 steps (monitoring 5+ services)
+- Monitored: de-backend, krisp-proxy, nginx, pendant-backend (canvas-server: excluded)
+- Real performance 2026-09-26: 27-34 steps → **WITHIN TARGET**
+
+---
+
+### R7 — Human Decision Channel
+
+- Level 2 decisions MUST reach portal inbox
+- Delivery: Portal-first (Decisions API: `http://localhost:8766`)
+- Telegram: secondary channel only for urgent/real-time alerts
+
+---
+
+## DE Inventory — Expected Behavior (2026-09-26)
+
+| DE | Schedule | Expected Steps | Last Session | Last Status | Last Steps |
+|---|---|---|---|---|---|
+| ops | every 2h | ≤ 40 | 2026-09-26 | ✅ complete | 34 |
+| shield | daily 07:00 | ≤ 55 | 2026-09-26 | ✅ complete | 36 |
+| max | daily 06:00 | ≤ 35 | 2026-09-26 | ⚠️ max_iter | 39 |
+| flow | daily 08:00 | ≤ 25 | 2026-09-26 | ❌ max_iter | 46 |
+| coach | daily 08:30 | ≤ 30 | 2026-09-26 | ✅ complete | 29 |
+| aria | Mon+Thu 09:00 | ≤ 40 | 2026-09-24 | ❌ max_iter | 65 |
+| growth | weekly Mon 09:00 | ≤ 40 | 2026-09-24 | ✅ complete | 22 |
+| grow_agentic_living | every 2 days 10:00 | ≤ 30 | 2026-09-24 | ❌ max_iter | 52 |
+| growed | every 2 days 10:00 | ≤ 30 | 2026-09-24 | ❌ max_iter | 45 |
+| grow_flyraising | every 2 days 11:00 | ≤ 30 | 2026-09-24 | ❌ max_iter | 49 |
+| grow_agentfabric | every 2 days 09:00 | ≤ 30 | 2026-09-26 | ❌ max_iter | 43 |
+| grow_engelreal | every 2 days 11:00 | ≤ 30 | 2026-09-24 | ❌ max_iter | 50 |
+
+---
+
+## Health Check Commands
+
+```bash
+# Quick status check — all DEs
+for de in ops shield max flow coach aria growth grow_agentic_living growed grow_flyraising grow_agentfabric grow_engelreal; do
+  last=$(ls /var/de-agents/$de/sessions/ws-${de}-2026*.json 2>/dev/null | sort | tail -1)
+  if [ -z "$last" ]; then echo "$de: no session"; continue; fi
+  python3 -c "
+import json
+d=json.load(open('$last'))
+steps=d.get('steps',[])
+actions=sum(1 for s in steps if s.get('type')=='action')
+print(f'$de: {d[\"status\"]} ({len(steps)} steps, {actions} actions)')
+"
+done
+
+# pre_fetch smoke test for each grow_* agent
+for de in grow_agentic_living growed grow_flyraising grow_agentfabric grow_engelreal; do
+  echo -n "$de pre_fetch soav: "
+  python3 /var/de-agents/$de/workspace/measure_soav.py 2>/dev/null || echo "ERROR"
+done
+
+# Service health
+curl -s http://localhost:8769/health && echo " ← de-backend OK" || echo "de-backend DOWN"
+curl -s http://localhost:8770/health && echo " ← krisp-proxy OK" || echo "krisp-proxy DOWN"
+```
+
+---
+
+## Known Issues & Mitigations (2026-09-26)
+
+| Issue | Root Cause | Fix Applied | Date | Status |
+|---|---|---|---|---|
+| canvas-server 40+ wasted steps | Wrong KPI in ops kpis.yaml | Removed from kpis.yaml + pre_fetch.py | 2026-09-23 | ✅ FIXED |
+| grow_flyraising/agentfabric/engelreal not_measured | measure_soav.py wrong path | Updated measure_soav.py fallback paths | 2026-09-26 | ✅ FIXED |
+| grow_* 43-52 steps | Perplexity queries run in session | pre_fetch.py now calls benchmark if stale | 2026-09-26 | ✅ APPLIED |
+| flow 46 steps, max_iterations | STOP block too generic, agent investigates KPI source | Specific done-condition + 4-tool hard limit | 2026-09-26 | ✅ FIXED |
+| aria 65 steps, max_iterations | No STOP block at all | Full STOP block added | 2026-09-26 | ✅ FIXED |
+| grow_* 43-52 steps (underlying) | Perplexity API key expired (401) | Needs new API key in job.md | 2026-09-26 | ⚠️ OPEN |
+| max 39 steps, max_iterations | STOP block may need tightening | Not yet investigated | 2026-09-26 | ⚠️ OPEN |
+
+---
+
+## Decision Log (continued from above)
+
+| Date | Decision | Reason |
+|---|---|---|
+| 2026-09-26 | grow_* STOP block: hard 10-tool limit + "DO NOT run Perplexity in session" | Root cause of 43-52 step runs; Perplexity belongs in pre_fetch |
+| 2026-09-26 | pre_fetch.py: run_benchmark_if_stale() for all grow_* | Moves Perplexity benchmark out of ReAct loop; reduces session steps by ~20 |
+| 2026-09-26 | measure_soav.py: fallback to agent workspace soav_history.json | Fix not_measured for grow_flyraising/agentfabric/engelreal |
+| 2026-09-26 | ARIA: added full STOP block | Had NO STOP block — sessions ran 65 steps without limit |
+| 2026-09-26 | FLOW: hard 4-tool limit + explicit done-condition | Was investigating KPI source for 40+ steps; brief was enough |
+
+---
+
+## User Experience & Portal Requirements
+*Added: 2026-09-26*
+
+### R-DATA1 — User Input Persistence (CRITICAL)
+Every user input — decisions, feedback, chat messages — MUST be:
+- Saved to disk before processing (raw, immutable)
+- Stored in `<de-dir>/user_inputs/YYYY-MM-DD-HH-MM-<type>.json`
+- Never deleted automatically
+- Available for learning pipelines
+
+```json
+{
+  "timestamp": "ISO",
+  "type": "decision|feedback|chat|annotation",
+  "session_id": "ws-...",
+  "de": "ops",
+  "raw_input": "...",
+  "context": { "decision_id": "...", "file": "..." }
+}
+```
+
+### R-DATA2 — DE Learning from User Feedback
+When a user provides feedback or makes a decision:
+1. Input MUST be saved (R-DATA1)
+2. If feedback is actionable → DE's `memory.md` and/or `job.md` MAY be updated
+3. All updates attributed (what changed, why, which user input triggered it)
+4. Learning is scoped to the DE's domain — never absorbs another DE's function
+
+### R-UX1 — Decision Flow Visualization
+- Portal MUST show visually where human was looped in
+- Decision card shows: original agent question + human answer + agent continuation
+- Session timeline shows: [Agent working] → [⏸ Waiting for human] → [✅ Human decided: "X"] → [Agent continuing]
+- User must be able to navigate to the full session post-decision
+
+### R-UX2 — File Feedback Pattern
+When an agent requests feedback on a document/file:
+- Output MUST be a file in `<de-dir>/workspace/outputs/<filename>` (never ephemeral)
+- File MUST include references (where data came from, what sources were used)
+- Portal shows the file with: open | annotate | delete | send back to agent
+- User can delete the file — agent receives deletion as signal to regenerate or drop
+
+### R-UX3 — Update Notifications (Closeable)
+Agent updates (non-decision outputs) MUST be:
+- Dismissible: user can close without action
+- Followable: user can click "Follow up" → opens conversation with that DE
+- Archived: closed updates stay in history, not deleted
+
+### R-UX4 — Direct DE Chat
+Portal MUST support direct message to any DE:
+- Identical to sending a Telegram message to the agent
+- DE receives message with its full context (role, mission, tools defined in job.md)
+- Response appears in portal chat view
+- Chat history saved to `<de-dir>/user_inputs/`
+
+### R-UX5 — Tool Management
+- Portal MUST show tool inventory per DE (what tools are enabled in job.md)
+- Adding a tool: user types "add [tool_name] to [DE]" in interface → agent updates job.md
+- Tool additions require human confirmation before taking effect
+- Tool list sourced from framework's `docs/runtime-environment.md`
+
+### R-UX6 — Cost Overview per DE
+- Portal MUST show cost per DE: total tokens, estimated cost (USD), breakdown by session
+- Ability to view and delete scheduled cron tasks per DE directly from cost view
+- "This DE costs $X/month at current cadence" visible at a glance
+- Cost data sourced from session JSON files (steps × model pricing)
+
+### R-FRAMEWORK1 — Terminology File (Per Organization)
+Every DE deployment MUST include a `terminology.md` in the shared workspace:
+- Defines how the organization understands key terms (e.g., "lead", "conversion", "churn")
+- Defines exactly how each KPI is measured (formula, data source, frequency)
+- DEs MUST reference this file when interpreting data — never invent definitions
+- Updated when org changes how they define things
+- Template: `templates/terminology.md` in the framework repo
+
+### R-FRAMEWORK2 — Recommendations Transparency
+All agent recommendations MUST include:
+- The data/evidence it's based on
+- The reasoning chain (not just the conclusion)
+- Confidence level (high/medium/low)
+- What the agent would need to be more certain
+

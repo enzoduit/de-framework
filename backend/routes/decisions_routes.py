@@ -3,9 +3,27 @@ Decisions Routes — /decisions, /decide, /audit-log, /revert
 """
 
 import json
+import datetime
 import subprocess as _sp
 from pathlib import Path
 from backend.config import AGENTS_BASE, now_iso
+
+
+# ── User Input Persistence ────────────────────────────────────────────────────
+
+def _save_user_input(de_name: str, input_type: str, data: dict) -> None:
+    """Save user input to AGENTS_BASE/<de>/user_inputs/YYYY-MM-DD-HH-MM-<type>.json.
+    Never raises — failures are silently swallowed.
+    """
+    try:
+        safe_de = de_name if de_name and de_name != 'system' else 'system'
+        ui_dir = AGENTS_BASE / safe_de / 'user_inputs'
+        ui_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d-%H-%M')
+        fname = f'{ts}-{input_type}.json'
+        (ui_dir / fname).write_text(json.dumps(data, indent=2))
+    except Exception:
+        pass
 
 _SESSION_RUNNER = Path(__file__).parent.parent / 'core' / 'session_runner.py'
 from backend.routes.tasks_routes import create_human_task, execute_decision
@@ -97,6 +115,21 @@ def handle_decide(handler, body):
             pending = decisions.get('pending', [])
             match = next((item for item in pending if item['id'] == decision_id), None)
             if match:
+                # ── P1: Persist user input BEFORE processing ───────────────────────────────
+                _de_for_save = agent_dir.name if agent_dir != AGENTS_BASE else 'system'
+                _choice_map = {'approve': 'approved', 'reject': 'rejected', 'sendback': 'deferred'}
+                _save_user_input(_de_for_save, 'decision', {
+                    'timestamp': now_iso(),
+                    'type': 'decision',
+                    'session_id': match.get('session_id', ''),
+                    'de': _de_for_save,
+                    'decision_id': decision_id,
+                    'raw_input': note,
+                    'choice': _choice_map.get(action, action),
+                    'context': {'question': match.get('title', match.get('description', ''))},
+                })
+                # ── End P1 ────────────────────────────────────────────────────────
+
                 # SEND BACK: keep in pending, add feedback, queue for re-thinking
                 if action == 'sendback':
                     match['status'] = 'replied'
@@ -275,3 +308,144 @@ def handle_revert(handler, body):
         }) + '\n')
 
     return handler.send_json(200, {'ok': True, 'queued': f'revert-{entry_id}'})
+
+
+# ── P2: Decision Thread ────────────────────────────────────────────────────
+
+def handle_decision_thread(handler, decision_id: str):
+    """GET /decisions/<id>/thread — decision + session context timeline."""
+    found = None
+    found_de = None
+
+    # Search root-level decisions.json
+    root_file = AGENTS_BASE / 'decisions.json'
+    if root_file.exists():
+        try:
+            d = json.loads(root_file.read_text())
+            all_items = d.get('pending', []) + d.get('resolved', []) + d.get('history', [])
+            for item in all_items:
+                if item.get('id') == decision_id:
+                    found = item
+                    found_de = 'system'
+                    break
+        except Exception:
+            pass
+
+    # Search per-agent decisions.json files
+    if not found:
+        for agent_dir in AGENTS_BASE.iterdir():
+            if not agent_dir.is_dir():
+                continue
+            df = agent_dir / 'decisions.json'
+            if not df.exists():
+                continue
+            try:
+                d = json.loads(df.read_text())
+                all_items = d.get('pending', []) + d.get('resolved', []) + d.get('history', [])
+                for item in all_items:
+                    if item.get('id') == decision_id:
+                        found = item
+                        found_de = agent_dir.name
+                        break
+            except Exception:
+                pass
+            if found:
+                break
+
+    if not found:
+        return handler.send_json(404, {'error': 'decision not found'})
+
+    # Load session file
+    sess_id = found.get('session_id')
+    session_data = None
+    if sess_id and found_de and found_de != 'system':
+        sess_file = AGENTS_BASE / found_de / 'sessions' / f'{sess_id}.json'
+        if sess_file.exists():
+            try:
+                session_data = json.loads(sess_file.read_text())
+            except Exception:
+                pass
+
+    steps = (session_data or {}).get('steps', [])
+
+    # Count steps before the matching decision_request, and after resolution
+    steps_before = 0
+    steps_after = 0
+    found_dec_step = False
+    found_res_step = False
+    for step in steps:
+        stype = step.get('type', '')
+        if not found_dec_step:
+            if stype == 'decision_request' and step.get('decision_id') == decision_id:
+                found_dec_step = True
+            else:
+                steps_before += 1
+        elif not found_res_step:
+            if stype in ('decision_response', 'human_reply'):
+                found_res_step = True
+        else:
+            steps_after += 1
+
+    # Build timeline
+    timeline = []
+    if steps_before > 0:
+        timeline.append({'type': 'agent_working', 'steps': steps_before,
+                         'label': f'Agent analyzed options ({steps_before} steps)'})
+    timeline.append({'type': 'human_pause', 'label': '⏸ Waiting for human decision'})
+
+    dec_status = found.get('status', 'pending')
+    label_map = {
+        'approved': '✅ Human approved',
+        'rejected': '🛑 Human rejected',
+        'replied': '↩️ Human replied',
+    }
+    if dec_status in label_map:
+        answer_text = found.get('resolution_note') or found.get('ed_feedback', '')
+        ts_resolved = found.get('resolved_at') or found.get('replied_at', '')
+        timeline.append({
+            'type': 'human_decided',
+            'label': label_map[dec_status],
+            'answer': answer_text,
+            'timestamp': ts_resolved,
+        })
+        if steps_after > 0:
+            timeline.append({'type': 'agent_resumed', 'steps': steps_after,
+                             'label': f'Agent executed plan ({steps_after} steps)'})
+
+    session_status = (session_data or {}).get('status', 'unknown')
+    session_before = ({'id': sess_id, 'status': 'paused_human', 'steps_before_pause': steps_before}
+                      if sess_id else None)
+    session_after = ({'id': sess_id, 'status': session_status, 'steps_after_resume': steps_after}
+                     if sess_id else None)
+
+    human_answer = None
+    if dec_status in label_map:
+        human_answer = {
+            'choice': dec_status,
+            'note': found.get('resolution_note') or found.get('ed_feedback', ''),
+            'timestamp': found.get('resolved_at') or found.get('replied_at', ''),
+        }
+
+    return handler.send_json(200, {
+        'decision': found,
+        'session_before': session_before,
+        'session_after': session_after,
+        'human_answer': human_answer,
+        'timeline': timeline,
+    })
+
+
+# ── Feedback (P1 complement) ──────────────────────────────────────────────────
+
+def handle_feedback_post(handler, body: dict):
+    """POST /feedback — save portal feedback to user_inputs."""
+    de_name = body.get('de', 'system')
+    _save_user_input(de_name, 'feedback', {
+        'timestamp': now_iso(),
+        'type': 'feedback',
+        'de': de_name,
+        'session_id': body.get('session_id', ''),
+        'message': body.get('message', ''),
+        'rating': body.get('rating'),
+    })
+    return handler.send_json(200, {'ok': True})
