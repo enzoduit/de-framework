@@ -1321,6 +1321,17 @@ def handle_de_kpis_get(handler, de_name: str):
         if 'soav' in kpi_id.lower() and soav_score is not None:
             current = soav_score
 
+        # Normalize: if current is a dict, try to extract a scalar value
+        if isinstance(current, dict):
+            for _k in ('value', 'score', 'pct_cited', 'current', 'combined_any_model'):
+                if _k in current and isinstance(current[_k], (int, float)):
+                    current = current[_k]
+                    break
+            else:
+                current = None
+        elif isinstance(current, list):
+            current = None
+
         result_kpis.append({
             'id': kpi_id,
             'name': kpi.get('name', kpi_id),
