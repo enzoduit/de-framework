@@ -5,6 +5,7 @@ Returns a feed sorted by last activity, newest first.
 """
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -85,6 +86,33 @@ def _load_de_meta(de_dir: Path) -> dict:
         return {}
 
 
+def clean_summary_preview(text: str, max_chars: int = 300) -> str:
+    """Strip leading markdown syntax for a clean plain-text preview."""
+    if not text:
+        return ''
+    lines = [
+        l for l in text.split('\n')
+        if l.strip()
+        and not l.strip().startswith('---')
+        and not l.strip().startswith('#')
+    ]
+    clean = ' '.join(lines)
+    return clean[:max_chars] if len(clean) > max_chars else clean
+
+
+def _find_report_file(de_dir: Path, session_date: str) -> str | None:
+    """Return the first .md report file in workspace/reports/ matching session_date prefix."""
+    if not session_date:
+        return None
+    reports_dir = de_dir / 'workspace' / 'reports'
+    if not reports_dir.exists():
+        return None
+    for f in sorted(reports_dir.iterdir()):
+        if f.is_file() and f.suffix == '.md' and f.name.startswith(session_date):
+            return f.name
+    return None
+
+
 def handle_inbox_get(handler):
     """GET /inbox — aggregated recent DE session feed."""
     items = []
@@ -143,6 +171,11 @@ def handle_inbox_get(handler):
         status = session_data.get('status', 'unknown')
         steps = session_data.get('steps', [])
 
+        raw_summary = _extract_summary(session_data)
+        session_dt = _parse_dt(created_at)
+        session_date = session_dt.strftime('%Y-%m-%d') if session_dt else ''
+        report_file = _find_report_file(de_dir, session_date)
+
         items.append({
             'de': de_name,
             'display_name': full_display,
@@ -150,7 +183,9 @@ def handle_inbox_get(handler):
             'status': status,
             'steps': len(steps),
             'created_at': created_at,
-            'summary': _extract_summary(session_data),
+            'summary': clean_summary_preview(raw_summary),
+            'full_summary': raw_summary,
+            'report_file': report_file,
             'kpis': kpis,
             'color': meta.get('color', '#6366f1'),
         })

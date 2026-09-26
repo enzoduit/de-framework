@@ -123,6 +123,25 @@ python3 -c "..."
 
 ---
 
+## Output
+
+At the end of every cron session, write your session summary to:
+`workspace/reports/YYYY-MM-DD.md` (append if file exists, new file if not)
+
+Format: plain markdown. Start with `## Session YYYY-MM-DD HH:MM` header.
+This file is shown in the portal inbox — keep it human-readable.
+
+```markdown
+## Session 2026-09-26 14:30
+
+**KPI checked:** [value] vs target [target]
+**Status:** On track / Off track
+**Action taken:** [what you did, or "none"]
+**Next check:** [date]
+```
+
+---
+
 ## Chef-Agent Template
 
 If this DE coordinates other DEs rather than doing operational work itself, use the **Chef Agent pattern** instead of this standard template.

@@ -908,6 +908,39 @@ def handle_de_get(handler, parts):
                 })
         return handler.send_json(200, {'files': files, 'count': len(files), 'de': de_name})
 
+    # GET /de/<name>/workspace/reports  — list report markdown files
+    if len(parts) == 4 and parts[2] == 'workspace' and parts[3] == 'reports':
+        import datetime as _dt
+        reports_dir = de_dir / 'workspace' / 'reports'
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        files = []
+        for f in sorted(reports_dir.iterdir(), reverse=True):
+            if f.is_file() and f.suffix == '.md' and not f.name.startswith('.'):
+                stat = f.stat()
+                files.append({
+                    'name': f.name,
+                    'size': stat.st_size,
+                    'mtime': _dt.datetime.fromtimestamp(
+                        stat.st_mtime, tz=_dt.timezone.utc
+                    ).isoformat(),
+                })
+        return handler.send_json(200, {'files': files, 'count': len(files)})
+
+    # GET /de/<name>/workspace/reports/<filename>  — read a report file
+    if len(parts) == 5 and parts[2] == 'workspace' and parts[3] == 'reports':
+        report_name = parts[4]
+        reports_dir = de_dir / 'workspace' / 'reports'
+        fp = reports_dir / report_name
+        if not fp.exists() or not fp.is_file():
+            return handler.send_json(404, {'error': 'Report not found'})
+        if not str(fp.resolve()).startswith(str(reports_dir.resolve())):
+            return handler.send_json(403, {'error': 'Access denied'})
+        try:
+            content = fp.read_text(encoding='utf-8', errors='replace')
+        except Exception as e:
+            return handler.send_json(500, {'error': str(e)})
+        return handler.send_json(200, {'content': content, 'name': report_name})
+
     # GET /de/<name>/workspace/<filename>  — read file content for popup viewer
     if len(parts) == 4 and parts[2] == 'workspace':
         filename = parts[3]

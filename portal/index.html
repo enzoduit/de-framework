@@ -242,13 +242,7 @@
       justify-content: space-between;
       margin-bottom: 14px;
     }
-    .section-title {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
+    /* .section-title overridden below with improved styling */
     .section-count { font-size: 12px; color: var(--text-muted); }
 
     /* ═══════════════════════════════════════════
@@ -841,6 +835,56 @@
     .inbox-action-btn:hover { border-color: var(--brand); color: var(--brand); }
     .inbox-action-btn.dismiss:hover { border-color: var(--text-muted); color: var(--text-muted); }
     .inbox-card.dismissed { opacity: 0.45; }
+
+    /* Inbox expand view */
+    .inbox-full-summary {
+      margin-top: 10px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border-radius: 8px;
+      border-left: 2px solid var(--border-med);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-sec);
+      overflow-wrap: break-word;
+      word-break: break-word;
+      animation: slideDown 0.2s ease;
+    }
+    .inbox-full-summary.hidden { display: none !important; }
+    .inbox-full-summary h4, .inbox-full-summary h3, .inbox-full-summary h2, .inbox-full-summary h1 {
+      font-size: 13px; font-weight: 700; color: var(--text);
+      margin: 8px 0 3px;
+    }
+    .inbox-full-summary ul { padding-left: 18px; margin: 4px 0; }
+    .inbox-full-summary li { margin: 2px 0; }
+    .inbox-full-summary hr { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+    .inbox-full-summary strong { color: var(--text); }
+    .inbox-full-summary code { background: rgba(0,0,0,0.18); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    .inbox-full-summary p { margin: 4px 0; }
+
+    /* Report modal */
+    .report-modal-body.md h1, .report-modal-body.md h2, .report-modal-body.md h3, .report-modal-body.md h4 {
+      margin: 10px 0 5px; font-weight: 600;
+    }
+    .report-modal-body.md hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+    .report-modal-body.md ul { padding-left: 18px; margin: 6px 0; }
+    .report-modal-body.md li { margin: 3px 0; }
+    .report-modal-body.md strong { font-weight: 600; }
+    .report-modal-body.md code { background: rgba(0,0,0,0.18); padding: 2px 5px; border-radius: 4px; font-size: 12px; }
+    .report-modal-body.md p { margin-bottom: 7px; }
+
+    /* Section header — slightly larger, less cramped */
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-count { font-size: 12px; color: var(--text-muted); }
 
     /* ═══════════════════════════════════════════
        COSTS PAGE
@@ -1441,6 +1485,20 @@
 </div>
 
 <!-- ════════════════════════════════════
+     WORKSPACE REPORT MODAL
+════════════════════════════════════ -->
+<div class="thread-overlay" id="report-overlay" onclick="closeReportModal(event)">
+  <div class="thread-modal" id="report-modal" style="max-width:700px;width:92%">
+    <div class="thread-modal-hdr">
+      <div class="thread-modal-title" id="report-modal-title" style="font-size:15px;font-weight:600;"></div>
+      <button class="icon-btn" onclick="closeReportModal()">&#x2715;</button>
+    </div>
+    <div class="report-modal-body md" id="report-modal-body"
+         style="font-size:13px;line-height:1.75;color:var(--text-sec);max-height:65vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
      DE CHAT PANEL
 ════════════════════════════════════ -->
 <div class="chat-overlay" id="chat-overlay" onclick="closeChatPanel()"></div>
@@ -1516,17 +1574,37 @@ function renderMd(text) {
   if (window.marked) {
     try { return marked.parse(text); } catch(e) {}
   }
-  // Minimal fallback
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  // Improved line-by-line fallback: handles ##, **, `code`, - list, ---, <br>
+  const esc2 = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inline = s => s
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`(.+?)`/g,'<code>$1</code>')
-    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
-    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
-    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
-    .replace(/\n\n+/g,'</p><p>')
-    .replace(/^([^<].*)$/gm,'<p>$1</p>');
+    .replace(/`([^`]+)`/g,'<code>$1</code>');
+  const lines = text.split('\n');
+  let html = '', inUl = false;
+  for (const raw of lines) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      continue;
+    }
+    if (/^---+$/.test(trimmed)) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      html += '<hr>';
+    } else if (/^#{1,6}\s/.test(raw)) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      const content = inline(esc2(trimmed.replace(/^#+\s*/, '')));
+      html += `<h4>${content}</h4>`;
+    } else if (/^[-*]\s/.test(raw)) {
+      if (!inUl) { html += '<ul>'; inUl = true; }
+      html += `<li>${inline(esc2(trimmed.replace(/^[-*]\s/, '')))}</li>`;
+    } else {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      html += `<p>${inline(esc2(trimmed))}</p>`;
+    }
+  }
+  if (inUl) html += '</ul>';
+  return html;
 }
 
 /* ───────────────────────────────────────────────────
@@ -1819,7 +1897,7 @@ function outputCardHTML(s, de, i) {
       <span class="badge badge-brand">${typeLabel}</span>
       <span class="out-time">${timeAgo(s.created_at)}</span>
     </div>
-    <div class="out-title">${esc((s.summary||'Session completed').slice(0,80))}</div>
+    <div class="out-title">${esc(cleanTitle(s.summary||'Session completed').slice(0,80))}</div>
     <div class="out-summary md">${renderMd(summary)}${s.summary?.length > 180 ? '…' : ''}</div>
     <div class="out-actions">${actions}</div>
     <div class="out-feedback hidden" id="fb-${esc(s.id)}">
@@ -1957,13 +2035,21 @@ function inboxCardHTML(item) {
   const icon = inboxStatusIcon(item.status);
   const label = inboxStatusLabel(item.status);
   const color = item.color || '#6366f1';
-  const summary = (item.summary || '').replace(/#+\s/g, '').replace(/\n/g, ' ').trim();
-  const shortSummary = summary.length > 150 ? summary.slice(0, 147) + '…' : summary;
+  // Backend provides: summary = clean plain preview, full_summary = raw markdown
+  const previewText = item.summary || '';
+  const fullText = item.full_summary || item.summary || '';
+  const statusCls = item.status === 'complete' ? 'ok'
+    : (item.status.includes('error') || item.status === 'max_iterations_reached' ? 'err' : 'warn');
   const kpiHtml = (item.kpis || []).map(k =>
     `<span class="inbox-kpi-badge">${esc(k.label.length > 40 ? k.label.slice(0,40)+'…' : k.label)}</span>`
   ).join('');
+  const sessId = esc(item.session_id);
+  const deName = esc(item.de);
+  // Only show expand if full text is meaningfully longer than clean preview
+  const hasExpand = fullText && fullText.trim().length > 30;
+  const hasReport = !!(item.report_file);
   return `
-    <div class="inbox-card" onclick="navDE('${esc(item.de)}')" style="--de-color:${color}" data-sessid="${esc(item.session_id)}">
+    <div class="inbox-card" onclick="navDE('${deName}')" style="--de-color:${color}" data-sessid="${sessId}">
       <div class="inbox-card-left">
         <div class="inbox-de-avatar" style="background:${color}22">${icon}</div>
       </div>
@@ -1973,17 +2059,79 @@ function inboxCardHTML(item) {
           <span class="inbox-time">${timeAgo(item.created_at)}</span>
         </div>
         <div class="inbox-status-row">
-          <span class="inbox-status-label ${item.status === 'complete' ? 'ok' : (item.status.includes('error') || item.status === 'max_iterations_reached' ? 'err' : 'warn')}">${label}</span>
+          <span class="inbox-status-label ${statusCls}">${label}</span>
           <span class="inbox-steps">${item.steps} steps</span>
         </div>
-        ${shortSummary ? `<div class="inbox-summary">${esc(shortSummary)}</div>` : ''}
+        ${previewText ? `<div class="inbox-summary md">${renderMd(previewText)}</div>` : ''}
         ${kpiHtml ? `<div class="inbox-kpis">${kpiHtml}</div>` : ''}
         <div class="inbox-card-actions" onclick="event.stopPropagation()">
-          <button class="inbox-action-btn" onclick="followUpDE('${esc(item.de)}','${esc(item.session_id)}','${esc(item.created_at)}')">↩ Follow up</button>
-          <button class="inbox-action-btn dismiss" onclick="dismissInboxItem('${esc(item.session_id)}',this)">✕ Dismiss</button>
+          ${hasExpand ? `<button class="inbox-action-btn" id="expand-btn-${sessId}" onclick="toggleInboxExpand('${sessId}')">📄 Read full</button>` : ''}
+          <button class="inbox-action-btn" onclick="openInboxSession('${deName}','${sessId}')">🔗 Session</button>
+          ${hasReport ? `<button class="inbox-action-btn" onclick="openInboxReport('${deName}','${esc(item.report_file || '')}')">📂 Workspace report</button>` : ''}
+          <button class="inbox-action-btn" onclick="followUpDE('${deName}','${sessId}','${esc(item.created_at)}')">↩ Follow up</button>
+          <button class="inbox-action-btn dismiss" onclick="dismissInboxItem('${sessId}',this)">✕ Dismiss</button>
         </div>
+        ${hasExpand ? `<div class="inbox-full-summary md hidden" id="inbox-expand-${sessId}" onclick="event.stopPropagation()">${renderMd(fullText)}</div>` : ''}
       </div>
     </div>`;
+}
+
+/* ───────────────────────────────────────────────────
+   INBOX EXPAND / SESSION / REPORT HANDLERS
+─────────────────────────────────────────────────── */
+function toggleInboxExpand(sessId) {
+  const el = document.getElementById('inbox-expand-' + sessId);
+  const btn = document.getElementById('expand-btn-' + sessId);
+  if (!el) return;
+  const nowHidden = el.classList.contains('hidden');
+  el.classList.toggle('hidden', !nowHidden);
+  if (btn) btn.textContent = nowHidden ? '📄 Collapse' : '📄 Read full';
+}
+
+function openInboxSession(deName, sessId) {
+  // Navigate to the DE detail page and open the specific session timeline
+  const de = S.des.find(d => d.name === deName);
+  if (de) {
+    navDE(deName);
+    setTimeout(() => openSession(deName, sessId), 320);
+  } else {
+    // DE not yet loaded in state — go to team page
+    toast('🔗 Opening session…', 'ok');
+    setTimeout(() => openSession(deName, sessId), 120);
+  }
+}
+
+async function openInboxReport(deName, reportFile) {
+  if (!deName || !reportFile) return;
+  try {
+    const data = await apiJSON(`/de/${deName}/workspace/reports/${encodeURIComponent(reportFile)}`);
+    showReportModal(reportFile, data.content || '');
+  } catch(e) {
+    toast('Could not load report: ' + e.message, 'err');
+  }
+}
+
+function showReportModal(title, content) {
+  document.getElementById('report-modal-title').textContent = title;
+  document.getElementById('report-modal-body').innerHTML = renderMd(content);
+  document.getElementById('report-overlay').classList.add('open');
+}
+
+function closeReportModal(ev) {
+  if (!ev || ev.target === document.getElementById('report-overlay')) {
+    document.getElementById('report-overlay').classList.remove('open');
+  }
+}
+
+/* Clean markdown syntax from the first line of a summary for use as a title */
+function cleanTitle(text) {
+  if (!text) return '';
+  const lines = text.split('\n').filter(l => {
+    const s = l.trim();
+    return s && !s.startsWith('---') && !s.startsWith('#');
+  });
+  const clean = (lines[0] || '').replace(/^\*+|\*+$/g, '').replace(/^[-*]\s/, '').trim();
+  return clean || text.split('\n')[0].trim() || text.trim();
 }
 
 /* ───────────────────────────────────────────────────
