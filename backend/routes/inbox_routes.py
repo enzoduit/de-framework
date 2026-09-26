@@ -86,20 +86,16 @@ def _load_de_meta(de_dir: Path) -> dict:
         return {}
 
 
-def clean_summary_preview(text: str, max_chars: int = 300) -> str:
-    """Strip leading markdown syntax for a clean plain-text preview."""
-    if not text:
-        return ''
-    lines = [
-        l for l in text.split('\n')
-        if l.strip()
-        and not l.strip().startswith('---')
-        and not l.strip().startswith('#')
-    ]
+def clean_summary_preview(text, max_chars=300):
+    lines = [l for l in text.split('\n') if l.strip()
+             and not l.strip().startswith('---')
+             and not l.strip().startswith('#')]
     clean = ' '.join(lines)
+    clean = re.sub(r'\*\*(.+?)\*\*', r'\1', clean)
+    clean = re.sub(r'`(.+?)`', r'\1', clean)
+    clean = re.sub(r'\*(.+?)\*', r'\1', clean)
+    clean = re.sub(r'_(.+?)_', r'\1', clean)
     return clean[:max_chars] if len(clean) > max_chars else clean
-
-
 def _find_report_file(de_dir: Path, session_date: str) -> str | None:
     """Return the first .md report file in workspace/reports/ matching session_date prefix."""
     if not session_date:
