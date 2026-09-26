@@ -467,6 +467,32 @@ curl -s http://localhost:8770/health && echo " ← krisp-proxy OK" || echo "kris
 ## User Experience & Portal Requirements
 *Added: 2026-09-26*
 
+### R-DEC2 — Decision Dismissal Without Learning
+
+Decision resolution choices carry different semantics:
+
+| Resolution | DE behavior change | Session spawned |
+|---|---|---|
+| `go_ahead` (approve) | Normal continuation | Yes |
+| `go_ahead_with_note` (approve + note) | Continuation with human guidance | Yes |
+| `stop` (reject) | Log rejection, may affect future proposals | No |
+| `already_handled` | Log "closed externally", NO behavior change | No (or minimal 2-step log) |
+
+The `already_handled` resolution MUST NOT change:
+- Monitoring targets
+- Check frequencies
+- KPI thresholds
+- Any job.md behavior
+
+When a paused session is resumed after `already_handled`:
+- Trigger context is overridden with a max-2-tool-call instruction
+- DE logs one line to `workspace/log.md` and stops
+- No analysis, investigation, or follow-up is performed
+
+Use case: issue was resolved by a different agent, human, or external system before the DE could act.
+
+---
+
 ### R-DATA1 — User Input Persistence (CRITICAL)
 Every user input — decisions, feedback, chat messages — MUST be:
 - Saved to disk before processing (raw, immutable)

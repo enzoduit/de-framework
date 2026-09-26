@@ -87,12 +87,12 @@ def handle_audit_log_get(handler):
 
 def handle_decide(handler, body):
     """POST /decide — approve, reject, or send back a decision."""
-    decision_id = body.get('id')
-    action = body.get('action')  # 'approve', 'reject', or 'sendback'
+    decision_id = body.get('id') or body.get('decision_id')
+    action = body.get('action') or body.get('choice')  # 'approve', 'reject', 'sendback', or 'already_handled'
     note = body.get('note', '')
 
-    if not decision_id or action not in ('approve', 'reject', 'sendback'):
-        return handler.send_json(400, {'error': 'missing id or invalid action (approve/reject/sendback)'})
+    if not decision_id or action not in ('approve', 'reject', 'sendback', 'already_handled'):
+        return handler.send_json(400, {'error': 'missing id or invalid action (approve/reject/sendback/already_handled)'})
 
     # Search order: root-level decisions.json first, then per-agent subdirs
     candidate_files = []
@@ -117,7 +117,7 @@ def handle_decide(handler, body):
             if match:
                 # ── P1: Persist user input BEFORE processing ───────────────────────────────
                 _de_for_save = agent_dir.name if agent_dir != AGENTS_BASE else 'system'
-                _choice_map = {'approve': 'approved', 'reject': 'rejected', 'sendback': 'deferred'}
+                _choice_map = {'approve': 'approved', 'reject': 'rejected', 'sendback': 'deferred', 'already_handled': 'already_handled'}
                 _save_user_input(_de_for_save, 'decision', {
                     'timestamp': now_iso(),
                     'type': 'decision',
@@ -129,6 +129,74 @@ def handle_decide(handler, body):
                     'context': {'question': match.get('title', match.get('description', ''))},
                 })
                 # ── End P1 ────────────────────────────────────────────────────────
+
+                # ALREADY HANDLED: close without DE learning or behavior change
+                if action == 'already_handled':
+                    _save_user_input(_de_for_save, 'decision', {
+                        'timestamp': now_iso(),
+                        'type': 'decision',
+                        'session_id': match.get('session_id', ''),
+                        'de': _de_for_save,
+                        'decision_id': decision_id,
+                        'raw_input': note or 'Resolved externally — monitoring continues normally.',
+                        'choice': 'already_handled',
+                        'context': {'question': match.get('title', match.get('description', ''))},
+                    })
+                    match['status'] = 'resolved'
+                    match['resolution'] = 'already_handled'
+                    match['resolved_at'] = now_iso()
+                    match['note'] = note or 'Resolved externally — monitoring continues normally.'
+                    decisions['pending'] = [item for item in pending if item['id'] != decision_id]
+                    if 'resolved' not in decisions:
+                        decisions['resolved'] = []
+                    decisions['resolved'].append(match)
+                    decisions_file.write_text(json.dumps(decisions, indent=2))
+
+                    # If a session was paused waiting for this decision, resume it with
+                    # a minimal "log and stop" context (max 2 tool calls, no behavior change)
+                    sess_id = match.get('session_id')
+                    de_from_dec = match.get('agent', '')
+                    session_resumed = None
+                    if sess_id and de_from_dec:
+                        sess_file = AGENTS_BASE / de_from_dec / 'sessions' / f'{sess_id}.json'
+                        if sess_file.exists():
+                            sess_data = json.loads(sess_file.read_text())
+                            if sess_data.get('status') == 'paused_human':
+                                already_handled_ctx = (
+                                    f'[Decision "{match.get("title", "")}" closed as "Already handled externally"]\n\n'
+                                    f'The human has indicated this issue was already resolved by someone else '
+                                    f'before you could act on it.\n\n'
+                                    f'YOUR RESPONSE (HARD LIMIT — MAX 2 TOOL CALLS):\n'
+                                    f'1. Log exactly one line to workspace/log.md: '
+                                    f'"[{now_iso()[:10]}] Decision "{match.get("title", "")}" closed externally."\n'
+                                    f'2. Continue your normal monitoring schedule as if this decision never existed.\n'
+                                    f'3. Do NOT change any monitoring targets, check frequencies, or KPI thresholds.\n'
+                                    f'4. Do NOT propose any follow-up actions or investigations.\n'
+                                    f'5. STOP immediately after logging. Do not run any further analysis.'
+                                )
+                                sess_data['trigger_context'] = already_handled_ctx
+                                steps = sess_data.get('steps', [])
+                                steps.append({
+                                    'type': 'human_reply',
+                                    'ts': now_iso(),
+                                    'content': f'[already_handled] {match.get("note", "Resolved externally")}',
+                                })
+                                sess_data['steps'] = steps
+                                sess_data['status'] = 'pending'
+                                sess_file.write_text(json.dumps(sess_data, indent=2))
+                                _rlog = f'/tmp/already-handled-{de_from_dec}-{sess_id}.log'
+                                _sp.Popen(
+                                    ['python3', str(_SESSION_RUNNER), de_from_dec, sess_id],
+                                    stdout=open(_rlog, 'w'), stderr=_sp.STDOUT,
+                                    cwd=str(AGENTS_BASE),
+                                )
+                                session_resumed = sess_id
+
+                    return handler.send_json(200, {
+                        'status': 'ok',
+                        'message': 'Decision closed. DE will continue normal monitoring.',
+                        'session_resumed': session_resumed,
+                    })
 
                 # SEND BACK: keep in pending, add feedback, queue for re-thinking
                 if action == 'sendback':
