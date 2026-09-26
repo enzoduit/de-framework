@@ -833,6 +833,63 @@
       cursor: pointer; transition: all var(--tr);
     }
     .inbox-action-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+    /* ── DE Card KPI row ───────────────────────────────── */
+    .de-kpi-row { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; min-height:20px; }
+    .de-kpi-badge {
+      font-size:10px; padding:2px 7px; border-radius:10px;
+      background:var(--surface2); border:1px solid var(--border);
+      color:var(--text-muted); white-space:nowrap;
+    }
+
+    /* ── Tools tab ─────────────────────────────────────── */
+    .tools-section { margin-bottom:20px; }
+    .tools-section-hdr {
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      color:var(--text-muted); letter-spacing:0.07em;
+      margin-bottom:8px; padding:0 2px;
+    }
+    .tool-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px; }
+    .tool-chip {
+      font-size:12px; font-weight:500;
+      padding:4px 10px; border-radius:20px;
+      background:var(--surface2); border:1px solid var(--border-med);
+      color:var(--text-sec); cursor:default;
+      transition:border-color var(--tr), color var(--tr);
+    }
+    .tool-chip:hover { border-color:var(--brand); color:var(--brand); }
+    .tool-chip.shell   { border-color:rgba(59,130,246,.4);  color:#3b82f6; }
+    .tool-chip.memory  { border-color:rgba(168,85,247,.4);  color:#a855f7; }
+    .tool-chip.web     { border-color:rgba(16,185,129,.4);  color:#10b981; }
+    .tool-chip.multi_agent { border-color:rgba(245,158,11,.4); color:#f59e0b; }
+    .tool-chip.communication { border-color:rgba(236,72,153,.4); color:#ec4899; }
+    .tool-chip.media   { border-color:rgba(239,68,68,.4);   color:#ef4444; }
+    .add-tool-btn {
+      font-size:12px; padding:4px 12px; border-radius:20px;
+      background:transparent; border:1px dashed var(--border-med);
+      color:var(--text-muted); cursor:pointer;
+      transition:all var(--tr);
+    }
+    .add-tool-btn:hover { border-color:var(--brand); color:var(--brand); }
+
+    /* ── KPIs tab ──────────────────────────────────────── */
+    .kpi-table { width:100%; border-collapse:collapse; margin-top:4px; }
+    .kpi-table th {
+      text-align:left; font-size:11px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.06em;
+      color:var(--text-muted); padding:6px 10px;
+      border-bottom:1px solid var(--border);
+    }
+    .kpi-table td { padding:10px; border-bottom:1px solid var(--border); font-size:13px; }
+    .kpi-table tr:last-child td { border-bottom:none; }
+    .kpi-status.on_track  { color:#10b981; font-weight:600; }
+    .kpi-status.off_track { color:#ef4444; font-weight:600; }
+    .kpi-status.not_measured { color:var(--text-muted); }
+
+    /* ── DE detail: cost row ───────────────────────────── */
+    .de-cost-row { display:flex; align-items:baseline; gap:8px; }
+    .cost-val { font-weight:700; color:var(--text-primary); }
+    .cost-meta { font-size:12px; color:var(--text-muted); }
     .inbox-action-btn.dismiss:hover { border-color: var(--text-muted); color: var(--text-muted); }
     .inbox-card.dismissed { opacity: 0.45; }
 
@@ -1469,6 +1526,8 @@
     <div class="tabs-row" id="de-tabs">
       <div class="tab active" data-tab="sessions" onclick="switchTab('sessions')">Sessions</div>
       <div class="tab" data-tab="profile" onclick="switchTab('profile')">Profile</div>
+      <div class="tab" data-tab="kpis" onclick="switchTab('kpis')">📊 KPIs</div>
+      <div class="tab" data-tab="tools" onclick="switchTab('tools')">🔧 Tools</div>
       <div class="tab" data-tab="schedule" onclick="switchTab('schedule')">Schedule</div>
       <div class="tab" data-tab="workspace" onclick="switchTab('workspace')">Workspace</div>
     </div>
@@ -1613,6 +1672,7 @@ function renderMd(text) {
 const S = {
   des: [],
   decisions: [],
+  costs: {},
   currentDE: null,
   currentTab: 'sessions',
   view: 'home',
@@ -1808,6 +1868,9 @@ function renderHome() {
     S.des.map((de, i) => deCardHTML(de, i)).join('') ||
     '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👥</div><p>No team members yet.</p></div>';
 
+  // Enrich cards with live KPI badges (async, non-blocking)
+  enrichCardsWithKPIs(S.des);
+
   // Delivered today (async, rendered after)
   renderDelivered();
   updateBadges();
@@ -1928,6 +1991,7 @@ function deCardHTML(de, i) {
   <div class="de-name">${esc(de.display_name || de.name)}</div>
   <div class="de-role">${esc(de.role || '')}</div>
   <div class="de-status-label">${statusLabel}</div>
+  <div class="de-kpi-row" id="kpi-row-${esc(de.name)}"></div>
 </div>`;
 }
 
@@ -1938,6 +2002,7 @@ function renderTeam() {
   document.getElementById('team-grid').innerHTML = S.des.length
     ? S.des.map((de, i) => deCardHTML(de, i)).join('')
     : '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👥</div><p>No team members found.</p></div>';
+  enrichCardsWithKPIs(S.des);
 }
 
 function renderDecisionsPage() {
@@ -2176,6 +2241,8 @@ function renderTab(tab) {
   if (!de) return;
   if (tab === 'sessions') renderSessionsTab(de);
   else if (tab === 'profile') renderProfileTab(de);
+  else if (tab === 'kpis') renderKPIsTab(de);
+  else if (tab === 'tools') renderToolsTab(de);
   else if (tab === 'schedule') renderScheduleTab(de);
   else if (tab === 'workspace') renderWorkspaceTab(de);
 }
@@ -2292,7 +2359,8 @@ function renderProfileTab(de) {
   <div style="font-size:12px;color:var(--text-muted);margin-top:5px">Level ${autonomy} of 5</div>
 </div>
 ${de.pending_decisions ? `<div class="profile-field"><div class="pf-label">Pending Decisions</div><div class="pf-value">${de.pending_decisions}</div></div>` : ''}
-${de.last_session_at ? `<div class="profile-field"><div class="pf-label">Last Active</div><div class="pf-value">${timeAgo(de.last_session_at)}</div></div>` : ''}`;
+${de.last_session_at ? `<div class="profile-field"><div class="pf-label">Last Active</div><div class="pf-value">${timeAgo(de.last_session_at)}</div></div>` : ''}
+${(()=>{ const c=(S.costs||{})[de.name]; return c ? `<div class="profile-field"><div class="pf-label">💰 Cost (30d)</div><div class="pf-value de-cost-row"><span class="cost-val">$${c.estimated_usd.toFixed(4)}</span><span class="cost-meta">${c.sessions_30d} sessions · avg ${c.avg_steps} steps/session</span></div></div>` : ''; })()}`;
 }
 
 /* Schedule Tab */
@@ -2364,6 +2432,150 @@ async function openWsFile(deName, fileName) {
 <div class="step-body md" style="max-height:none">${isMd ? renderMd(text) : `<pre>${esc(text)}</pre>`}</div>`;
   } catch(e) {
     toast('Could not open file: ' + e.message, 'err');
+  }
+}
+
+/* ───────────────────────────────────────────────────
+   KPI BADGES (team cards)
+─────────────────────────────────────────────────── */
+async function enrichCardsWithKPIs(des) {
+  if (!des || !des.length) return;
+  await Promise.all(des.map(async de => {
+    const el = document.getElementById(`kpi-row-${de.name}`);
+    if (!el) return;
+    try {
+      const data = await apiJSON(`/de/${de.name}/kpis`);
+      const topKpis = (data.kpis || []).filter(k => k.current !== null && k.current !== undefined).slice(0, 2);
+      if (!topKpis.length) return;
+      el.innerHTML = topKpis.map(k => {
+        const icon = k.status === 'on_track' ? '🟢' : k.status === 'off_track' ? '🔴' : '⚪';
+        const isPct = k.unit === '%' || k.unit === 'pct';
+        const val  = isPct ? `${k.current}%` : String(k.current);
+        const tgt  = k.target !== null && k.target !== undefined
+          ? `/${isPct ? k.target+'%' : k.target}` : '';
+        return `<span class="de-kpi-badge">${icon} ${esc((k.name||'').slice(0,14))}: ${val}${tgt}</span>`;
+      }).join('');
+    } catch(e) { /* fail silently — non-critical */ }
+  }));
+}
+
+/* ───────────────────────────────────────────────────
+   TOOLS TAB
+─────────────────────────────────────────────────── */
+const CATEGORY_LABELS = {
+  shell: { icon: '🖥️', label: 'Shell / Files' },
+  memory: { icon: '🧠', label: 'Memory' },
+  web: { icon: '🌐', label: 'Web / Research' },
+  multi_agent: { icon: '🤖', label: 'Multi-Agent' },
+  communication: { icon: '💬', label: 'Communication' },
+  media: { icon: '🎨', label: 'Media' },
+  other: { icon: '🔧', label: 'Other' },
+};
+
+async function renderToolsTab(de) {
+  const body = document.getElementById('de-tab-body');
+  body.innerHTML = '<div class="skeleton" style="height:60px;margin-bottom:12px"></div>'.repeat(3);
+  try {
+    const data = await apiJSON(`/de/${de.name}/tools`);
+    const tools = data.tools || [];
+    if (!tools.length) {
+      body.innerHTML = '<div class="empty-state"><div class="empty-icon">🔧</div><p>No tools found in job.md.</p></div>';
+      return;
+    }
+    // Group by category
+    const groups = {};
+    tools.forEach(t => {
+      const cat = t.category || 'other';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(t);
+    });
+
+    const catOrder = ['shell','memory','web','communication','multi_agent','media','other'];
+    const sortedCats = catOrder.filter(c => groups[c]);
+
+    const html = sortedCats.map(cat => {
+      const meta = CATEGORY_LABELS[cat] || { icon: '🔧', label: cat };
+      const chips = groups[cat].map(t =>
+        `<span class="tool-chip ${cat}" title="${esc(t.description)}">${esc(t.name)}</span>`
+      ).join('');
+      return `
+<div class="tools-section">
+  <div class="tools-section-hdr">${meta.icon} ${meta.label}</div>
+  <div class="tool-chips">${chips}</div>
+</div>`;
+    }).join('');
+
+    const source = data.source === 'job.md' ? 'Parsed from job.md' : 'Default set';
+    body.innerHTML = `
+<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+  ${tools.length} tools · <span style="font-style:italic">${source}</span>
+</div>
+${html}
+<div style="margin-top:20px">
+  <button class="add-tool-btn" onclick="addToolPrompt('${esc(de.name)}')">➕ Add tool…</button>
+</div>`;
+  } catch(e) {
+    body.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+function addToolPrompt(deName) {
+  const tool = prompt('Which tool to add to ' + deName + '?');
+  if (!tool || !tool.trim()) return;
+  openChatPanel(deName);
+  setTimeout(() => {
+    const inp = document.getElementById('chat-input');
+    if (inp) { inp.value = `Please add ${tool.trim()} to my available tools list in job.md`; inp.focus(); }
+  }, 300);
+}
+
+/* ───────────────────────────────────────────────────
+   KPIs TAB
+─────────────────────────────────────────────────── */
+async function renderKPIsTab(de) {
+  const body = document.getElementById('de-tab-body');
+  body.innerHTML = '<div class="skeleton" style="height:44px;margin-bottom:8px"></div>'.repeat(4);
+  try {
+    const data = await apiJSON(`/de/${de.name}/kpis`);
+    const kpis = data.kpis || [];
+    if (!kpis.length) {
+      body.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><p>No KPIs configured yet.</p></div>';
+      return;
+    }
+    const lastUpdated = data.last_updated ? `<span style="float:right;font-size:11px;color:var(--text-muted)">Updated ${timeAgo(data.last_updated)}</span>` : '';
+
+    const rows = kpis.map(k => {
+      const statusDot = k.status === 'on_track' ? '🟢' : k.status === 'off_track' ? '🔴' : '⚪';
+      const statusText = k.status === 'on_track' ? 'On track' : k.status === 'off_track' ? 'Off track' : 'Not measured';
+      const isPct = k.unit === '%' || k.unit === 'pct';
+      const cur = k.current !== null && k.current !== undefined
+        ? (isPct ? `${k.current}%` : `${k.current}${k.unit ? ' '+k.unit : ''}`)
+        : '<span style="color:var(--text-muted)">—</span>';
+      const tgt = k.target !== null && k.target !== undefined
+        ? (isPct ? `${k.target}%` : `${k.target}${k.unit ? ' '+k.unit : ''}`)
+        : '<span style="color:var(--text-muted)">—</span>';
+      const dir = k.direction === 'down' ? '↓' : '↑';
+      return `
+<tr>
+  <td>${esc(k.name)}</td>
+  <td><strong>${cur}</strong></td>
+  <td>${tgt} <span style="font-size:10px;color:var(--text-muted)">${dir}</span></td>
+  <td><span class="kpi-status ${k.status}">${statusDot} ${statusText}</span></td>
+</tr>`;
+    }).join('');
+
+    body.innerHTML = `
+<div style="margin-bottom:16px">
+  <div style="font-size:18px;font-weight:700;margin-bottom:4px">📊 KPIs${lastUpdated}</div>
+</div>
+<table class="kpi-table">
+  <thead><tr>
+    <th>Metric</th><th>Current</th><th>Target</th><th>Status</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>`;
+  } catch(e) {
+    body.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>${esc(e.message)}</p></div>`;
   }
 }
 
@@ -2486,12 +2698,15 @@ async function toggleSched(deName, schedId, active) {
 async function loadData() {
   if (!getCfg().url) return;
   try {
-    const [des, decisions] = await Promise.all([
+    const [des, decisions, costs] = await Promise.all([
       apiJSON('/de-list').catch(()=>[]),
       apiJSON('/decisions').catch(()=>[]),
+      apiJSON('/costs').catch(()=>({})),
     ]);
     S.des = Array.isArray(des) ? des : (des.des || des.DEs || []);
     S.decisions = Array.isArray(decisions) ? decisions : (decisions.decisions || decisions.pending || []);
+    S.costs = {};
+    if (costs && costs.by_de) costs.by_de.forEach(c => { S.costs[c.de] = c; });
     updateBadges();
   } catch(e) { console.warn('Load error:', e); }
 }

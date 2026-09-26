@@ -886,6 +886,14 @@ def handle_de_get(handler, parts):
     if len(parts) == 3 and parts[2] == 'metrics':
         return handle_de_metrics_get(handler, de_name)
 
+    # GET /de/<name>/tools  — tools parsed from job.md
+    if len(parts) == 3 and parts[2] == 'tools':
+        return handle_de_tools_get(handler, de_name)
+
+    # GET /de/<name>/kpis  — structured KPIs with current values + status
+    if len(parts) == 3 and parts[2] == 'kpis':
+        return handle_de_kpis_get(handler, de_name)
+
     # GET /de/<name>/schedule  — scheduled activities
     if len(parts) == 3 and parts[2] == 'schedule':
         return handle_de_schedule_get(handler, de_name)
@@ -1181,6 +1189,166 @@ def handle_de_metrics_get(handler, de_name: str):
         return handler.send_json(200, data)
     except Exception:
         return handler.send_json(200, {'kpis': []})
+
+
+# ── Tool-parsing constants ──────────────────────────────────────────────────
+_TOOL_CATEGORIES = {
+    'exec': 'shell', 'read': 'shell', 'write': 'shell',
+    'edit': 'shell', 'apply_patch': 'shell',
+    'memory_search': 'memory', 'memory_get': 'memory',
+    'browser': 'web', 'pdf': 'web', 'view_image': 'web',
+    'sessions_spawn': 'multi_agent', 'sessions_send': 'multi_agent',
+    'sessions_list': 'multi_agent',
+    'message': 'communication', 'ask_user': 'communication', 'tts': 'communication',
+    'image_generate': 'media', 'video_generate': 'media', 'music_generate': 'media',
+}
+_TOOL_DESCRIPTIONS = {
+    'exec': 'Run shell commands',
+    'read': 'Read files',
+    'write': 'Write files',
+    'edit': 'Edit files precisely',
+    'apply_patch': 'Apply patches to files',
+    'memory_search': 'Search memory',
+    'memory_get': 'Retrieve memory entries',
+    'browser': 'Web research & automation',
+    'pdf': 'Read PDF files',
+    'view_image': 'Analyze images',
+    'sessions_spawn': 'Spawn sub-agents',
+    'sessions_send': 'Send messages to agents',
+    'sessions_list': 'List active sessions',
+    'message': 'Send to Telegram/Discord',
+    'ask_user': 'Ask user a question',
+    'tts': 'Text-to-speech',
+    'image_generate': 'Generate images',
+    'video_generate': 'Generate videos',
+    'music_generate': 'Generate music',
+}
+_KNOWN_TOOLS = list(_TOOL_CATEGORIES.keys())
+_DEFAULT_TOOLS = ['exec', 'read', 'write', 'edit', 'memory_search', 'message']
+
+
+def handle_de_tools_get(handler, de_name: str):
+    """GET /de/<name>/tools — extract tools referenced in job.md."""
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+
+    job_md_file = de_dir / 'job.md'
+    found, source = [], 'default'
+
+    if job_md_file.exists():
+        content = job_md_file.read_text()
+        found = [t for t in _KNOWN_TOOLS if t in content]
+        if found:
+            source = 'job.md'
+
+    if not found:
+        found = _DEFAULT_TOOLS[:]
+
+    tools = [
+        {
+            'name': t,
+            'description': _TOOL_DESCRIPTIONS.get(t, t),
+            'category': _TOOL_CATEGORIES.get(t, 'other'),
+        }
+        for t in found
+    ]
+    return handler.send_json(200, {'de': de_name, 'tools': tools, 'source': source})
+
+
+def handle_de_kpis_get(handler, de_name: str):
+    """GET /de/<name>/kpis — structured KPIs with current values and status."""
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+
+    de_data = json.loads((de_dir / 'de.json').read_text())
+
+    # Read metrics.json
+    metrics_raw, last_updated = {}, None
+    metrics_file = de_dir / 'metrics.json'
+    if metrics_file.exists():
+        try:
+            m = json.loads(metrics_file.read_text())
+            last_updated = m.get('updated') or m.get('last_updated')
+            for kpi in m.get('kpis', []):
+                if isinstance(kpi, dict) and kpi.get('id'):
+                    metrics_raw[kpi['id']] = kpi
+        except Exception:
+            pass
+
+    # Read workspace/metrics.json — {kpi_id: current_value}
+    ws_metrics = {}
+    ws_metrics_file = de_dir / 'workspace' / 'metrics.json'
+    if ws_metrics_file.exists():
+        try:
+            d = json.loads(ws_metrics_file.read_text())
+            if isinstance(d, dict):
+                ws_metrics = d
+        except Exception:
+            pass
+
+    # grow_* agents: soav_latest.json
+    soav_score = None
+    soav_file = de_dir / 'workspace' / 'soav_latest.json'
+    if soav_file.exists():
+        try:
+            soav_score = json.loads(soav_file.read_text()).get('combined_any_model')
+        except Exception:
+            pass
+
+    def _status(current, target, direction):
+        if current is None or target is None:
+            return 'not_measured'
+        try:
+            c, t = float(current), float(target)
+            if direction == 'down':
+                return 'on_track' if c <= t else 'off_track'
+            return 'on_track' if c >= t else 'off_track'
+        except Exception:
+            return 'not_measured'
+
+    result_kpis = []
+    for kpi in metrics_raw.values():
+        kpi_id = kpi.get('id', '')
+        current = kpi.get('value')
+        target = kpi.get('target')
+        direction = kpi.get('direction', 'up')
+        unit = kpi.get('unit', '')
+
+        if kpi_id in ws_metrics:
+            current = ws_metrics[kpi_id]
+        if 'soav' in kpi_id.lower() and soav_score is not None:
+            current = soav_score
+
+        result_kpis.append({
+            'id': kpi_id,
+            'name': kpi.get('name', kpi_id),
+            'target': target,
+            'current': current,
+            'direction': direction,
+            'unit': unit,
+            'status': _status(current, target, direction),
+            'last_measured': last_updated,
+        })
+
+    # Fallback: de.json kpis (plain text list)
+    if not result_kpis:
+        for kpi_str in de_data.get('kpis', []):
+            if isinstance(kpi_str, str):
+                result_kpis.append({
+                    'id': kpi_str[:40].replace(' ', '_').lower(),
+                    'name': kpi_str[:80],
+                    'target': None, 'current': None,
+                    'direction': 'up', 'unit': '',
+                    'status': 'not_measured', 'last_measured': None,
+                })
+
+    return handler.send_json(200, {
+        'de': de_name,
+        'kpis': result_kpis,
+        'last_updated': last_updated,
+    })
 
 
 # ────────────────────────────────────────────────────────────────────────────
