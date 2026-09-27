@@ -53,10 +53,13 @@ def handle_chat(handler, de_name: str, body: dict):
     sessions_dir = de_dir / 'sessions'
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
+    # Use user_chat trigger type so the DE behaves conversationally
+    trigger_type = body.get('trigger_type', 'user_chat')
+
     session_data = {
         'id': session_id,
         'de': de_name,
-        'trigger_type': 'user',
+        'trigger_type': trigger_type,
         'trigger_from': 'portal_chat',
         'trigger_context': f'[Message from {user} via portal chat] {message}',
         'status': 'queued',

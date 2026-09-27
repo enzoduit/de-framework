@@ -150,7 +150,14 @@ def main():
         f'== RL LOOP — DO THIS AFTER EVERY ACTION ==\n'
         f'After EACH meaningful action (publishing content, running a script, making a change, writing something), '
         f'call log_assumption IMMEDIATELY — right then, before your next step. Do not save it for the end. '
-        f'If you are approaching the iteration limit with real, valuable work still left to do, call request_more_iterations first.'
+        f'If you are approaching the iteration limit with real, valuable work still left to do, call request_more_iterations first.\n\n'
+        + (
+            f'== CRON SESSION HARD STOP RULE ==\n'
+            f'This is a CRON session (trigger_type=cron). You have a strict iteration budget.\n'
+            f'DO NOT call request_more_iterations — cron sessions must complete within the allocated iterations.\n'
+            f'When you reach your limit: write one log line and STOP. No exploration, no rabbit holes.\n'
+            if trigger_type == 'cron' else ''
+        )
     )
 
     # ─── RL Loop: inject due assumptions for measurement ──────────────────────
@@ -210,11 +217,15 @@ def main():
         from tool_implementations import get_tool_defs
         de_tools = get_tool_defs(de_info.get('tools', []))
 
+        # max_iterations: prefer de.json setting, then cron-specific override, fallback 15
+        _base_max_iter = de_info.get('max_iterations', 15)
+        if trigger_type == 'cron':
+            _base_max_iter = de_info.get('max_iterations_cron', min(_base_max_iter, 5))
         engine = ReActEngine(
             agent_name=de_name,
             mission=task_prompt,
             tools=de_tools,
-            max_iterations=15,
+            max_iterations=_base_max_iter,
             model='claude-sonnet-4-6',
             session=ws,
         )

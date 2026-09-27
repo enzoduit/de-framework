@@ -571,3 +571,42 @@ All agent recommendations MUST include:
 - Confidence level (high/medium/low)
 - What the agent would need to be more certain
 
+
+---
+
+## R-SESSION: Session Types
+
+The DE Framework distinguishes two fundamentally different session modes:
+
+### R-SESSION-1: Work Session (Autonomous)
+- **Trigger:** Schedule (cron) or event (decision resolved, experiment followup)
+- **Behavior:** Agent works autonomously toward its KPIs, produces a structured output
+- **Style:** Focused, minimal tool calls (STOP blocks enforced), self-terminating
+- **Output:** Report → Inbox, Decision → Portal, or both
+- **Step target:** As few as possible (cron ≤ 5, analysis ≤ 15)
+- **Termination:** Agent decides when done based on job.md criteria
+
+### R-SESSION-2: Chat Session (Interactive)
+- **Trigger:** User message via Portal Chat Panel
+- **Behavior:** Conversational, reactive, executes tasks as requested during the exchange
+- **Style:** Colleague-like, direct, no formal structure required
+- **Output:** Direct response in Chat Panel — not Inbox
+- **Step target:** No limit — conversation continues as long as user needs
+- **Termination:** User decides when done
+- **Context injected:** Full DE job.md context + KPIs + recent session summary
+- **Key rule:** Never write a cron-style report during a chat session. Respond like a person.
+
+### R-SESSION-3: Session Type Detection
+Every session must identify its type in the first step:
+- `trigger_type = "cron"` → Work Session (autonomous)
+- `trigger_type = "user"` with "Decision resolved" → Work Session (decision execution)
+- `trigger_type = "user_chat"` → Chat Session (interactive)
+- `trigger_type = "user"` (other) → Direct Request — respond and done
+
+### R-CHAT-1: Chat UX Requirements
+- Messages appear in bubble-style UI (user right, DE left)
+- Conversation history persisted per DE in localStorage
+- Send on Enter, Shift+Enter for newline
+- DE name + avatar shown in header
+- Response includes session_id for reference
+- "🆕 New chat" button clears history and starts fresh session

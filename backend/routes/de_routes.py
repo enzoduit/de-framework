@@ -775,6 +775,69 @@ def handle_de_list(handler):
     return handler.send_json(200, {'des': des, 'ts': now_iso()})
 
 
+def handle_session_response(handler, de_name: str, session_id: str):
+    """GET /de/<name>/sessions/<session_id>/response
+    Returns the DE's last assistant text from a session, or status=running if not done yet.
+    Used by the chat panel to poll for a conversational reply.
+    Response: {"response": "...", "status": "complete|running|failed"}
+    """
+    de_dir = AGENTS_BASE / de_name
+    if not (de_dir / 'de.json').exists():
+        return handler.send_json(404, {'error': f'DE not found: {de_name}'})
+
+    session_file = de_dir / 'sessions' / f'{session_id}.json'
+    if not session_file.exists():
+        return handler.send_json(404, {'error': f'Session not found: {session_id}'})
+
+    try:
+        s = json.loads(session_file.read_text())
+    except Exception as exc:
+        return handler.send_json(500, {'error': str(exc)})
+
+    status = s.get('status', 'unknown')
+
+    # Still running — tell the client to keep polling
+    if status in ('queued', 'running', 'in_progress'):
+        return handler.send_json(200, {'status': 'running', 'response': None})
+
+    if status == 'failed':
+        # Return last error content if available
+        steps = s.get('steps', [])
+        for step in reversed(steps):
+            if step.get('type') == 'error' and step.get('content'):
+                return handler.send_json(200, {'status': 'failed', 'response': step['content'][:1000]})
+        return handler.send_json(200, {'status': 'failed', 'response': 'Session failed with no error detail.'})
+
+    # Session complete — extract last assistant/text reply
+    steps = s.get('steps', [])
+    response_text = None
+
+    # Priority order: look for explicit reply/complete/result steps with text content
+    for step in reversed(steps):
+        t = step.get('type', '')
+        # Prefer steps that contain a direct text reply to the user
+        if t in ('reply', 'response', 'message', 'complete') and step.get('content'):
+            response_text = step['content']
+            break
+        if t == 'complete' and step.get('summary'):
+            response_text = step['summary']
+            break
+
+    # Fallback: any assistant step with substantial content
+    if not response_text:
+        for step in reversed(steps):
+            content = step.get('content', '') or step.get('result', '') or step.get('summary', '')
+            if content and len(content) > 20:
+                response_text = content
+                break
+
+    # Final fallback: session summary
+    if not response_text:
+        response_text = s.get('summary') or 'Session completed — no text response captured.'
+
+    return handler.send_json(200, {'status': 'complete', 'response': response_text})
+
+
 def handle_session_summary(handler, de_name: str, session_id: str):
     """GET /de/<name>/sessions/<session_id>/summary
     Return an LLM-generated 1-2 sentence plain-English summary of the session.
@@ -872,6 +935,10 @@ def handle_de_get(handler, parts):
     # GET /de/<name>/sessions/<session_id>/summary  — LLM summary (cached)
     if len(parts) == 5 and parts[2] == 'sessions' and parts[4] == 'summary':
         return handle_session_summary(handler, de_name, parts[3])
+
+    # GET /de/<name>/sessions/<session_id>/response  — chat response poll
+    if len(parts) == 5 and parts[2] == 'sessions' and parts[4] == 'response':
+        return handle_session_response(handler, de_name, parts[3])
 
     # GET /de/<name>/sessions/<session_id>  — full session detail
     if len(parts) == 4 and parts[2] == 'sessions':
