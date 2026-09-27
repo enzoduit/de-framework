@@ -1083,17 +1083,34 @@
     /* ═══════════════════════════════════════════
        DE CHAT PANEL — Bubble Chat UI
     ═══════════════════════════════════════════ */
+    /* Bug 3 fix: overlay must cover 100% of viewport with no horizontal overflow */
     .chat-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      width: 100%; max-width: 100vw;
+      background: rgba(0,0,0,0.4);
       z-index: 150; display: none;
+      overflow: hidden;
     }
     .chat-overlay.open { display: block; }
+    /* Bug 1 + Bug 3 fix:
+       - overflow: hidden clips flex children at panel bounds (input stays visible on mobile)
+       - height: -webkit-fill-available adapts to iOS Safari visible viewport (excl. address bar)
+       - max-height: 100vh ensures panel never exceeds viewport on other browsers
+       - max-width: 100vw prevents the panel from being wider than the screen (eliminates gap)
+       - overflow-x: hidden prevents any inner content from causing horizontal scroll
+    */
     .chat-panel {
-      position: fixed; top: 0; right: -440px; height: 100vh;
-      width: 420px; max-width: 96vw;
+      position: fixed; top: 0; right: -440px;
+      height: 100vh;
+      height: -webkit-fill-available; /* iOS Safari: real available height below address bar */
+      max-height: 100vh;
+      width: 420px; max-width: 100vw; /* was 96vw — caused 16px gap on 390px screens */
       background: var(--surface);
       border-left: 1px solid var(--border-med);
       display: flex; flex-direction: column;
+      overflow: hidden;   /* clip contents — keeps input inside panel on mobile */
+      overflow-x: hidden;
+      box-sizing: border-box;
       z-index: 160;
       transition: right 0.28s cubic-bezier(.4,0,.2,1);
     }
@@ -1123,7 +1140,9 @@
     .chat-new-btn:hover { background: var(--border); }
     /* message list */
     .chat-messages {
-      flex: 1; overflow-y: auto; padding: 16px 14px;
+      flex: 1;
+      min-height: 0; /* Bug 1 fix: prevents flex child from overflowing panel bounds */
+      overflow-y: auto; padding: 16px 14px;
       display: flex; flex-direction: column; gap: 12px;
     }
     /* row wraps avatar + bubble */
@@ -2013,8 +2032,12 @@ function outputCardHTML(s, de, i) {
   const icon = hasDecision ? '🔔' : isDoc ? '📄' : '📊';
   const typeLabel = hasDecision ? 'Decision' : isDoc ? 'Document' : 'Insight';
   const summary = (s.summary || '').slice(0, 180);
+  const fullSummary = s.summary || '';
+  const hasMore = fullSummary.length > 180;
+  const docId = esc(s.id);
   const actions = isDoc
-    ? `<button onclick="markUseful('${esc(s.id)}')">👍 Useful</button>
+    ? `${hasMore ? `<button id="expand-doc-btn-${docId}" onclick="toggleDocExpand('${docId}')">📄 Read full</button>` : ''}
+       <button onclick="markUseful('${esc(s.id)}')">👍 Useful</button>
        <button onclick="showFeedback('${esc(s.id)}')">💬 Could be better…</button>`
     : `<button onclick="markSeen('${esc(s.id)}')">✓ Seen</button>
        <button onclick="tellMeMore('${esc(s.id)}','${esc(de?.name||'')}')">❓ Tell me more</button>`;
@@ -2028,7 +2051,8 @@ function outputCardHTML(s, de, i) {
       <span class="out-time">${timeAgo(s.created_at)}</span>
     </div>
     <div class="out-title">${esc(cleanTitle(s.summary||'Session completed').slice(0,80))}</div>
-    <div class="out-summary md">${renderMd(summary)}${s.summary?.length > 180 ? '…' : ''}</div>
+    <div class="out-summary md">${renderMd(summary)}${hasMore ? '…' : ''}</div>
+    ${hasMore ? `<div class="out-full-summary md hidden" id="doc-expand-${docId}">${renderMd(fullSummary)}</div>` : ''}
     <div class="out-actions">${actions}</div>
     <div class="out-feedback hidden" id="fb-${esc(s.id)}">
       <textarea id="fb-txt-${esc(s.id)}" placeholder="What could be better?"></textarea>
@@ -2715,6 +2739,13 @@ async function submitDecision(id, action, note) {
 /* ───────────────────────────────────────────────────
    OUTPUT CARD HANDLERS
 ─────────────────────────────────────────────────── */
+function toggleDocExpand(docId) {
+  const el = document.getElementById('doc-expand-' + docId);
+  const btn = document.getElementById('expand-doc-btn-' + docId);
+  if (!el) return;
+  const hidden = el.classList.toggle('hidden');
+  if (btn) btn.textContent = hidden ? '📄 Read full' : '📄 Collapse';
+}
 function markUseful(id) { fadeOut('out-'+id); toast('👍 Marked as useful','ok'); }
 function showFeedback(id) { document.getElementById('fb-'+id).classList.remove('hidden'); document.getElementById('fb-txt-'+id).focus(); }
 function hideFeedback(id) { document.getElementById('fb-'+id).classList.add('hidden'); }
@@ -3256,7 +3287,7 @@ async function sendChatMessage() {
     // Poll for response
     let deResponse = null;
     if (sessionId) {
-      const maxWait = 90000; // 90s
+      const maxWait = 180000; // 3 min — DE sessions can take 60-120s for complex runs
       const pollInterval = 3000;
       const start = Date.now();
       while (Date.now() - start < maxWait) {

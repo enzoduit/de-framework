@@ -812,26 +812,45 @@ def handle_session_response(handler, de_name: str, session_id: str):
     steps = s.get('steps', [])
     response_text = None
 
-    # Priority order: look for explicit reply/complete/result steps with text content
+    # Priority order: explicit step types, most specific first
     for step in reversed(steps):
         t = step.get('type', '')
-        # Prefer steps that contain a direct text reply to the user
-        if t in ('reply', 'response', 'message', 'complete') and step.get('content'):
+
+        # 1. complete step (ReAct engine, Path A) — summary holds the final LLM text
+        if t == 'complete':
+            if step.get('summary'):
+                response_text = step['summary']
+                break
+            if step.get('content'):
+                response_text = step['content']
+                break
+
+        # 2. result step (OpenClaw single-call, Path B) — content holds the full LLM response
+        if t == 'result' and step.get('content'):
             response_text = step['content']
             break
-        if t == 'complete' and step.get('summary'):
-            response_text = step['summary']
+
+        # 3. explicit reply/message steps
+        if t in ('reply', 'response', 'message') and step.get('content'):
+            response_text = step['content']
             break
 
-    # Fallback: any assistant step with substantial content
+        # 4. reasoning step — last reasoning block is the LLM's final conversational text
+        if t == 'reasoning' and step.get('content') and len(step['content']) > 30:
+            response_text = step['content']
+            break
+
+    # Fallback: any step with substantial content (skipping trigger — that's the prompt)
     if not response_text:
         for step in reversed(steps):
+            if step.get('type') == 'trigger':
+                continue  # skip — this is the user's prompt, not the DE's reply
             content = step.get('content', '') or step.get('result', '') or step.get('summary', '')
             if content and len(content) > 20:
                 response_text = content
                 break
 
-    # Final fallback: session summary
+    # Final fallback: session-level summary
     if not response_text:
         response_text = s.get('summary') or 'Session completed — no text response captured.'
 
