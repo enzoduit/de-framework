@@ -1,24 +1,82 @@
 """
 Chat Routes — POST /chat/<de_name>
-Direct human → DE message that saves input and spawns a session.
+
+Persistent session architecture:
+  - Each DE gets a fixed session key: agent:test-intern:chat-<de_name>
+  - Messages are sent via `openclaw agent --session-key` (synchronous, ~5s)
+  - No session spawning, no polling — response returned directly
+  - Session key stored in de.json for reference/visibility
+
+Response: { "response": str, "session_key": str, "status": "ok" }
 """
 
 import json
-import uuid
+import subprocess
 import datetime
-import subprocess as _sp
 from pathlib import Path
 from backend.config import AGENTS_BASE, now_iso
 
 _BACKEND_DIR = Path(__file__).parent.parent
-_SESSION_RUNNER = _BACKEND_DIR / 'core' / 'session_runner.py'
+_SESSION_KEY_PREFIX = 'agent:test-intern:chat-'
+_CHAT_TIMEOUT = 90  # seconds — openclaw agent subprocess timeout (heavy DEs can take 60s)
+
+
+def _load_de(de_name: str) -> dict | None:
+    de_file = AGENTS_BASE / de_name / 'de.json'
+    if not de_file.exists():
+        return None
+    return json.loads(de_file.read_text())
+
+
+def _save_de(de_name: str, de: dict) -> None:
+    de_file = AGENTS_BASE / de_name / 'de.json'
+    de_file.write_text(json.dumps(de, indent=2))
+
+
+def _session_key(de_name: str) -> str:
+    return f'{_SESSION_KEY_PREFIX}{de_name}'
+
+
+def _build_message(de: dict, user_message: str) -> str:
+    """
+    Prepend a concise DE-context header so the persistent session
+    knows who it is AND stays in fast chat mode (no unsolicited tool calls).
+    """
+    name = de.get('display_name', de.get('name', '').upper())
+    role = de.get('role', 'Digital Employee')
+    mission = de.get('mission', '')
+    return (
+        f'[CHAT MODE — You are {name}, Ed\'s {role}. '
+        f'Mission: {mission}\n'
+        f'RULES: Answer from memory. NO tool calls or file reads unless Ed explicitly asks. '
+        f'Keep replies short (2-4 sentences max). Be direct and conversational.]\n\n'
+        f'{user_message}'
+    )
+
+
+def _log_user_input(de_name: str, message: str, user: str) -> None:
+    """Persist user input for audit/memory. Best-effort."""
+    try:
+        ui_dir = AGENTS_BASE / de_name / 'user_inputs'
+        ui_dir.mkdir(parents=True, exist_ok=True)
+        ts_label = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d-%H-%M-%S')
+        (ui_dir / f'{ts_label}-chat.json').write_text(json.dumps({
+            'timestamp': now_iso(),
+            'type': 'chat',
+            'de': de_name,
+            'user': user,
+            'message': message,
+        }, indent=2))
+    except Exception:
+        pass
 
 
 def handle_chat(handler, de_name: str, body: dict):
-    """POST /chat/<de_name> — send a message directly to a DE.
+    """POST /chat/<de_name> — send a message to a DE's persistent session.
 
-    Body: { "message": "...", "user": "human" }
-    Response: { "session_id": "ws-...", "status": "triggered" }
+    Body: { "message": str, "user": str? }
+    Response (success): { "response": str, "session_key": str, "status": "ok" }
+    Response (error): { "error": str }
     """
     message = (body.get('message') or '').strip()
     user = body.get('user', 'human')
@@ -30,58 +88,62 @@ def handle_chat(handler, de_name: str, body: dict):
     if not (de_dir / 'de.json').exists():
         return handler.send_json(404, {'error': f'DE not found: {de_name}'})
 
-    # ── Save user input (P1) ──────────────────────────────────────────────
+    de = _load_de(de_name)
+    session_key = _session_key(de_name)
+
+    # Persist user input (audit trail — never blocks the response)
+    _log_user_input(de_name, message, user)
+
+    # Store session_key in de.json on first use (for visibility / portal link)
+    if de.get('chat_session_key') != session_key:
+        de['chat_session_key'] = session_key
+        _save_de(de_name, de)
+
+    full_message = _build_message(de, message)
+
     try:
-        ui_dir = de_dir / 'user_inputs'
-        ui_dir.mkdir(parents=True, exist_ok=True)
-        ts_label = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d-%H-%M')
-        (ui_dir / f'{ts_label}-chat.json').write_text(json.dumps({
-            'timestamp': now_iso(),
-            'type': 'chat',
-            'de': de_name,
-            'user': user,
-            'message': message,
-        }, indent=2))
-    except Exception:
-        pass  # Never fail the session start because of input logging
-
-    # ── Create session file ───────────────────────────────────────────────
-    ts2 = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S')
-    short = uuid.uuid4().hex[:6]
-    session_id = f'ws-{de_name}-{ts2}-{short}'
-
-    sessions_dir = de_dir / 'sessions'
-    sessions_dir.mkdir(parents=True, exist_ok=True)
-
-    # Use user_chat trigger type so the DE behaves conversationally
-    trigger_type = body.get('trigger_type', 'user_chat')
-
-    session_data = {
-        'id': session_id,
-        'de': de_name,
-        'trigger_type': trigger_type,
-        'trigger_from': 'portal_chat',
-        'trigger_context': f'[Message from {user} via portal chat] {message}',
-        'status': 'queued',
-        'decision_ids': [],
-        'colleague_calls': {},
-        'steps': [],
-        'paused_state': None,
-        'created_at': now_iso(),
-        'updated_at': now_iso(),
-        'summary': None,
-    }
-    (sessions_dir / f'{session_id}.json').write_text(json.dumps(session_data, indent=2))
-
-    # ── Spawn session runner ──────────────────────────────────────────────
-    try:
-        rlog = f'/tmp/chat-{de_name}-{session_id}.log'
-        _sp.Popen(
-            ['python3', str(_SESSION_RUNNER), de_name, session_id],
-            stdout=open(rlog, 'w'), stderr=_sp.STDOUT,
-            cwd=str(AGENTS_BASE),
+        result = subprocess.run(
+            [
+                'openclaw', 'agent',
+                '--agent', 'test-intern',
+                '--session-key', session_key,
+                '--message', full_message,
+                '--json',
+            ],
+            capture_output=True,
+            text=True,
+            timeout=_CHAT_TIMEOUT,
         )
-    except Exception as e:
-        return handler.send_json(500, {'error': f'Failed to start session: {e}'})
 
-    return handler.send_json(200, {'session_id': session_id, 'status': 'triggered'})
+        if result.returncode != 0:
+            stderr = result.stderr[:500] if result.stderr else '(no stderr)'
+            return handler.send_json(500, {
+                'error': 'Agent call failed',
+                'detail': stderr,
+                'session_key': session_key,
+            })
+
+        data = json.loads(result.stdout)
+        payloads = data.get('result', {}).get('payloads', [])
+        response_text = payloads[0].get('text', '') if payloads else '(no response)'
+        duration_ms = data.get('result', {}).get('meta', {}).get('durationMs', 0)
+
+        return handler.send_json(200, {
+            'response': response_text,
+            'session_key': session_key,
+            'status': 'ok',
+            'duration_ms': duration_ms,
+        })
+
+    except subprocess.TimeoutExpired:
+        return handler.send_json(504, {
+            'error': f'Agent timeout ({_CHAT_TIMEOUT}s) — DE may be busy',
+            'session_key': session_key,
+        })
+    except json.JSONDecodeError as e:
+        return handler.send_json(500, {
+            'error': f'Invalid JSON from agent: {e}',
+            'raw': result.stdout[:300] if result else '',
+        })
+    except Exception as e:
+        return handler.send_json(500, {'error': str(e)})

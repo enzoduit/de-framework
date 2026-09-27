@@ -3274,56 +3274,42 @@ async function sendChatMessage() {
   _saveChatHistory(_chatDE, history);
   inp.value = '';
 
-  // Show typing indicator
+  // Show typing indicator while waiting for persistent-session response
   const typingId = _showTyping();
 
   try {
-    const res = await apiJSON(`/chat/${_chatDE}`, {
-      method: 'POST',
-      body: JSON.stringify({message: msg, user: 'human', trigger_type: 'user_chat'}),
-    });
-    const sessionId = res.session_id || '';
-
-    // Poll for response
-    let deResponse = null;
-    if (sessionId) {
-      const maxWait = 180000; // 3 min — DE sessions can take 60-120s for complex runs
-      const pollInterval = 3000;
-      const start = Date.now();
-      while (Date.now() - start < maxWait) {
-        await new Promise(r => setTimeout(r, pollInterval));
-        try {
-          const statusRes = await apiJSON(`/de/${_chatDE}/sessions/${sessionId}/response`);
-          if (statusRes.status === 'complete' && statusRes.response) {
-            deResponse = {text: statusRes.response, sessionId};
-            break;
-          } else if (statusRes.status === 'failed') {
-            deResponse = {text: '⚠️ Session failed — check logs.', sessionId};
-            break;
-          }
-          // still running — keep polling
-        } catch(pollErr) {
-          // network hiccup — retry
-        }
-      }
-      if (!deResponse) {
-        deResponse = {text: '⏱️ Session is running. ' +
-          `<a href="javascript:void(0)" onclick="closeChatPanel();navDE('${esc(_chatDE)}');setTimeout(()=>openSession('${esc(_chatDE)}','${esc(sessionId)}'),200)" style="color:var(--brand)">View progress →</a>`, sessionId};
-      }
-    } else {
-      deResponse = {text: '✉️ Message queued — no session ID returned.', sessionId: ''};
+    // Persistent session — response comes back directly (no polling needed)
+    // Backend: openclaw agent --session-key agent:test-intern:chat-<de> → ~5s
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 100000); // 100s hard limit (matches backend 90s)
+    let res;
+    try {
+      const raw = await apiFetch(`/chat/${_chatDE}`, {
+        method: 'POST',
+        body: JSON.stringify({message: msg, user: 'human'}),
+        signal: controller.signal,
+      });
+      clearTimeout(fetchTimeout);
+      res = await raw.json();
+    } catch(fetchErr) {
+      clearTimeout(fetchTimeout);
+      throw fetchErr;
     }
 
     _removeEl(typingId);
     const rTs = new Date().toISOString();
-    _appendBubble('de', deResponse.text, rTs, deResponse.sessionId);
-    history.push({role: 'de', content: deResponse.text, ts: rTs, session_id: deResponse.sessionId});
+    const responseText = res.response || res.error || '(no response)';
+    _appendBubble('de', responseText, rTs, null);
+    history.push({role: 'de', content: responseText, ts: rTs});
     _saveChatHistory(_chatDE, history);
 
   } catch(e) {
     _removeEl(typingId);
     const errTs = new Date().toISOString();
-    _appendBubble('de', '❌ Error: ' + e.message, errTs, null);
+    const errMsg = e.name === 'AbortError'
+      ? '⏱️ Timeout — DE took too long. Try again.'
+      : '❌ Error: ' + e.message;
+    _appendBubble('de', errMsg, errTs, null);
   }
 }
 
