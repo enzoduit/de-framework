@@ -461,6 +461,50 @@ def check_portal_endpoints():
     code, _ = api("POST", "/feedback", {"de": "hc", "session_id": "hc", "message": "test"})
     check("POST /feedback returns 200", CAT, code in (200, 201), f"status={code}")
 
+    # ── Chat endpoint — core user input, must not be missing ─────────────────
+    # Find a DE that exists on this system
+    _chat_de = None
+    for _candidate in ["scribe", "geo", "max", "flow"]:
+        _de_dir = AGENTS_DIR / _candidate
+        if (_de_dir / "de.json").exists():
+            _chat_de = _candidate
+            break
+
+    if _chat_de:
+        # Valid message → must return 200 with a response field
+        code, body = api("POST", f"/chat/{_chat_de}", {
+            "message": "health-check ping — please reply with a one-word acknowledgement",
+            "user": "health-check",
+        })
+        check(
+            f"POST /chat/{_chat_de} returns 200",
+            CAT, code == 200 and isinstance(body, dict) and "response" in body,
+            f"status={code}, keys={list((body or {}).keys())}",
+        )
+        check(
+            f"POST /chat/{_chat_de} response is non-empty",
+            CAT, bool((body or {}).get("response", "").strip()),
+            f"response={repr(str((body or {}).get('response',''))[:60])}",
+        )
+
+        # Empty message → must return 400, not 500
+        code_empty, _ = api("POST", f"/chat/{_chat_de}", {"message": ""})
+        check(
+            "POST /chat empty message returns 400 not 500",
+            CAT, code_empty == 400,
+            f"status={code_empty}",
+        )
+
+        # Unknown DE → must return 404, not 500
+        code_miss, _ = api("POST", "/chat/hc-nonexistent-de", {"message": "ping"})
+        check(
+            "POST /chat unknown DE returns 404 not 500",
+            CAT, code_miss == 404,
+            f"status={code_miss}",
+        )
+    else:
+        skip("POST /chat/<de> — no known DE found", CAT, "scribe/geo/max/flow not configured")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 8. Live Session Test (optional, slow)
