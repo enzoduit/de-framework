@@ -11,19 +11,49 @@ from pathlib import Path as _Path
 from backend.config import AGENTS_BASE
 
 
-def _try_extract_pdf(pdf_path: _Path, ws_dir: _Path):
-    """Auto-extract PDF text to a sidecar .txt file after upload.
-    Returns the .txt path on success, None on failure.
+def _try_extract_text(file_path: _Path, ws_dir: _Path):
+    """Auto-extract text from binary files to a sidecar .txt file after upload.
+    Supports: PDF (pdftotext), DOCX (python-docx), XLSX/XLS (openpyxl/csv).
+    Text-based files (csv, json, txt, md, py, etc.) need no extraction.
+    Returns the .txt path on success, None if extraction not applicable/failed.
     """
-    txt_name = pdf_path.stem + '.txt'
-    txt_path = ws_dir / txt_name
+    ext = file_path.suffix.lower()
+    txt_path = ws_dir / (file_path.stem + '.txt')
+
     try:
-        result = subprocess.run(
-            ['pdftotext', str(pdf_path), str(txt_path)],
-            capture_output=True, timeout=30
-        )
-        if result.returncode == 0 and txt_path.exists() and txt_path.stat().st_size > 0:
-            return txt_path
+        if ext == '.pdf':
+            result = subprocess.run(
+                ['pdftotext', str(file_path), str(txt_path)],
+                capture_output=True, timeout=30
+            )
+            if result.returncode == 0 and txt_path.exists() and txt_path.stat().st_size > 0:
+                return txt_path
+
+        elif ext in ('.docx', '.doc'):
+            import docx as _docx
+            doc = _docx.Document(str(file_path))
+            text = '\n'.join(p.text for p in doc.paragraphs if p.text.strip())
+            if text:
+                txt_path.write_text(text, encoding='utf-8')
+                return txt_path
+
+        elif ext in ('.xlsx', '.xls', '.ods'):
+            import openpyxl as _xl
+            import csv as _csv, io as _io
+            wb = _xl.load_workbook(str(file_path), read_only=True, data_only=True)
+            buf = _io.StringIO()
+            for sheet in wb.sheetnames:
+                ws = wb[sheet]
+                buf.write(f'# Sheet: {sheet}\n')
+                writer = _csv.writer(buf)
+                for row in ws.iter_rows(values_only=True):
+                    writer.writerow([str(c) if c is not None else '' for c in row])
+                buf.write('\n')
+            text = buf.getvalue()
+            if text.strip():
+                txt_path.write_text(text, encoding='utf-8')
+                return txt_path
+
     except Exception:
         pass
     return None
@@ -67,8 +97,8 @@ def handle_upload(handler, parts):
             data = fi.file.read()
             dest.write_bytes(data)
             extra = {}
-            if safe.lower().endswith('.pdf'):
-                txt = _try_extract_pdf(dest, ws_dir)
+            if dest.suffix.lower() in ('.pdf', '.docx', '.doc', '.xlsx', '.xls', '.ods'):
+                txt = _try_extract_text(dest, ws_dir)
                 if txt:
                     extra['extracted_text'] = txt.name
             return handler.send_json(200, {'ok': True, 'name': safe, 'size': len(data), **extra})
