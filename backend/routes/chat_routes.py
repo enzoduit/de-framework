@@ -98,7 +98,10 @@ def handle_chat(handler, de_name: str, body: dict):
     """POST /chat/<de_name> — send a message to a DE's persistent session.
 
     Body: { "message": str, "user": str? }
-    Response (success): { "response": str, "session_key": str, "status": "ok" }
+    Response (success): { "response": str, "session_key": str, "status": "ok", "format": "markdown",
+                           "duration_ms": int }
+    NOTE: response is Markdown-formatted text. Frontend MUST render with a markdown renderer.
+          Input widget SHOULD be <textarea> (not <input type=text>) so users can write multiline.
     Response (error): { "error": str }
     """
     message = (body.get('message') or '').strip()
@@ -185,6 +188,7 @@ def handle_chat(handler, de_name: str, body: dict):
             'session_key': session_key,
             'status': 'ok',
             'duration_ms': duration_ms,
+            'format': 'markdown',  # consumer must render with a markdown renderer
         })
 
     except subprocess.TimeoutExpired:
