@@ -6,7 +6,27 @@ GET / text-write / delete workspace routes are handled in de_routes.py
 import json
 import cgi
 import os.path as _osp
+import subprocess
+from pathlib import Path as _Path
 from backend.config import AGENTS_BASE
+
+
+def _try_extract_pdf(pdf_path: _Path, ws_dir: _Path):
+    """Auto-extract PDF text to a sidecar .txt file after upload.
+    Returns the .txt path on success, None on failure.
+    """
+    txt_name = pdf_path.stem + '.txt'
+    txt_path = ws_dir / txt_name
+    try:
+        result = subprocess.run(
+            ['pdftotext', str(pdf_path), str(txt_path)],
+            capture_output=True, timeout=30
+        )
+        if result.returncode == 0 and txt_path.exists() and txt_path.stat().st_size > 0:
+            return txt_path
+    except Exception:
+        pass
+    return None
 
 
 def handle_upload(handler, parts):
@@ -46,7 +66,12 @@ def handle_upload(handler, parts):
             dest = ws_dir / safe
             data = fi.file.read()
             dest.write_bytes(data)
-            return handler.send_json(200, {'ok': True, 'name': safe, 'size': len(data)})
+            extra = {}
+            if safe.lower().endswith('.pdf'):
+                txt = _try_extract_pdf(dest, ws_dir)
+                if txt:
+                    extra['extracted_text'] = txt.name
+            return handler.send_json(200, {'ok': True, 'name': safe, 'size': len(data), **extra})
         else:
             # Raw body upload — filename must come from URL
             if not url_filename:

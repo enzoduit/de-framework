@@ -358,6 +358,19 @@ class ReActEngine:
                 lines.append(f'### {fpath.name}\n{content}')
                 count += 1
 
+        # List non-.md files so DE knows they exist (PDFs, CSVs, etc.)
+        non_md = [
+            f for f in sorted(workspace.iterdir())
+            if f.is_file() and f.suffix.lower() not in ('.md',) and not f.name.startswith('.')
+        ]
+        if non_md:
+            file_list = '\n'.join(
+                f'- {f.name} ({f.stat().st_size // 1024 + 1} KB)'
+                + (' ← extract text with: exec_shell("pdftotext ' + f.name + ' -")' if f.suffix.lower() == '.pdf' else '')
+                for f in non_md[:10]
+            )
+            lines.append(f'### Other files in workspace (use read_file or exec_shell to access)\n{file_list}')
+
         if not lines:
             return ''
 
