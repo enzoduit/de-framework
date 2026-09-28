@@ -78,37 +78,49 @@ def _deliver_approval_note(de_name: str, decision_id: str, title: str, note: str
 
 
 def handle_decisions_get(handler):
-    """GET /decisions — return all pending decisions across all agents."""
+    """GET /decisions — return pending decisions + recent resolved (for portal UX)."""
     all_pending = []
+    all_resolved = []
 
-    # Root-level decisions.json (system agents write here)
+    def _collect(decisions_dict, agent_name):
+        d = decisions_dict
+        items = d if isinstance(d, list) else d.get('pending', [])
+        for item in items:
+            if item.get('status', 'pending') == 'pending':
+                item['_agent_dir'] = agent_name
+                all_pending.append(item)
+        for item in d.get('resolved', []):
+            item['_agent_dir'] = agent_name
+            all_resolved.append(item)
+
+    # Root-level decisions.json
     root_file = AGENTS_BASE / 'decisions.json'
     if root_file.exists():
         try:
-            d = json.loads(root_file.read_text())
-            items = d if isinstance(d, list) else d.get('pending', [])
-            for item in items:
-                if item.get('status', 'pending') == 'pending':
-                    item['_agent_dir'] = item.get('agent', 'system')
-                    all_pending.append(item)
+            _collect(json.loads(root_file.read_text()), 'system')
         except Exception:
             pass
 
-    # Per-agent decisions.json files (subdirectories only)
+    # Per-agent decisions.json files
     for agent_dir in AGENTS_BASE.iterdir():
         if not agent_dir.is_dir():
             continue
         decisions_file = agent_dir / 'decisions.json'
         if decisions_file.exists():
             try:
-                d = json.loads(decisions_file.read_text())
-                for item in d.get('pending', []):
-                    item['_agent_dir'] = agent_dir.name
-                    all_pending.append(item)
+                _collect(json.loads(decisions_file.read_text()), agent_dir.name)
             except Exception:
                 pass
 
-    return handler.send_json(200, {'pending': all_pending, 'count': len(all_pending)})
+    # Sort: pending newest first, resolved newest first (cap at 50)
+    all_pending.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    all_resolved.sort(key=lambda x: x.get('resolved_at', x.get('created_at', '')), reverse=True)
+
+    return handler.send_json(200, {
+        'pending': all_pending,
+        'resolved': all_resolved[:50],
+        'count': len(all_pending),
+    })
 
 
 def handle_audit_log_get(handler):

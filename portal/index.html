@@ -633,6 +633,36 @@
     .ws-file:hover { border-color: var(--border-med); }
     .ws-name { font-size: 14px; font-weight: 500; flex: 1; }
     .ws-meta { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    /* Decisions — two-section layout */
+    .dec-section-hdr {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; font-weight: 600; color: var(--text-muted);
+      margin: 18px 0 10px; letter-spacing: .03em; text-transform: uppercase;
+    }
+    .dec-section-hdr .dec-sec-badge {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 99px; padding: 1px 9px; font-size: 12px; font-weight: 500;
+      color: var(--text-sec);
+    }
+    .dec-section-hdr .dec-sec-toggle {
+      margin-left: auto; cursor: pointer; font-size: 18px; line-height: 1;
+      color: var(--text-muted); user-select: none;
+    }
+    .dec-resolved-list { display: none; }
+    .dec-resolved-list.open { display: block; }
+    .dec-resolved-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; border-radius: 9px; margin-bottom: 5px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .dec-resolved-row .drr-title { flex: 1; color: var(--text-sec); }
+    .dec-resolved-row .drr-de   { font-weight: 600; color: var(--brand); min-width: 60px; }
+    .dec-resolved-row .drr-badge { border-radius: 99px; padding: 1px 8px; font-size: 11px; font-weight: 600; }
+    .drr-badge.approved { background:#d1fae5; color:#065f46; }
+    .drr-badge.rejected { background:#fee2e2; color:#991b1b; }
+    .drr-badge.resolved { background:#e5e7eb; color:#374151; }
+    .dec-resolved-row .drr-time { color: var(--text-muted); white-space: nowrap; font-size: 12px; }
     .ws-upload-bar { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
     .ws-upload-btn { background:var(--brand); color:#fff; border:none; border-radius:8px;
       padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer; display:flex;
@@ -1782,6 +1812,7 @@ function renderMd(text) {
 const S = {
   des: [],
   decisions: [],
+  resolved: [],   // resolved decisions (approved/rejected)
   costs: {},
   currentDE: null,
   currentTab: 'sessions',
@@ -2122,14 +2153,57 @@ function renderTeam() {
 
 function renderDecisionsPage() {
   const list = document.getElementById('decisions-list');
-  if (!S.decisions.length) {
-    list.innerHTML = `<div class="all-clear">
+  const pending = S.decisions; // already sorted newest-first by backend
+  const resolved = S.resolved; // already sorted newest-first by backend
+
+  let html = '';
+
+  // ── Needs Your Action ────────────────────────
+  html += `<div class="dec-section-hdr">
+    Needs Your Action
+    <span class="dec-sec-badge">${pending.length}</span>
+  </div>`;
+
+  if (!pending.length) {
+    html += `<div class="all-clear">
       <div class="all-clear-icon">✅</div>
       <div><div class="all-clear-text">All clear!</div>
       <div class="all-clear-sub">No pending decisions.</div></div></div>`;
-    return;
+  } else {
+    html += pending.map((d, i) => decisionCardHTML(d, i)).join('');
   }
-  list.innerHTML = S.decisions.map((d, i) => decisionCardHTML(d, i)).join('');
+
+  // ── Resolved ─────────────────────────────────
+  if (resolved.length) {
+    html += `<div class="dec-section-hdr" onclick="toggleResolvedSection()" style="cursor:pointer">
+      Resolved
+      <span class="dec-sec-badge">${resolved.length}</span>
+      <span class="dec-sec-toggle" id="dec-resolved-toggle">▶</span>
+    </div>
+    <div class="dec-resolved-list" id="dec-resolved-list">
+      ${resolved.map(d => {
+        const de = S.des.find(x => x.name === d.de_name);
+        const name = esc(de ? (de.display_name || de.name) : (d.de_name || d._agent_dir || ''));
+        const status = d.status || 'resolved';
+        return `<div class="dec-resolved-row">
+          <span class="drr-de">${name}</span>
+          <span class="drr-title">${esc(d.title)}</span>
+          <span class="drr-badge ${status}">${status}</span>
+          <span class="drr-time">${timeAgo(d.resolved_at || d.created_at)}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  list.innerHTML = html;
+}
+
+function toggleResolvedSection() {
+  const el = document.getElementById('dec-resolved-list');
+  const tog = document.getElementById('dec-resolved-toggle');
+  if (!el) return;
+  el.classList.toggle('open');
+  tog.textContent = el.classList.contains('open') ? '▼' : '▶';
 }
 
 /* ───────────────────────────────────────────────────
@@ -2871,7 +2945,9 @@ async function loadData() {
       apiJSON('/costs').catch(()=>({})),
     ]);
     S.des = Array.isArray(des) ? des : (des.des || des.DEs || []);
-    S.decisions = Array.isArray(decisions) ? decisions : (decisions.decisions || decisions.pending || []);
+    const _decData = Array.isArray(decisions) ? {pending: decisions} : decisions;
+    S.decisions = (_decData.pending || _decData.decisions || []);
+    S.resolved  = (_decData.resolved || []);
     S.costs = {};
     if (costs && costs.by_de) costs.by_de.forEach(c => { S.costs[c.de] = c; });
     updateBadges();
