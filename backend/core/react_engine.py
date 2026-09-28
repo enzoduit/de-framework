@@ -97,6 +97,9 @@ class ReActEngine:
         # Always add the write_metric tool (agent-context-aware)
         self._register_write_metric_tool()
 
+        # Always add the create_document tool (portal-side viewer, no external URL)
+        self._register_create_document_tool()
+
         # Soft checkpoint state — fires once at 70% of max_iterations
         self._soft_checkpoint_fired = False
 
@@ -178,6 +181,61 @@ class ReActEngine:
         # Only add to API list if not already registered by _register_tools
         if not any(t.get('name') == 'write_metric' for t in self._tools_for_api):
             self._tools_for_api.append(write_metric_tool)
+
+    def _register_create_document_tool(self):
+        """Register create_document as a built-in tool for every DE session."""
+        tool_def = {
+            'name': 'create_document',
+            'description': (
+                'Write a document to your workspace. Returns a portal:// link that renders '
+                'as a clickable \u00ab\ud83d\udcc4 View\u00bb button in the portal — '
+                'no external URL needed, works behind Cloudflare Zero Trust. '
+                'Use in Decision/Inbox summaries whenever you want Ed to read the full content. '
+                'Returns embed: [Doc: description](portal://dename/filename)'
+            ),
+            'input_schema': {
+                'type': 'object',
+                'properties': {
+                    'filename':    {'type': 'string', 'description': 'e.g. report.md or analysis.md'},
+                    'content':     {'type': 'string', 'description': 'Full document text'},
+                    'description': {'type': 'string', 'description': 'Button label shown to Ed'},
+                },
+                'required': ['filename', 'content'],
+            },
+        }
+        # Import: try server context first, then subprocess context (session_runner runs as script)
+        fn = None
+        try:
+            from backend.core.tool_implementations import TOOL_LIBRARY as _TL
+            fn = _TL.get('create_document', {}).get('fn')
+        except ModuleNotFoundError:
+            pass
+        if fn is None:
+            try:
+                from tool_implementations import TOOL_LIBRARY as _TL
+                fn = _TL.get('create_document', {}).get('fn')
+            except ModuleNotFoundError:
+                pass
+        if fn is None:
+            # Inline fallback so tool always works regardless of import context
+            import os as _os
+            from pathlib import Path as _Path
+            def fn(inp):
+                agents_dir = _os.environ.get('AGENTS_DIR', '/var/de-agents')
+                de_name = _os.environ.get('DE_NAME', 'unknown')
+                filename = inp.get('filename', 'document.md')
+                content = inp.get('content', '')
+                description = inp.get('description', filename)
+                safe = ''.join(c for c in filename if c.isalnum() or c in '-_.')
+                ws = _Path(agents_dir) / de_name / 'workspace'
+                ws.mkdir(parents=True, exist_ok=True)
+                (_Path(ws) / safe).write_text(content, encoding='utf-8')
+                embed = f'[Doc: {description or safe}](portal://{de_name}/{safe})'
+                return {'status': 'ok', 'path': str(ws / safe), 'embed': embed}
+        if fn and 'create_document' not in self._tool_fns:
+            self._tool_fns['create_document'] = fn
+        if not any(t.get('name') == 'create_document' for t in self._tools_for_api):
+            self._tools_for_api.append(tool_def)
 
     def _register_ask_colleague_tool(self):
         colleague_tool = {
@@ -456,7 +514,9 @@ class ReActEngine:
         lines.append('Only after completing QA: use report_to_colleague or write your session summary.')
         lines.append('Human time is the most valuable resource — only escalate if output is verified.')
 
-        return '\n'.join(lines)
+        # Strip surrogate characters that break UTF-8 serialization to Anthropic API
+        raw = '\n'.join(lines)
+        return raw.encode('utf-8', errors='replace').decode('utf-8')
 
     # ─────────────────────────────────────────────────────────────────────
     # Anthropic client (lazy)
@@ -685,8 +745,10 @@ class ReActEngine:
         if self.session is not None:
             self.session.add_step("trigger", content=self.mission)
 
+        # Sanitize mission to remove surrogates (from job.md / pre_fetch output)
+        _clean = lambda s: s.encode('utf-8', errors='replace').decode('utf-8') if isinstance(s, str) else s
         messages = [
-            {"role": "user", "content": self.mission}
+            {"role": "user", "content": _clean(self.mission)}
         ]
 
         iterations = 0
@@ -703,12 +765,22 @@ class ReActEngine:
 
             # ── Reason: call Claude ──────────────────────────────────────
             try:
+                # Deep-clean all strings before serialization (removes surrogates
+                # from workspace files, job.md, pre_fetch output, tool descriptions)
+                def _dc(o):
+                    if isinstance(o, str):
+                        return o.encode('utf-8', errors='replace').decode('utf-8')
+                    if isinstance(o, dict):
+                        return {k: _dc(v) for k, v in o.items()}
+                    if isinstance(o, list):
+                        return [_dc(x) for x in o]
+                    return o
                 response = client.messages.create(
                     model=self.model,
                     max_tokens=4096,
-                    system=self._system_prompt,
-                    tools=self._tools_for_api,
-                    messages=messages,
+                    system=_dc(self._system_prompt),
+                    tools=_dc(self._tools_for_api),
+                    messages=_dc(messages),
                 )
             except Exception as e:
                 self._log({"type": "llm_error", "message": str(e)})
