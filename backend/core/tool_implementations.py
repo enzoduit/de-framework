@@ -110,7 +110,7 @@ def _create_document(inp: dict) -> dict:
     return {
         'ok': True, 'filename': safe, 'public_url': public_url,
         'bytes': len(content), 'description': desc,
-        'embed': f'[{desc or safe}]({public_url})',
+        'embed': f'[📄 {desc or safe}](portal://{agent}/{safe})',
     }
 
 # ─── send_telegram ───────────────────────────────────────────────────────────

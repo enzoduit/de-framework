@@ -929,6 +929,10 @@
     .report-modal-body.md strong { font-weight: 600; }
     .report-modal-body.md code { background: rgba(0,0,0,0.18); padding: 2px 5px; border-radius: 4px; font-size: 12px; }
     .report-modal-body.md p { margin-bottom: 7px; }
+    .doc-view-btn { display:inline-flex; align-items:center; gap:5px; padding:4px 10px;
+      background:var(--accent,#6366f1); color:#fff; border:none; border-radius:6px;
+      font-size:12px; font-weight:600; cursor:pointer; margin:2px 0; }
+    .doc-view-btn:hover { opacity:0.85; }
 
     /* Section header — slightly larger, less cramped */
     .section-title {
@@ -1717,7 +1721,21 @@
 function renderMd(text) {
   if (!text) return '';
   if (window.marked) {
-    try { return marked.parse(text); } catch(e) {}
+    try {
+      var result = marked.parse(text);
+
+  // Convert portal:// links to inline-view buttons (no external URL needed)
+  if (typeof result === 'string') {
+    result = result.replace(
+      /<a\s+href=["']portal:\/\/([^\/'"]+)\/([^'"]+)["'][^>]*>([^<]*)<\/a>/gi,
+      function(_, de, file, label) {
+        return '<button class="doc-view-btn" onclick="viewWorkspaceDoc(\'' + de + '\',\'' + file + '\')">' +
+               '\u{1F4C4} ' + (label || file) + '</button>';
+      }
+    );
+  }
+      return result;
+    } catch(e) {}
   }
   // Improved line-by-line fallback: handles ##, **, `code`, - list, ---, <br>
   const esc2 = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2264,6 +2282,20 @@ async function openInboxReport(deName, reportFile) {
     showReportModal(reportFile, data.content || '');
   } catch(e) {
     toast('Could not load report: ' + e.message, 'err');
+  }
+}
+
+
+async function viewWorkspaceDoc(deName, filename) {
+  document.getElementById('report-modal-title').textContent = '\u{1F4C4} ' + filename;
+  document.getElementById('report-modal-body').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">Loading\u2026</div>';
+  document.getElementById('report-overlay').classList.add('open');
+  try {
+    const data = await apiFetch('/de/' + deName + '/workspace/' + filename.replace('?raw=1', ''));
+    const content = (data && data.content) ? data.content : '[Empty document]';
+    document.getElementById('report-modal-body').innerHTML = renderMd(content);
+  } catch(e) {
+    document.getElementById('report-modal-body').textContent = 'Could not load document: ' + e.message;
   }
 }
 
