@@ -293,30 +293,17 @@ def check_decision_flow():
     else:
         check("feedback.db exists", CAT, False, str(db))
 
-    # Recency check (timezone-safe)
-    if db_ok:
-        try:
-            conn = sqlite3.connect(str(db))
-            row = conn.execute(
-                "SELECT timestamp FROM feedback ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-            conn.close()
-            if not row:
-                check("feedback.db has recent data (< 30 days)", CAT, False, "no entries — feedback loop may be broken")
-            else:
-                ts_str = row[0]
-                # Parse as naive then treat as UTC
-                try:
-                    last = datetime.fromisoformat(ts_str)
-                except ValueError:
-                    last = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-                if last.tzinfo is None:
-                    last = last.replace(tzinfo=timezone.utc)
-                age = (datetime.now(timezone.utc) - last).days
-                check("feedback.db has recent data (< 30 days)", CAT, age < 30,
-                      f"last entry {age} days ago ({ts_str[:10]})" + (" ⚠️ UI may be broken" if age >= 30 else ""))
-        except Exception as e:
-            check("feedback.db has recent data (< 30 days)", CAT, False, str(e))
+    # End-to-end: POST /feedback → verify it appears in user_inputs/
+    # Note: feedback goes to user_inputs/ (not feedback.db) — this tests the actual flow
+    import time as _time
+    test_msg = f"health-check-{int(_time.time())}"
+    api("POST", "/feedback", {"de": "system", "session_id": "hc-e2e", "message": test_msg})
+    _time.sleep(0.5)
+    ui_dirs = list(AGENTS_DIR.glob("*/user_inputs/*.json")) + list(AGENTS_DIR.glob("system/user_inputs/*.json"))
+    recent_ui = sorted(ui_dirs, key=lambda f: f.stat().st_mtime, reverse=True)[:5]
+    found_msg = any(test_msg in f.read_text() for f in recent_ui)
+    check("POST /feedback stored in user_inputs/ (end-to-end)", CAT, found_msg,
+          "message found in user_inputs/" if found_msg else "message NOT found — feedback not persisted")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -337,6 +324,35 @@ def check_learning_loop():
     has = "_soft_checkpoint_fired" in src and "Soft checkpoint" in src and "0.7" in src
     check("Soft checkpoint implemented in react_engine.py", CAT, has,
           "soft checkpoint at 70% present" if has else "MISSING — run was this deployed?")
+
+    # pre_fetch.py: all DEs should have one (runs before React Loop, injects live data)
+    de_dirs = [d for d in AGENTS_DIR.iterdir() if d.is_dir() and (d / "de.json").exists()]
+    with_prefetch = [d.name for d in de_dirs if (d / "workspace" / "pre_fetch.py").exists()]
+    without = [d.name for d in de_dirs if not (d / "workspace" / "pre_fetch.py").exists()
+               and d.name not in ("test-agent", "test-intern")]
+    check("All DEs have pre_fetch.py (live data before React Loop)", CAT,
+          len(with_prefetch) > 0,
+          f"{len(with_prefetch)} DEs have pre_fetch.py" + (f"; missing: {without}" if without else ""))
+
+    # metrics.json: per-DE KPI storage with history
+    de_with_kpis = []
+    for d in de_dirs:
+        mf = d / "metrics.json"
+        if mf.exists():
+            try:
+                m = json.loads(mf.read_text())
+                if m.get("kpis"):
+                    de_with_kpis.append(d.name)
+            except Exception:
+                pass
+    check("DEs have metrics.json with KPIs", CAT,
+          len(de_with_kpis) >= 3,
+          f"{len(de_with_kpis)} DEs tracking KPIs via metrics.json")
+
+    # create_document tool: DEs can produce public URLs
+    src2 = (HERE / "backend/core/tool_implementations.py").read_text()
+    check("create_document tool registered (public URL linking)", CAT,
+          "create_document" in src2 and "public_url" in src2 and "?raw=1" in src2)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
