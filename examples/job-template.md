@@ -17,9 +17,16 @@
 
 ## SESSION TYPE: `cron` — Scheduled Check (max 5 iterations, max 3 tool calls)
 
-**One job: measure the KPI. Flag if off track.**
+⛔ **HARD RULE — CRON: The pre_fetch.py has ALREADY run and cached all measurements.**
+⛔ **DO NOT re-fetch external data. DO NOT call APIs. The briefing at the top of context IS your data.**
+⛔ **MAX 3 exec calls total. After 3rd exec → write to log.md → STOP regardless.**
+⛔ **If deploy fails on FIRST try → write ONE line to log.md → STOP. Do NOT search for alternative tokens.**
+⛔ **If deploy credentials are EXPIRED (401) or config file is MISSING → log ONE line → STOP immediately.**
+⛔ **DO NOT create decision_requests in cron sessions. Blockers → log → STOP.**
 
-1. Read metrics.json → get current KPI value
+**One job: read the briefing. Act if off track.**
+
+1. Read the briefing KPI value (already at top of context — do NOT re-measure)
 2. Compare to target
    - **On track:** write `[date] KPI=[value] ✓` to `workspace/log.md`. Done.
    - **Off track:** identify ONE specific assumption to test

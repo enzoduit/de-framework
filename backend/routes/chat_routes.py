@@ -37,21 +37,44 @@ def _session_key(de_name: str) -> str:
     return f'{_SESSION_KEY_PREFIX}{de_name}'
 
 
-def _build_message(de: dict, user_message: str) -> str:
+def _build_message(de: dict, user_message: str, context_update: str = '') -> str:
     """
     Prepend a concise DE-context header so the persistent session
     knows who it is AND stays in fast chat mode (no unsolicited tool calls).
+
+    If context_update is provided it is injected between the CHAT MODE header
+    and Ed's message so the DE absorbs the new job.md before answering.
     """
     name = de.get('display_name', de.get('name', '').upper())
     role = de.get('role', 'Digital Employee')
     mission = de.get('mission', '')
+    context_block = f'{context_update}\n' if context_update else ''
     return (
         f'[CHAT MODE — You are {name}, Ed\'s {role}. '
         f'Mission: {mission}\n'
         f'RULES: Answer from memory. NO tool calls or file reads unless Ed explicitly asks. '
         f'Keep replies short (2-4 sentences max). Be direct and conversational.]\n\n'
+        f'{context_block}'
         f'{user_message}'
     )
+
+
+def _get_job_md_mtime(de_name: str) -> float | None:
+    """Return job.md modification time for a DE, or None if the file doesn't exist."""
+    job_md = AGENTS_BASE / de_name / 'job.md'
+    try:
+        return job_md.stat().st_mtime if job_md.exists() else None
+    except Exception:
+        return None
+
+
+def _get_job_md_content(de_name: str) -> str:
+    """Read full job.md content for a DE."""
+    job_md = AGENTS_BASE / de_name / 'job.md'
+    try:
+        return job_md.read_text() if job_md.exists() else ''
+    except Exception:
+        return ''
 
 
 def _log_user_input(de_name: str, message: str, user: str) -> None:
@@ -94,12 +117,41 @@ def handle_chat(handler, de_name: str, body: dict):
     # Persist user input (audit trail — never blocks the response)
     _log_user_input(de_name, message, user)
 
-    # Store session_key in de.json on first use (for visibility / portal link)
+    # ── de.json housekeeping (session key + job.md mtime tracking) ──────────
+    de_dirty = False
+
     if de.get('chat_session_key') != session_key:
         de['chat_session_key'] = session_key
+        de_dirty = True
+
+    # job.md context refresh: detect changes and inject update when needed
+    job_md_mtime = _get_job_md_mtime(de_name)
+    context_update = ''
+
+    if job_md_mtime is not None:
+        stored_mtime = de.get('chat_job_md_mtime')
+        if stored_mtime is None:
+            # First chat with this DE — record baseline; job.md is already fresh
+            de['chat_job_md_mtime'] = job_md_mtime
+            de_dirty = True
+        elif abs(float(stored_mtime) - job_md_mtime) > 0.001:
+            # job.md has changed since last chat — build context update block
+            new_content = _get_job_md_content(de_name)
+            context_update = (
+                '[CONTEXT UPDATE] Your job.md has been updated. New content:\n'
+                '---\n'
+                f'{new_content}\n'
+                '---\n'
+                'Please update your understanding of your role, KPIs, and tools accordingly.'
+            )
+            de['chat_job_md_mtime'] = job_md_mtime
+            de_dirty = True
+            print(f'[chat:{de_name}] job.md changed — injecting context update')
+
+    if de_dirty:
         _save_de(de_name, de)
 
-    full_message = _build_message(de, message)
+    full_message = _build_message(de, message, context_update=context_update)
 
     try:
         result = subprocess.run(

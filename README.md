@@ -554,6 +554,41 @@ result = engine.run(trigger_context="custom trigger context")
 
 ---
 
+## Session Types — How DEs Know What to Do
+
+Every DE session is typed by `trigger_type`. The DE reads this first and scopes its entire behavior accordingly:
+
+| trigger_type | Session type | Step target | Behavior |
+|---|---|---|---|
+| `cron` | Work Session | Monitoring ≤10 · Analysis ≤20 · Growth ≤15 | Autonomous: read briefing → act or log → STOP |
+| `user` + "Decision resolved" | Decision execution | ≤5 | Execute ONE approved action → log → STOP |
+| `experiment_followup` | Measurement | ≤8 | Measure before/after → keep or revert |
+| `user_chat` | Live chat | Unlimited | Conversational — no cron-style reports |
+| `user` (direct) | Direct request | ≤10 | Do exactly what was asked |
+
+### ⛔ STOP Blocks (mandatory in every job.md cron section)
+
+Every `cron` session in `job.md` MUST have these hard rules at the top:
+
+```
+⛔ HARD RULE — CRON: The pre_fetch.py has ALREADY run and cached all measurements.
+⛔ DO NOT re-fetch external data. DO NOT call APIs. The briefing at the top of context IS your data.
+⛔ MAX 3 exec calls total. After 3rd exec → write to log.md → STOP regardless.
+⛔ If deploy fails on FIRST try → write ONE line to log.md → STOP. Do NOT search for tokens.
+```
+
+These prevent the #1 source of max_iterations failures: agents exploring instead of acting.
+
+### pre_fetch.py — Cache Before the Session Starts
+
+`pre_fetch.py` runs before the LLM session starts. It caches expensive API calls (Perplexity benchmarks, Garmin data, external metrics) so the DE session itself consumes zero API quota and needs only 1–3 tool calls.
+
+The DE session MUST NOT re-run pre_fetch operations. The briefing is the data.
+
+See [`docs/pre-fetch-pattern.md`](docs/pre-fetch-pattern.md) for templates.
+
+---
+
 ## For agents reading this repo
 
 If you're an AI agent looking to spin up Digital Employees for a new user:

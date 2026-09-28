@@ -47,6 +47,20 @@ The script is always in the DE's `workspace/` directory. This is where `session_
 
 ---
 
+## Critical Rule: DE Session Must NOT Re-Run pre_fetch Operations
+
+⛔ The DE session MUST NOT re-run what pre_fetch.py has already done:
+- NEVER call benchmark scripts in-session
+- NEVER call the Perplexity API in-session if pre_fetch ran it
+- NEVER re-measure KPIs that are already in the briefing
+- The briefing injected at session start IS the data source — use it directly
+
+If `soav_latest.json` or another cached file is missing → write one line to log.md:
+`"YYYY-MM-DD: Pre-fetch data missing — skipping this run."` → STOP.
+Do NOT attempt to re-fetch in-session.
+
+---
+
 ## What pre_fetch.py Should Do
 
 1. **Read `metrics.json`** — the KPI store for this DE

@@ -583,7 +583,7 @@ The DE Framework distinguishes two fundamentally different session modes:
 - **Behavior:** Agent works autonomously toward its KPIs, produces a structured output
 - **Style:** Focused, minimal tool calls (STOP blocks enforced), self-terminating
 - **Output:** Report → Inbox, Decision → Portal, or both
-- **Step target:** As few as possible (cron ≤ 5, analysis ≤ 15)
+- **Step target:** Monitoring DEs (ops, shield, max): ≤10 steps · Analysis DEs (coach, geo): ≤20 steps · Research/Growth DEs (grow_*): ≤15 steps · never approach the OpenClaw max_iterations ceiling
 - **Termination:** Agent decides when done based on job.md criteria
 
 ### R-SESSION-2: Chat Session (Interactive)
@@ -602,6 +602,39 @@ Every session must identify its type in the first step:
 - `trigger_type = "user"` with "Decision resolved" → Work Session (decision execution)
 - `trigger_type = "user_chat"` → Chat Session (interactive)
 - `trigger_type = "user"` (other) → Direct Request — respond and done
+
+### R-SESSION-4: Max Iterations Budget by DE Type
+
+| DE type | Examples | Cron target | Hard ceiling |
+|---|---|---|---|
+| Monitoring | ops, shield, max | ≤10 steps | Never exceed |
+| Analysis | coach, geo | ≤20 steps | Never exceed |
+| Research/Growth | grow_* | ≤15 steps | Never exceed |
+| Chat (user_chat) | any DE | No limit | Conversation-driven |
+
+Rule: pre_fetch.py absorbs expensive operations so session step count stays low. If a cron session needs >15 steps, the root cause is missing pre_fetch coverage — fix pre_fetch, not the session.
+
+---
+
+## R-DEC: Decision Resolution Types
+
+Every decision card resolves with one of four outcomes. Each carries distinct semantics for the DE:
+
+| Resolution | DE behavior | DE learns |
+|---|---|---|
+| `approved` | Execute the proposed action | Approach confirmed |
+| `rejected` | Do NOT take this action | "This approach is wrong" |
+| `already_handled` | Log "closed externally", NO behavior change | Nothing — monitoring continues normally |
+| `deferred` | Log "deferred", schedule re-evaluation | Re-evaluate later |
+
+**R-DEC-KEY:** `already_handled` NEVER changes:
+- Monitoring targets or KPI thresholds
+- Check frequencies or schedules  
+- Any job.md behavior
+
+When resumed after `already_handled`: max 2 tool calls — log one line → done. No analysis.
+
+---
 
 ### R-CHAT-1: Chat UX Requirements
 - Messages appear in bubble-style UI (user right, DE left)
