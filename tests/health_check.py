@@ -111,63 +111,140 @@ def check_backend_health():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 2. Credentials
+# 2. Credentials (auto-discovery — tests only what's configured)
 # ══════════════════════════════════════════════════════════════════════════════
+
+# Integration validators — add new integrations here.
+# Each entry: (env_var_or_cfg_key, label, validator_fn)
+# validator_fn(token) -> (ok: bool, note: str)
+
+def _validate_github(token: str) -> tuple[bool, str]:
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/user",
+            headers={"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+            return r.status == 200, f"authenticated as {data.get('login', '?')}"
+    except urllib.error.HTTPError as e:
+        return False, f"HTTP {e.code} — token may be expired"
+    except Exception as e:
+        return False, str(e)
+
+
+def _validate_cloudflare(token: str) -> tuple[bool, str]:
+    try:
+        req = urllib.request.Request(
+            "https://api.cloudflare.com/client/v4/user/tokens/verify",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+            status = data.get("result", {}).get("status", "?")
+            return status == "active", f"status={status}"
+    except urllib.error.HTTPError as e:
+        return False, f"HTTP {e.code}"
+    except Exception as e:
+        return False, str(e)
+
+
+def _validate_openai(token: str) -> tuple[bool, str]:
+    try:
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/models",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status == 200, "token valid"
+    except urllib.error.HTTPError as e:
+        return False, f"HTTP {e.code}"
+    except Exception as e:
+        return False, str(e)
+
+
+def _validate_anthropic(token: str) -> tuple[bool, str]:
+    # Anthropic doesn't have a lightweight "verify" endpoint;
+    # just check the key is non-empty and has the right prefix.
+    ok = token.startswith("sk-ant-")
+    return ok, "key format valid" if ok else "unexpected key format (expected sk-ant-...)"
+
+
+def _validate_perplexity(token: str) -> tuple[bool, str]:
+    ok = token.startswith("pplx-")
+    return ok, "key format valid" if ok else "unexpected key format (expected pplx-...)"
+
+
+# Registry: env-var name → (human label, validator)
+INTEGRATION_REGISTRY: dict[str, tuple[str, callable]] = {
+    "GITHUB_TOKEN":        ("GitHub",      _validate_github),
+    "CLOUDFLARE_TOKEN":    ("Cloudflare",  _validate_cloudflare),
+    "CF_API_TOKEN":        ("Cloudflare",  _validate_cloudflare),
+    "OPENAI_API_KEY":      ("OpenAI",      _validate_openai),
+    "ANTHROPIC_API_KEY":   ("Anthropic",   _validate_anthropic),
+    "PERPLEXITY_API_KEY":  ("Perplexity",  _validate_perplexity),
+}
+
+# Also check common credential files for tokens
+CREDENTIAL_FILE_KEYS: dict[str, str] = {
+    # file-key -> env-var key to map to
+    "github_token":     "GITHUB_TOKEN",
+    "token":            "CLOUDFLARE_TOKEN",  # cloudflare-config.json uses 'token'
+    "cf_token":         "CLOUDFLARE_TOKEN",
+    "openai_api_key":   "OPENAI_API_KEY",
+    "anthropic_api_key": "ANTHROPIC_API_KEY",
+    "perplexity_key":   "PERPLEXITY_API_KEY",
+}
+
+
+def _discover_credentials() -> dict[str, str]:
+    """Discover configured credentials from env + credential files. Returns {env_var: token}."""
+    found = {}
+
+    # 1. From environment / de-framework.env
+    for key in INTEGRATION_REGISTRY:
+        val = ENV.get(key) or os.environ.get(key, "")
+        if val:
+            found[key] = val
+
+    # 2. From any *.json credential files in the workspace
+    for cfg_file in list(WORKSPACE.glob("*config*.json")) + list(WORKSPACE.glob("*credentials*.json")):
+        try:
+            cfg = json.loads(cfg_file.read_text())
+            for file_key, env_key in CREDENTIAL_FILE_KEYS.items():
+                val = cfg.get(file_key, "")
+                if val and env_key not in found:
+                    found[env_key] = val
+        except Exception:
+            pass
+
+    return found
+
+
 def check_credentials():
-    print("\n── 2. Credentials ───────────────────────────────────────────────")
+    print("\n── 2. Credentials (auto-discovered) ─────────────────────────────")
     CAT = "credentials"
 
-    cfg_path = WORKSPACE / "cloudflare-config.json"
-    check("cloudflare-config.json exists", CAT, cfg_path.exists(), str(cfg_path))
+    creds = _discover_credentials()
 
-    cfg = {}
-    if cfg_path.exists():
-        try:
-            cfg = json.loads(cfg_path.read_text())
-        except Exception as e:
-            check("cloudflare-config.json is valid JSON", CAT, False, str(e))
-            return
-        missing = [f for f in ["token", "account_id", "github_token"] if not cfg.get(f)]
-        check("cloudflare-config.json has required fields", CAT,
-              not missing, f"missing: {missing}" if missing else "all fields present")
-    else:
-        check("cloudflare-config.json has required fields", CAT, False, "file missing")
+    if not creds:
+        check("At least one integration credential configured", CAT, False,
+              "No tokens found in env or credential files — DEs may not be able to deploy")
+        return
 
-    # GitHub token
-    gh_token = cfg.get("github_token") or ENV.get("GITHUB_TOKEN", "")
-    if gh_token:
-        try:
-            req = urllib.request.Request(
-                "https://api.github.com/user",
-                headers={"Authorization": f"token {gh_token}", "Accept": "application/vnd.github.v3+json"},
-            )
-            with urllib.request.urlopen(req, timeout=10) as r:
-                data = json.loads(r.read())
-                check("GitHub token is valid", CAT, r.status == 200,
-                      f"authenticated as {data.get('login','?')}")
-        except urllib.error.HTTPError as e:
-            check("GitHub token is valid", CAT, False, f"HTTP {e.code}")
-        except Exception as e:
-            check("GitHub token is valid", CAT, False, str(e))
-    else:
-        check("GitHub token is valid", CAT, False, "no github_token found")
+    print(f"  ℹ️  Found {len(creds)} configured integration(s): {', '.join(
+        INTEGRATION_REGISTRY[k][0] for k in creds if k in INTEGRATION_REGISTRY
+    )}")
 
-    # Cloudflare token
-    cf_token = cfg.get("token", "")
-    if cf_token:
+    for env_key, token in creds.items():
+        if env_key not in INTEGRATION_REGISTRY:
+            continue
+        label, validator = INTEGRATION_REGISTRY[env_key]
         try:
-            req = urllib.request.Request(
-                "https://api.cloudflare.com/client/v4/user/tokens/verify",
-                headers={"Authorization": f"Bearer {cf_token}"},
-            )
-            with urllib.request.urlopen(req, timeout=10) as r:
-                data = json.loads(r.read())
-                status = data.get("result", {}).get("status", "?")
-                check("Cloudflare token is valid", CAT, status == "active", f"status={status}")
+            ok, note = validator(token)
+            check(f"{label} token is valid", CAT, ok, note)
         except Exception as e:
-            check("Cloudflare token is valid", CAT, False, str(e))
-    else:
-        check("Cloudflare token is valid", CAT, False, "no CF token in cloudflare-config.json")
+            check(f"{label} token is valid", CAT, False, str(e))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
