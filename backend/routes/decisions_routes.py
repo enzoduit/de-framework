@@ -31,6 +31,52 @@ from backend.routes.tasks_routes import create_human_task, execute_decision
 
 # ── GET handlers ──────────────────────────────────────────────────────────────
 
+def _deliver_approval_note(de_name: str, decision_id: str, title: str, note: str) -> None:
+    """Write approval note to DE inbox + trigger a new session so the DE can act immediately."""
+    import os, urllib.request
+
+    # 1. Write to DE inbox — reliable, picked up on any session start
+    inbox = AGENTS_BASE / de_name / 'inbox.jsonl'
+    inbox.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        'ts': now_iso(),
+        'from': 'human',
+        'type': 'decision_approved',
+        'decision_id': decision_id,
+        'title': title,
+        'message': (
+            f"Decision approved: '{title}'. "
+            f"Human feedback: {note}. "
+            f"Please act on this feedback now."
+        ),
+        'status': 'pending',
+    }
+    with open(inbox, 'a') as f:
+        f.write(json.dumps(entry) + '\n')
+
+    # 2. Trigger immediate session — best-effort, inbox write is the reliable path
+    try:
+        port = os.environ.get('DE_API_PORT', '8769')
+        token = os.environ.get('DE_API_TOKEN', '')
+        payload = json.dumps({
+            'de_name': de_name,
+            'trigger_type': 'decision_approved',
+            'trigger_context': (
+                f"Your decision '{title}' was approved with human feedback: \"{note}\". "
+                f"Check your inbox and act on this now."
+            ),
+        }).encode()
+        req = urllib.request.Request(
+            f'http://localhost:{port}/de-start',
+            data=payload,
+            headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'},
+            method='POST',
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # Inbox write is reliable; session trigger is best-effort
+
+
 def handle_decisions_get(handler):
     """GET /decisions — return all pending decisions across all agents."""
     all_pending = []
@@ -305,6 +351,12 @@ def handle_decide(handler, body):
                     else:
                         executed = execute_decision(match, agent_dir)
                         result['executed'] = executed
+
+                    # If human left a note and session isn’t already resumed,
+                    # notify the DE via inbox + trigger a new session so it can act.
+                    if note and de_from_dec and not result.get('session_resumed'):
+                        _deliver_approval_note(de_from_dec, decision_id, match.get('title', ''), note)
+                        result['de_notified'] = True
 
                 return handler.send_json(200, result)
         except Exception as e:

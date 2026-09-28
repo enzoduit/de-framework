@@ -85,6 +85,34 @@ def _write_file(inp: dict) -> dict:
         return {'error': str(e)}
 
 
+
+# ─── create_document ─────────────────────────────────────────────────────────
+
+def _create_document(inp: dict) -> dict:
+    """Write a document to the DE workspace and return a public URL.
+    Use instead of write_file when you want Ed to click a link and read the document.
+    """
+    import os
+    filename = inp.get('filename', '').strip().lstrip('/')
+    content  = inp.get('content', '')
+    desc     = inp.get('description', '')
+    agent    = inp.get('_agent_name', 'unknown')
+    if not filename: return {'error': 'filename is required'}
+    if not content:  return {'error': 'content is required'}
+    from pathlib import Path
+    safe = Path(filename).name
+    ws   = AGENTS_DIR / agent / 'workspace'
+    ws.mkdir(parents=True, exist_ok=True)
+    (ws / safe).write_text(content)
+    api_url    = os.environ.get('DE_PUBLIC_URL',
+                    f'http://localhost:{os.environ.get("DE_API_PORT","8769")}')
+    public_url = f'{api_url}/de/{agent}/workspace/{safe}?raw=1'
+    return {
+        'ok': True, 'filename': safe, 'public_url': public_url,
+        'bytes': len(content), 'description': desc,
+        'embed': f'[{desc or safe}]({public_url})',
+    }
+
 # ─── send_telegram ───────────────────────────────────────────────────────────
 
 def _send_telegram(inp: dict) -> dict:
@@ -277,6 +305,24 @@ TOOL_LIBRARY = {
             'required': ['path', 'content'],
         },
         'fn': _write_file,
+    },
+    'create_document': {
+        'name': 'create_document',
+        'description': (
+            'Write a document to your workspace and get a public URL. '
+            'Use in Decision/Inbox entries so Ed can click through and read the full document. '
+            'Returns embed markdown: [description](url).'
+        ),
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'filename':    {'type': 'string', 'description': 'Filename (e.g. report.md)'},
+                'content':     {'type': 'string', 'description': 'Document content'},
+                'description': {'type': 'string', 'description': 'Human-readable label for the link'},
+            },
+            'required': ['filename', 'content'],
+        },
+        'fn': _create_document,
     },
     'send_telegram': {
         'name': 'send_telegram',

@@ -429,6 +429,20 @@ class ReActEngine:
         lines.append('Use this for every action where you have a hypothesis about the outcome.')
         lines.append('Your LEARNING_LOG.md accumulates evidence of what works and what does not — read it every session.')
 
+        # Document output standard
+        api_url = os.environ.get('DE_PUBLIC_URL', 'http://localhost:8769')
+        lines.extend([
+            '',
+            '## Document & File Output Standard',
+            '',
+            'When you create files or reference documents in summaries, decisions, or inbox entries:',
+            f'  ✅ USE: `{api_url}/de/{self.agent_name}/workspace/filename.md`',
+            '  ❌ NEVER: `/var/de-agents/...` or `/tmp/...` or any raw filesystem path',
+            '',
+            'To create a linkable document: call `create_document(filename, content, description)`.',
+            'It writes the file to your workspace and returns a public URL you can embed directly.',
+        ])
+
         # QA step — mandatory last step for every DE
         lines.append('')
         lines.append('## Quality Assurance — Mandatory Last Step')

@@ -210,6 +210,12 @@ class TestToolRegistration(unittest.TestCase):
         src = (Path(__file__).parent.parent.parent / "backend/core/tool_implementations.py").read_text()
         self.assertIn("measure_assumption", src)
 
+    def test_create_document_registered_in_tool_library(self):
+        """create_document must be in TOOL_LIBRARY so DEs can produce public-URL links."""
+        src = (Path(__file__).parent.parent.parent / "backend/core/tool_implementations.py").read_text()
+        self.assertIn("create_document", src)
+        self.assertIn("public_url", src)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
