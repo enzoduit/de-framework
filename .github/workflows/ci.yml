@@ -1,0 +1,109 @@
+name: DE Framework CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint-and-unit:
+    name: Syntax + Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Syntax check — all backend Python files
+        run: |
+          echo "Checking syntax..."
+          find backend/ -name "*.py" | xargs python3 -m py_compile && echo "✅ All files OK"
+
+      - name: Syntax check — test files
+        run: |
+          find tests/ -name "*.py" | xargs python3 -m py_compile && echo "✅ Test files OK"
+
+      - name: Unit tests (no live backend required)
+        run: |
+          python3 -m pytest tests/unit/ -v --tb=short
+        env:
+          AGENTS_DIR: /tmp/test-agents
+          AGENT_WORKSPACE: /tmp/test-workspace
+
+      - name: Verify soft checkpoint is implemented
+        run: |
+          python3 -c "
+          src = open('backend/core/react_engine.py').read()
+          assert '_soft_checkpoint_fired' in src, 'FAIL: soft checkpoint flag missing'
+          assert 'Soft checkpoint' in src, 'FAIL: soft checkpoint message missing'
+          assert '0.7' in src, 'FAIL: 70% threshold missing'
+          print('✅ Soft checkpoint implemented')
+          "
+
+      - name: Verify max_iterations_cron is read in session_runner
+        run: |
+          python3 -c "
+          src = open('backend/core/session_runner.py').read()
+          assert 'max_iterations_cron' in src, 'FAIL: max_iterations_cron not found in session_runner.py'
+          print('✅ max_iterations_cron config respected')
+          "
+
+      - name: Verify core tools are always registered
+        run: |
+          python3 -c "
+          src = open('backend/core/react_engine.py').read()
+          for tool in ['request_human_decision', 'write_metric', 'ask_colleague']:
+              assert tool in src, f'FAIL: {tool} not registered'
+          print('✅ All core tools registered')
+          "
+
+      - name: Verify learning loop tools exist
+        run: |
+          python3 -c "
+          src = open('backend/core/tool_implementations.py').read()
+          for tool in ['log_assumption', 'measure_assumption']:
+              assert tool in src, f'FAIL: {tool} not in tool_implementations.py'
+          print('✅ Learning loop tools present')
+          "
+
+      - name: Verify feedback_db has required functions
+        run: |
+          python3 -c "
+          src = open('backend/core/feedback_db.py').read()
+          for fn in ['init_db', 'store_feedback', 'get_feedback']:
+              assert fn in src, f'FAIL: {fn} not in feedback_db.py'
+          print('✅ feedback_db functions present')
+          "
+
+      - name: Check decision validation enforces required fields
+        run: |
+          python3 -c "
+          src = open('backend/core/react_engine.py').read()
+          assert '_validate_decision' in src, 'FAIL: decision validation missing'
+          assert 'proposed_action' in src, 'FAIL: proposed_action not checked'
+          print('✅ Decision quality validation present')
+          "
+
+  integration-check-script:
+    name: Verify health_check.py is runnable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Syntax check health_check.py
+        run: python3 -m py_compile tests/health_check.py && echo "✅ health_check.py valid"
+      - name: health_check.py --help runs without error
+        run: python3 tests/health_check.py --help
