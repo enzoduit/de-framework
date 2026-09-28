@@ -37,6 +37,35 @@ def _session_key(de_name: str) -> str:
     return f'{_SESSION_KEY_PREFIX}{de_name}'
 
 
+def _load_chat_workspace_context(de_name: str) -> str:
+    """Load compact workspace context for chat mode.
+    Includes MEMORY.md content + list of other workspace files.
+    Used inline in the prompt since chat mode has no tool calls.
+    """
+    ws = AGENTS_BASE / de_name / 'workspace'
+    if not ws.exists():
+        return ''
+    parts = []
+    priority = ['MEMORY.md', 'README.md']
+    found = set()
+    for fname in priority:
+        fp = ws / fname
+        if fp.exists():
+            text = fp.read_text(errors='replace')[:1500]
+            parts.append(f'### {fname}\n{text}')
+            found.add(fname)
+    others = [
+        f for f in sorted(ws.iterdir())
+        if f.is_file() and f.name not in found and not f.name.startswith('.')
+    ]
+    if others:
+        file_list = ', '.join(f.name for f in others[:10])
+        parts.append(f'Other workspace files (ask Ed to run a session if you need to read them): {file_list}')
+    if not parts:
+        return ''
+    return '\n\n## Your Workspace\n' + '\n\n'.join(parts)
+
+
 def _build_message(de: dict, user_message: str, context_update: str = '') -> str:
     """
     Prepend a concise DE-context header so the persistent session
@@ -48,12 +77,15 @@ def _build_message(de: dict, user_message: str, context_update: str = '') -> str
     name = de.get('display_name', de.get('name', '').upper())
     role = de.get('role', 'Digital Employee')
     mission = de.get('mission', '')
+    de_name = de.get('name', '')
     context_block = f'{context_update}\n' if context_update else ''
+    ws_context = _load_chat_workspace_context(de_name)
     return (
         f'[CHAT MODE — You are {name}, Ed\'s {role}. '
         f'Mission: {mission}\n'
-        f'RULES: Answer from memory. NO tool calls or file reads unless Ed explicitly asks. '
-        f'Keep replies short (2-4 sentences max). Be direct and conversational.]\n\n'
+        f'RULES: Answer from memory/workspace below. NO tool calls unless Ed explicitly asks. '
+        f'Keep replies short (2-4 sentences max). Be direct and conversational.]'
+        f'{ws_context}\n\n'
         f'{context_block}'
         f'{user_message}'
     )

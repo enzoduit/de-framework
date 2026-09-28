@@ -447,8 +447,15 @@ def check_portal_endpoints():
     print("\n── 7. Portal Endpoints ──────────────────────────────────────────")
     CAT = "portal"
 
-    code, _ = api("GET", "/decisions")
+    code, body = api("GET", "/decisions")
     check("GET /decisions", CAT, code == 200, f"status={code}")
+    check("GET /decisions returns pending + resolved keys", CAT,
+          isinstance(body, dict) and 'pending' in body and 'resolved' in body,
+          f"keys={list((body or {}).keys())}")
+    _pending = (body or {}).get('pending', [])
+    check("GET /decisions pending sorted newest-first", CAT,
+          len(_pending) < 2 or _pending[0].get('created_at','') >= _pending[-1].get('created_at',''),
+          f"{len(_pending)} pending decisions")
 
     code, body = api("GET", "/tools")
     tools = (body or {}).get("tools", body if isinstance(body, list) else [])
@@ -504,6 +511,40 @@ def check_portal_endpoints():
         )
     else:
         skip("POST /chat/<de> — no known DE found", CAT, "scribe/geo/max/flow not configured")
+
+    # ── Workspace upload (new: any-file upload to DE workspace) ──────────────
+    if _chat_de:
+        import tempfile, os as _os
+        _tmp = tempfile.NamedTemporaryFile(suffix='.txt', delete=False, mode='w')
+        _tmp.write('health-check upload test')
+        _tmp.close()
+        try:
+            with open(_tmp.name, 'rb') as _f:
+                import urllib.request as _ur, urllib.parse as _up
+                _boundary = 'hcboundary'
+                _body = (
+                    f'--{_boundary}\r\nContent-Disposition: form-data; name="file"; filename="hc-upload-test.txt"\r\n'
+                    f'Content-Type: text/plain\r\n\r\nhealth-check upload test\r\n--{_boundary}--\r\n'
+                ).encode()
+                _req = _ur.Request(
+                    f'{BASE_URL}/de/{_chat_de}/workspace/upload',
+                    data=_body,
+                    headers={
+                        'Authorization': f'Bearer {API_TOKEN}',
+                        'Content-Type': f'multipart/form-data; boundary={_boundary}',
+                    },
+                    method='POST',
+                )
+                try:
+                    _resp = _ur.urlopen(_req, timeout=10)
+                    _code = _resp.status
+                    _rbody = json.loads(_resp.read())
+                    check('POST /de/<de>/workspace/upload returns 200', CAT,
+                          _code == 200 and (_rbody or {}).get('ok'), f"status={_code}")
+                except Exception as _ue:
+                    check('POST /de/<de>/workspace/upload returns 200', CAT, False, str(_ue))
+        finally:
+            _os.unlink(_tmp.name)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
