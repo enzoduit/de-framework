@@ -97,6 +97,9 @@ class ReActEngine:
         # Always add the write_metric tool (agent-context-aware)
         self._register_write_metric_tool()
 
+        # Soft checkpoint state — fires once at 70% of max_iterations
+        self._soft_checkpoint_fired = False
+
         # Build system prompt (includes KPI list from metrics.json)
         self._system_prompt = self._build_system_prompt()
 
@@ -780,6 +783,28 @@ class ReActEngine:
                     # Check if human decision was requested → stop after this iteration
                     if tool_name == "request_human_decision":
                         human_decision_triggered = True
+
+                # ── Soft checkpoint: reflect before hitting hard limit ────────────
+                if (not self._soft_checkpoint_fired and
+                        iterations >= int(self.max_iterations * 0.7)):
+                    self._soft_checkpoint_fired = True
+                    remaining = self.max_iterations - iterations
+                    checkpoint_text = (
+                        f"\u23f1 Soft checkpoint \u2014 {iterations}/{self.max_iterations} "
+                        f"iterations used, {remaining} remaining. "
+                        f"Assess: do you have valuable work left that justifies continuing? "
+                        f"If YES \u2192 continue autonomously. "
+                        f"If NO \u2192 write your final summary and stop cleanly. "
+                        f"This is your call \u2014 no human input needed."
+                    )
+                    tool_results.append({"type": "text", "text": checkpoint_text})
+                    print(f"  [ReAct] \u23f1 Soft checkpoint at iteration {iterations}/{self.max_iterations}")
+                    self._log({"type": "soft_checkpoint", "iteration": iterations, "max": self.max_iterations})
+                    if self.session is not None:
+                        self.session.add_step(
+                            "reasoning",
+                            content=f"[Soft checkpoint \u2014 {iterations}/{self.max_iterations} iterations]",
+                        )
 
                 messages.append({"role": "user", "content": tool_results})
 
